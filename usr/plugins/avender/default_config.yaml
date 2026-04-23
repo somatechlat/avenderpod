@@ -1,12 +1,7 @@
 # ¡A VENDER! Plugin — Default Configuration
-# Settings are editable via the plugin's config.html UI or directly in config.json
+# Settings are managed via the Agent Zero Plugin Settings UI.
+# NEVER commit real credentials, PINs, or tokens here.
 
-# Chatwoot Connectivity
-chatwoot_url: ""
-chatwoot_api_token: ""
-chatwoot_account_id: "1"
-chatwoot_inbox_id: ""
-webhook_secret: ""
-
-# Admin Backdoor
-admin_pin: "0000"
+# Admin Backdoor (set via Plugin Settings UI — never hardcode)
+# The admin_pin is set by the tenant during first login and stored encrypted in config.json
+admin_pin: ""
