@@ -23,7 +23,7 @@ def test_avender_onboarding_full_flow(page: Page):
     # 2. Go to the Onboarding Wizard
     
     # Mock the catalog parsing endpoint to return 2 fake items when the PDF is uploaded
-    page.route("**/api/plugins/avender/parse_catalog", lambda route: route.fulfill(
+    page.route("**/api/plugins/avender/parse_catalog_api", lambda route: route.fulfill(
         status=200,
         content_type="application/json",
         body='{"ok": true, "items": [{"name": "Hamburguesa Doble", "price": "7.50"}, {"name": "Papas Medianas", "price": "2.50"}]}'

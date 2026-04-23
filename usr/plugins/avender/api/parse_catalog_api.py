@@ -1,7 +1,5 @@
 from helpers.api import ApiHandler, Request, Response
 from helpers.print_style import PrintStyle
-from initialize import initialize_agent
-from agent import Agent
 from langchain_core.messages import HumanMessage
 import json
 import os
@@ -81,14 +79,16 @@ class ParseCatalogHandler(ApiHandler):
                         text = f.read()
                 
                 if text:
-                    catalog_data = text
+                    # Limit text to 20,000 characters to avoid breaking the LLM context window
+                    catalog_data = text[:20000]
+                    if len(text) > 20000:
+                        PrintStyle.warning(f"Catalog text truncated from {len(text)} to 20000 chars.")
                 
                 if os.path.exists(temp_path):
                     os.remove(temp_path)
 
-            agent_config = initialize_agent()
-            agent = Agent(0, agent_config)
-            model = agent.get_utility_model()
+            context = self.use_context("parse_catalog")
+            model = context.agent.get_utility_model()
             
             sys_prompt = (
                 "Eres un experto extractor de datos. Convierte el siguiente texto/CSV o IMAGEN cruda de un menú/catálogo "

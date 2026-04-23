@@ -130,7 +130,7 @@
                     <label class="block text-base font-medium text-gray-700 mb-4">¿Cuál es el giro de tu negocio?</label>
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <template x-for="ind in industries" :key="ind.id">
-                            <button type="button" @click="formData.archetype = ind.id; if(ind.id === 'liquor') formData.requireAgeVerification = true;" 
+                            <button type="button" @click="formData.archetype = ind.id; if(ind.id === 'liquor' || ind.id === 'cbd') formData.requireAgeVerification = true;" 
                                 :class="formData.archetype === ind.id ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-500 shadow-md transform scale-105' : 'border-gray-200 bg-white hover:border-indigo-200 hover:shadow-sm'"
                                 class="flex flex-col items-center justify-center p-5 border-2 rounded-2xl transition-all duration-300 ease-in-out cursor-pointer group">
                                 <span class="text-4xl mb-3 group-hover:scale-110 transition-transform duration-300" x-text="ind.icon"></span>
@@ -517,6 +517,7 @@
                     { id: 'pharmacy', name: 'Farmacia', icon: '💊' },
                     { id: 'hardware', name: 'Ferretería', icon: '🔨' },
                     { id: 'liquor', name: 'Licorería', icon: '🍷' },
+                    { id: 'cbd', name: 'Cannabis / CBD', icon: '🌿' },
                     { id: 'other', name: 'Otro Negocio', icon: '📦' }
                 ],
                 catalogFileName: '',

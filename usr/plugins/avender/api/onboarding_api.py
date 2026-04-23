@@ -100,6 +100,13 @@ PRESETS = {
         {"name": "Clavos / Tornillos", "price": 0.00, "description": "Por libra o docena", "metadata": {}},
         {"name": "Tubos PVC", "price": 0.00, "description": "Tubería estándar", "metadata": {}},
         {"name": "Herramienta Manual", "price": 0.00, "description": "Martillo, destornillador, etc.", "metadata": {}}
+    ],
+    "cbd": [
+        {"name": "Aceite de CBD 500mg", "price": 0.00, "description": "Gotero 30ml, espectro completo", "metadata": {}},
+        {"name": "Aceite de CBD 1000mg", "price": 0.00, "description": "Gotero 30ml, alta concentración", "metadata": {}},
+        {"name": "Gomitas de CBD", "price": 0.00, "description": "Frasco de 30 gomitas relajantes", "metadata": {}},
+        {"name": "Bálsamo Muscular CBD", "price": 0.00, "description": "Crema para alivio de dolor articular", "metadata": {}},
+        {"name": "Flores Aromáticas CBD", "price": 0.00, "description": "1 gramo, cepa relajante (Uso legal EC)", "metadata": {}}
     ]
 }
 
