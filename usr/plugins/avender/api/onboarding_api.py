@@ -130,10 +130,18 @@ class AvenderOnboardingHandler(ApiHandler):
                 return {"ok": False, "error": "Onboarding already completed. Use the admin panel to modify settings."}
 
             # 2. Validate required fields
-            required_fields = ["idType", "idNumber", "tradeName", "archetype"]
+            required_fields = ["idType", "idNumber", "tradeName", "archetype", "whatsappNumber"]
             missing = [f for f in required_fields if not input.get(f)]
             if missing:
-                return {"ok": False, "error": f"Missing required fields: {', '.join(missing)}"}
+                return {"ok": False, "error": f"Faltan campos obligatorios: {', '.join(missing)}"}
+
+            # 2.1 Validate number restrictions
+            restrict_access = input.get("restrictAccess", False)
+            allowed_numbers = input.get("allowedNumbers", "")
+            if restrict_access and allowed_numbers:
+                numbers_list = [n.strip() for n in allowed_numbers.split(',') if n.strip()]
+                if len(numbers_list) > 100:
+                    return {"ok": False, "error": "No puedes agregar más de 100 números permitidos."}
 
             # 3. Save all wizard data to tenant_config KV store
             save_tenant_config(input)

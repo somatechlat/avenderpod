@@ -51,3 +51,8 @@ agent_history.gif
 .agent/**
 .claude/**
 !usr/plugins/avender/**
+
+# Ignore databases
+*.db
+*.sqlite3
+

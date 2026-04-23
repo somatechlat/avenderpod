@@ -34,8 +34,20 @@ class ParseCatalogHandler(ApiHandler):
             if "," in b64_content:
                 b64_content = b64_content.split(",", 1)[1]
             
-            file_bytes = base64.b64decode(b64_content)
+            # 1. Enforce max file size: 100MB (approximate using base64 length)
+            # Base64 length * 0.75 gives approximate bytes. 100MB = 104,857,600 bytes.
+            approx_size = len(b64_content) * 0.75
+            if approx_size > 104_857_600:
+                return {"ok": False, "error": "El archivo es demasiado grande. El límite es de 100 MB."}
+                
             ext = os.path.splitext(name)[1].lower()
+            
+            # 2. Strict whitelist of allowed extensions (no zip allowed, no code injection)
+            allowed_extensions = [".png", ".jpg", ".jpeg", ".pdf", ".xls", ".xlsx", ".doc", ".docx", ".txt", ".csv"]
+            if ext not in allowed_extensions or ext == ".zip":
+                return {"ok": False, "error": f"Tipo de archivo no permitido. Solo se permiten imágenes, PDF, Excel, Word y texto plano."}
+
+            file_bytes = base64.b64decode(b64_content)
             
             catalog_data = ""
             image_b64 = None

@@ -88,6 +88,8 @@ The system operates as a **Tiered Pod Architecture**:
 * **Data Minimization:** LLM prompts tuned to extract only necessary information (name, phone, order details).
 * **Admin Backdoor Timeout:** WhatsApp-based owner mode auto-expires after 10 minutes of inactivity.
 * **ISO Compliance Note:** The architecture provides strict tenant separation via isolated JSON stores or schemas, aligning with Ecuadorian LOPDP requirements.
+* **REQ-5.1.1 — File Ingestion Security:** All uploaded catalogs MUST be validated against a strict whitelist of extensions (`.png`, `.jpg`, `.jpeg`, `.pdf`, `.xls`, `.xlsx`, `.doc`, `.docx`, `.txt`, `.csv`). ZIP archives and executables are strictly prohibited to prevent code injection. File size is hard-capped at 100MB.
+* **REQ-5.1.2 — WhatsApp Access Control:** The system allows tenants to capture their designated WhatsApp number during onboarding. It also provides a "Restrict Access" security feature, allowing the tenant to supply a comma-separated list of up to 100 authorized phone numbers. If enabled, the Agent MUST ignore all messages from unlisted numbers, ensuring a closed sandbox for testing or internal B2B use.
 
 ---
 **End of Specification.**
