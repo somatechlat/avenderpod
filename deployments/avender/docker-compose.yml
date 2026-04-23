@@ -1,170 +1,18 @@
 # ============================================================================
-# ¡A VENDER! — Production Docker Compose Orchestration
+# ¡A VENDER! — Production Docker Compose Orchestration (v2.0 — Chatwoot-Free)
 # ============================================================================
-# Port Range: 45001–45003 (isolated from host dev services)
-# Startup Order: postgres → redis → chatwoot_migrate → chatwoot_web/worker → whisper → agent_zero
-# All services have: health checks, memory limits, restart policies, logging limits
+# Port Range: 45001–45002 (isolated from host dev services)
+# Stack: 2 services only — agent_zero (Baileys native WA) + whisper
+# Startup Order: whisper → agent_zero
+# RAM Budget: ~4GB total (was ~6.5GB with Chatwoot)
+# All services have: health checks, memory limits, restart policies, log rotation
 # ============================================================================
-
-x-chatwoot-env: &chatwoot-env
-  SECRET_KEY_BASE: ${CHATWOOT_SECRET_KEY_BASE}
-  FRONTEND_URL: http://localhost:45003
-  POSTGRES_DATABASE: chatwoot
-  POSTGRES_HOST: postgres
-  POSTGRES_USERNAME: postgres
-  POSTGRES_PASSWORD: ${CHATWOOT_POSTGRES_PASSWORD:-avender_secret}
-  REDIS_URL: redis://:${CHATWOOT_REDIS_PASSWORD:-avender_secret}@redis:6379/
 
 services:
 
   # ==========================================================================
-  # TIER 1 — DATA LAYER: PostgreSQL (pgvector) + Redis
-  # ==========================================================================
-
-  postgres:
-    image: pgvector/pgvector:pg15
-    restart: unless-stopped
-    container_name: avender_cw_db
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-        reservations:
-          memory: 256M
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    environment:
-      POSTGRES_DB: chatwoot
-      POSTGRES_PASSWORD: ${CHATWOOT_POSTGRES_PASSWORD:-avender_secret}
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d chatwoot"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    networks:
-      - avender_network
-
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    container_name: avender_cw_redis
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-        reservations:
-          memory: 64M
-    command:
-      - sh
-      - -c
-      - redis-server --requirepass "${CHATWOOT_REDIS_PASSWORD:-avender_secret}" --maxmemory 200mb --maxmemory-policy allkeys-lru --appendonly yes
-    volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${CHATWOOT_REDIS_PASSWORD:-avender_secret}", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-      start_period: 5s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    networks:
-      - avender_network
-
-  # ==========================================================================
-  # TIER 1 — CHATWOOT: Migration (one-shot) → Web → Worker
-  # ==========================================================================
-
-  chatwoot_migrate:
-    image: chatwoot/chatwoot:latest
-    container_name: avender_cw_migrate
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    environment:
-      <<: *chatwoot-env
-    command: ['bundle', 'exec', 'rails', 'db:chatwoot_prepare']
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    networks:
-      - avender_network
-
-  chatwoot_web:
-    image: chatwoot/chatwoot:latest
-    container_name: avender_cw_web
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-        reservations:
-          memory: 512M
-    depends_on:
-      chatwoot_migrate:
-        condition: service_completed_successfully
-    ports:
-      - "45003:3000"
-    environment:
-      <<: *chatwoot-env
-    command: ['bundle', 'exec', 'rails', 's', '-p', '3000', '-b', '0.0.0.0']
-    healthcheck:
-      test: ["CMD-SHELL", "ruby -e \"require 'net/http'; r=Net::HTTP.get_response(URI('http://localhost:3000/auth/sign_in')); exit(r.code.to_i < 500 ? 0 : 1)\""]
-      interval: 15s
-      timeout: 10s
-      retries: 15
-      start_period: 90s
-    logging:
-      driver: json-file
-      options:
-        max-size: "20m"
-        max-file: "5"
-    networks:
-      - avender_network
-
-  chatwoot_worker:
-    image: chatwoot/chatwoot:latest
-    container_name: avender_cw_worker
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-        reservations:
-          memory: 256M
-    depends_on:
-      chatwoot_migrate:
-        condition: service_completed_successfully
-    environment:
-      <<: *chatwoot-env
-    command: ['bundle', 'exec', 'sidekiq', '-C', 'config/sidekiq.yml']
-    logging:
-      driver: json-file
-      options:
-        max-size: "20m"
-        max-file: "5"
-    networks:
-      - avender_network
-
-  # ==========================================================================
   # TIER 1.5 — CENTRALIZED TRANSCRIPTION ENGINE (Whisper)
+  # CPU-only, handles OGG voice notes from WhatsApp customers
   # ==========================================================================
 
   whisper_server:
@@ -174,8 +22,10 @@ services:
     deploy:
       resources:
         limits:
+          cpus: '1.0'
           memory: 1G
         reservations:
+          cpus: '0.5'
           memory: 512M
     ports:
       - "45002:8000"
@@ -197,10 +47,11 @@ services:
       - avender_network
 
   # ==========================================================================
-  # TIER 2 — COGNITIVE ENGINE (Agent Zero + Avender Plugin)
+  # TIER 2 — COGNITIVE ENGINE (Agent Zero + Avender Plugin + Baileys WA Bridge)
   # ==========================================================================
-  # LLM API key is configured via Agent Zero's built-in settings UI,
-  # NOT injected via environment variables.
+  # LLM API key: configured via Agent Zero's built-in settings UI.
+  # WhatsApp: uses native _whatsapp_integration plugin (Baileys bridge, port 3100 internal).
+  # Admin portals served at /plugins/avender/tenant_admin and /plugins/avender/system_admin
   # ==========================================================================
 
   agent_zero:
@@ -220,13 +71,14 @@ services:
     depends_on:
       whisper_server:
         condition: service_healthy
-      chatwoot_web:
-        condition: service_healthy
     ports:
       - "45001:80"
     volumes:
       - ../../usr:/a0/usr
       - a0_workdir:/a0/usr/workdir
+    environment:
+      # Avender setup token — prevents unauthorized onboarding calls
+      AVENDER_SETUP_TOKEN: ${AVENDER_SETUP_TOKEN:-change_me_before_production}
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:80 || exit 1"]
       interval: 15s
@@ -247,9 +99,5 @@ networks:
     name: avender_network
 
 volumes:
-  postgres_data:
-    name: avender_postgres_data
-  redis_data:
-    name: avender_redis_data
   a0_workdir:
     name: avender_a0_workdir
