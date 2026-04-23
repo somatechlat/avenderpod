@@ -90,6 +90,7 @@ The system operates as a **Tiered Pod Architecture**:
 * **ISO Compliance Note:** The architecture provides strict tenant separation via isolated JSON stores or schemas, aligning with Ecuadorian LOPDP requirements.
 * **REQ-5.1.1 — File Ingestion Security:** All uploaded catalogs MUST be validated against a strict whitelist of extensions (`.png`, `.jpg`, `.jpeg`, `.pdf`, `.xls`, `.xlsx`, `.doc`, `.docx`, `.txt`, `.csv`). ZIP archives and executables are strictly prohibited to prevent code injection. File size is hard-capped at 100MB.
 * **REQ-5.1.2 — WhatsApp Access Control:** The system allows tenants to capture their designated WhatsApp number during onboarding. It also provides a "Restrict Access" security feature, allowing the tenant to supply a comma-separated list of up to 100 authorized phone numbers. If enabled, the Agent MUST ignore all messages from unlisted numbers, ensuring a closed sandbox for testing or internal B2B use.
+* **REQ-5.1.3 — Age Verification (18+):** For sensitive industries such as Liquor ("Licorería") and Cannabis/CBD ("Cannabis / CBD"), the system MUST enforce strict age verification in accordance with Ecuadorian regulations. The Agent is obligated to intercept the sales flow and demand the user to upload a photo of a valid government ID via WhatsApp before continuing the transaction. The sale must be aborted if the ID is not provided.
 
 ---
 **End of Specification.**
