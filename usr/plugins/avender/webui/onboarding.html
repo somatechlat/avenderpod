@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
-<body class="min-h-screen flex items-center justify-center p-4 md:p-8 bg-gray-50">
+<body class="min-h-screen flex flex-col items-center justify-center p-4 md:p-8 bg-gray-50">
 
     <div x-data="avenderWizard()" class="bg-white rounded-3xl shadow-2xl w-full max-w-3xl p-6 md:p-10 mx-auto overflow-hidden">
         
@@ -523,7 +523,7 @@
                         };
                         
                         try {
-                            const resp = await fetch('/api/plugins/avender/parse_catalog', {
+                            const resp = await fetch('/api/plugins/avender/parse_catalog_api', {
                                 method: 'POST',
                                 headers: {'Content-Type': 'application/json'},
                                 body: JSON.stringify({catalogFile: this.formData.catalogFile})
@@ -613,7 +613,7 @@
                     });
 
                     try {
-                        const resp = await fetch('/api/plugins/avender/wizard_chat', {
+                        const resp = await fetch('/api/plugins/avender/wizard_chat_api', {
                             method: 'POST',
                             headers: {'Content-Type': 'application/json'},
                             body: JSON.stringify(payload)
