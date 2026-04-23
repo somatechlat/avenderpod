@@ -38,6 +38,17 @@ class AvenderBusinessRules(Extension):
         use_slang_val = str(get_tenant_config("useSlang")).lower() == "true"
         slang_directive = "Puedes usar modismos locales moderadamente." if use_slang_val else "Mantén un lenguaje profesional sin modismos locales."
 
+        # Age Verification Constraint (LOPDP / Ecuadorian Law)
+        require_age_verification = str(get_tenant_config("requireAgeVerification")).lower() == "true"
+        age_verification_directive = ""
+        if require_age_verification:
+            age_verification_directive = (
+                "⚠️ RESTRICCIÓN LEGAL (ECUADOR - 18+): Este negocio vende productos regulados (ej: Licor). "
+                "ES ESTRICTAMENTE OBLIGATORIO que antes de cerrar cualquier venta o cobrar, pidas al cliente que envíe "
+                "una FOTO DE SU CÉDULA DE IDENTIDAD en el chat de WhatsApp. Si no envían la foto o son menores de 18 años, "
+                "CANCELA LA VENTA INMEDIATAMENTE explicando que la ley ecuatoriana lo prohíbe. NO HAY EXCEPCIONES.\n"
+            )
+
         rules = (
             f"\n\n[REGLAS DEL NEGOCIO - ¡A VENDER!]\n"
             f"Eres el asistente virtual oficial de '{trade_name}'. Tu nombre es {agent_name}.\n"
@@ -47,6 +58,7 @@ class AvenderBusinessRules(Extension):
             f"Reglas de Delivery / Cobertura: {delivery_rules}\n"
             f"Políticas Internas (Estrictas): {policies}\n"
             f"Métodos de Pago Aceptados: {methods_str}\n\n"
+            f"{age_verification_directive}"
             f"INSTRUCCIÓN CRÍTICA: SIEMPRE respeta estas políticas, horarios y métodos de pago. "
             f"Si el cliente pide algo fuera de tus capacidades o que rompe las políticas, "
             f"explica amablemente que no es posible y ofrece una alternativa válida dentro de tus reglas."
