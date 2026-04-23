@@ -1,0 +1,12 @@
+# ¡A VENDER! Plugin — Default Configuration
+# Settings are editable via the plugin's config.html UI or directly in config.json
+
+# Chatwoot Connectivity
+chatwoot_url: ""
+chatwoot_api_token: ""
+chatwoot_account_id: "1"
+chatwoot_inbox_id: ""
+webhook_secret: ""
+
+# Admin Backdoor
+admin_pin: "0000"
