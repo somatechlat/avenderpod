@@ -21,19 +21,26 @@ def test_avender_onboarding_full_flow(page: Page):
         page.wait_for_url("**/")
 
     # 2. Go to the Onboarding Wizard
+    
+    # Mock the catalog parsing endpoint to return 2 fake items when the PDF is uploaded
+    page.route("**/api/plugins/avender/parse_catalog", lambda route: route.fulfill(
+        status=200,
+        content_type="application/json",
+        body='{"ok": true, "items": [{"name": "Hamburguesa Doble", "price": "7.50"}, {"name": "Papas Medianas", "price": "2.50"}]}'
+    ))
+
     page.goto(f"{BASE_URL}/usr/plugins/avender/webui/onboarding.html")
-    expect(page).to_have_title("¡A VENDER! - Onboarding")
+    expect(page).to_have_title("¡A VENDER! - Activación de Asistente")
 
     # -- Step 1: Datos de tu Negocio --
-    expect(page.locator("h2").filter(has_text="Paso 1: Datos de tu Negocio")).to_be_visible()
-    page.fill("input[placeholder='Ej: Restaurante El Buen Sabor']", "Restaurante E2E Test")
+    expect(page.locator("h2").filter(has_text="Paso 1: Tu Negocio")).to_be_visible()
+    page.fill("input[placeholder='Ej: Juan Pérez S.A.']", "Restaurante E2E Test")
     page.select_option("select", "RUC")
-    page.fill("input[placeholder='Ej: 1791234567001']", "1791234567001")
-    page.check("input[type='checkbox']")  # accept terms
+    page.fill("input[placeholder='Ej: 1712345678001']", "1791234567001")
     page.click("button:has-text('Siguiente')")
 
     # -- Step 2: Operaciones y Delivery --
-    expect(page.locator("h2").filter(has_text="Paso 2: Operaciones y Delivery")).to_be_visible()
+    expect(page.locator("h2").filter(has_text="Paso 2: Operaciones")).to_be_visible()
     # Click to use current location (mocked or just click)
     page.click("button:has-text('🗺️ Capturar mi ubicación actual')")
     page.wait_for_timeout(1000) # Wait for Leaflet to catch up
@@ -41,9 +48,31 @@ def test_avender_onboarding_full_flow(page: Page):
     page.click("button:has-text('Siguiente')")
 
     # -- Step 3: Industria y Catálogo --
-    expect(page.locator("h2").filter(has_text="Paso 3: Industria y Catálogo")).to_be_visible()
+    expect(page.locator("h2").filter(has_text="Paso 3: Tu Catálogo")).to_be_visible()
     # Click the "Restaurante / Comidas" card
     page.click("div:has-text('🍔') >> text=Restaurante / Comidas")
+    
+    # Create a mock PDF file to upload
+    with open("mock_catalog.pdf", "w") as f:
+        f.write("Mock PDF Content")
+    
+    # Upload the PDF
+    page.set_input_files("input[type='file'][id='file-upload']", "mock_catalog.pdf")
+    # Wait for the table to appear with our mocked items
+    expect(page.locator("text=Hamburguesa Doble")).to_be_visible()
+    
+    # Edit the price of the first item
+    page.fill("input[type='number'] >> nth=0", "8.99")
+    
+    # Create a mock image file to upload
+    with open("mock_image.jpg", "w") as f:
+        f.write("Mock Image Content")
+
+    # Upload the image to the first item
+    page.set_input_files("input[type='file'][accept='image/*'] >> nth=0", "mock_image.jpg")
+    
+    page.fill("textarea[placeholder='Escribe tus promociones aquí...']", "2x1 los Martes")
+    
     page.click("button:has-text('Siguiente')")
 
     # -- Step 4: Personalidad --
