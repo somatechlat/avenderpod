@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>¡A VENDER! - Panel de Control</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+    <script type="module">
+        import { LitElement, html, css } from 'https://cdn.jsdelivr.net/gh/lit/dist@3/core/lit-core.min.js';
+
+        class AdminDashboard extends LitElement {
+            static properties = {
+                activeTab: { type: String },
+                whatsappConnected: { type: Boolean }
+            };
+
+            constructor() {
+                super();
+                this.activeTab = 'dashboard';
+                this.whatsappConnected = false;
+            }
+
+            createRenderRoot() {
+                return this; // Disable shadow DOM for Tailwind CSS compatibility
+            }
+
+            render() {
+                return html`
+                    <div class="min-h-screen bg-gray-50 flex">
+                        <!-- Sidebar -->
+                        <aside class="w-64 bg-gray-900 text-white flex flex-col">
+                            <div class="p-6 border-b border-gray-800">
+                                <h1 class="text-2xl font-extrabold text-white">¡A VENDER!</h1>
+                                <p class="text-sm text-gray-400 mt-1">Panel de Control</p>
+                            </div>
+                            <nav class="flex-1 p-4 space-y-2">
+                                ${this.renderNavItem('dashboard', '📊 Resumen')}
+                                ${this.renderNavItem('whatsapp', '📱 Conexión WhatsApp')}
+                                ${this.renderNavItem('catalog', '📦 Catálogo y Precios')}
+                                ${this.renderNavItem('personality', '🤖 Personalidad')}
+                                ${this.renderNavItem('billing', '💳 Planes y Facturación')}
+                            </nav>
+                            <div class="p-4 border-t border-gray-800 text-xs text-gray-500 text-center">
+                                Desarrollado por somatech.dev<br>Powered by Yachaq.ai
+                            </div>
+                        </aside>
+
+                        <!-- Main Content -->
+                        <main class="flex-1 p-8 overflow-y-auto">
+                            ${this.activeTab === 'dashboard' ? this.renderDashboard() : ''}
+                            ${this.activeTab === 'whatsapp' ? this.renderWhatsApp() : ''}
+                            ${this.activeTab === 'catalog' ? this.renderCatalog() : ''}
+                            ${this.activeTab === 'personality' ? this.renderPersonality() : ''}
+                            ${this.activeTab === 'billing' ? this.renderBilling() : ''}
+                        </main>
+                    </div>
+                `;
+            }
+
+            renderNavItem(id, label) {
+                const isActive = this.activeTab === id;
+                const classes = isActive 
+                    ? 'block px-4 py-3 rounded-lg bg-indigo-600 text-white font-medium shadow-md transition-colors'
+                    : 'block px-4 py-3 rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white transition-colors cursor-pointer';
+                
+                return html`<a @click=${() => this.activeTab = id} class="${classes}">${label}</a>`;
+            }
+
+            renderDashboard() {
+                return html`
+                    <h2 class="text-3xl font-bold text-gray-900 mb-6">Hola, bienvenido a tu negocio 🚀</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                            <h3 class="text-gray-500 text-sm font-medium">Pedidos de hoy</h3>
+                            <p class="text-3xl font-bold text-gray-900 mt-2">12</p>
+                        </div>
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                            <h3 class="text-gray-500 text-sm font-medium">Ventas Generadas</h3>
+                            <p class="text-3xl font-bold text-gray-900 mt-2">$240.50</p>
+                        </div>
+                        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                            <h3 class="text-gray-500 text-sm font-medium">Estado del Agente</h3>
+                            <p class="text-xl font-bold text-green-600 mt-2 flex items-center">
+                                <span class="w-3 h-3 bg-green-500 rounded-full mr-2 animate-pulse"></span>
+                                Activo y Atendiendo
+                            </p>
+                        </div>
+                    </div>
+                `;
+            }
+
+            renderWhatsApp() {
+                return html`
+                    <h2 class="text-3xl font-bold text-gray-900 mb-2">Conexión de WhatsApp</h2>
+                    <p class="text-gray-600 mb-8">Vincula tu número de WhatsApp para que el vendedor comience a atender. (Número registrado: +593997202547)</p>
+                    
+                    <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 max-w-2xl">
+                        ${this.whatsappConnected ? html`
+                            <div class="text-center py-10">
+                                <div class="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-4xl mx-auto mb-4">✓</div>
+                                <h3 class="text-2xl font-bold text-gray-900">¡Conectado!</h3>
+                                <p class="text-gray-600 mt-2">Tu número +593997202547 está enlazado a Chatwoot.</p>
+                                <button @click=${() => this.whatsappConnected = false} class="mt-6 px-6 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 font-medium transition-colors">Desconectar</button>
+                            </div>
+                        ` : html`
+                            <div class="flex flex-col md:flex-row items-center gap-8">
+                                <div class="w-64 h-64 bg-gray-100 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center p-4">
+                                    <!-- Placeholder for Chatwoot QR -->
+                                    <div class="text-center">
+                                        <div class="w-48 h-48 bg-white shadow-sm flex items-center justify-center text-gray-400 mx-auto">
+                                            [CÓDIGO QR]
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex-1">
+                                    <h3 class="text-xl font-bold text-gray-900 mb-4">Instrucciones:</h3>
+                                    <ol class="list-decimal list-inside space-y-3 text-gray-700">
+                                        <li>Abre WhatsApp en tu teléfono celular.</li>
+                                        <li>Toca el <strong>menú</strong> o <strong>Configuración</strong>.</li>
+                                        <li>Selecciona <strong>Dispositivos vinculados</strong>.</li>
+                                        <li>Toca <strong>Vincular un dispositivo</strong>.</li>
+                                        <li>Apunta tu teléfono a esta pantalla para escanear el código QR.</li>
+                                    </ol>
+                                    <button @click=${() => this.whatsappConnected = true} class="mt-6 bg-green-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-green-700 transition-colors w-full">Simular Escaneo Exitoso</button>
+                                </div>
+                            </div>
+                        `}
+                    </div>
+                `;
+            }
+
+            renderCatalog() {
+                return html`
+                    <div class="flex justify-between items-center mb-6">
+                        <div>
+                            <h2 class="text-3xl font-bold text-gray-900">Catálogo y Precios</h2>
+                            <p class="text-gray-600">Actualiza lo que configuraste durante el onboarding.</p>
+                        </div>
+                        <button class="bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-indigo-700">+ Nuevo Producto</button>
+                    </div>
+                    
+                    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                        <table class="w-full text-left">
+                            <thead class="bg-gray-50 border-b border-gray-100">
+                                <tr>
+                                    <th class="p-4 font-semibold text-gray-600">Nombre del Producto</th>
+                                    <th class="p-4 font-semibold text-gray-600">Descripción</th>
+                                    <th class="p-4 font-semibold text-gray-600">Precio</th>
+                                    <th class="p-4 font-semibold text-gray-600">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100">
+                                <tr>
+                                    <td class="p-4 font-medium text-gray-900">Hamburguesa Clásica</td>
+                                    <td class="p-4 text-gray-500">Con queso, lechuga y tomate</td>
+                                    <td class="p-4 font-bold text-green-600">$5.50</td>
+                                    <td class="p-4 text-indigo-600 font-medium cursor-pointer hover:underline">Editar</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-4 font-medium text-gray-900">Papas Fritas</td>
+                                    <td class="p-4 text-gray-500">Porción mediana</td>
+                                    <td class="p-4 font-bold text-green-600">$2.00</td>
+                                    <td class="p-4 text-indigo-600 font-medium cursor-pointer hover:underline">Editar</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            }
+
+            renderPersonality() {
+                return html`
+                    <h2 class="text-3xl font-bold text-gray-900 mb-2">Personalidad del Vendedor</h2>
+                    <p class="text-gray-600 mb-6">Ajusta cómo responde tu asistente a los clientes.</p>
+
+                    <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 max-w-2xl space-y-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Nombre del Vendedor</label>
+                            <input type="text" value="Vendedor E2E" class="w-full border-gray-300 rounded-lg shadow-sm p-3 border focus:border-indigo-500 focus:ring-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Idioma (i18n)</label>
+                            <select class="w-full border-gray-300 rounded-lg shadow-sm p-3 border bg-white focus:border-indigo-500 focus:ring-indigo-500">
+                                <option value="es" selected>Español 🇪🇸/🇪🇨</option>
+                                <option value="en">Inglés 🇺🇸</option>
+                                <option value="pt">Portugués 🇧🇷</option>
+                                <option value="fr">Francés 🇫🇷</option>
+                                <option value="it">Italiano 🇮🇹</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Tono de voz</label>
+                            <select class="w-full border-gray-300 rounded-lg shadow-sm p-3 border bg-white focus:border-indigo-500 focus:ring-indigo-500">
+                                <option value="friendly">Amigable</option>
+                                <option value="formal">Formal</option>
+                                <option value="persuasive" selected>Persuasivo</option>
+                            </select>
+                        </div>
+                        <div class="pt-4 border-t border-gray-100">
+                            <button class="bg-gray-900 text-white px-6 py-3 rounded-lg font-bold hover:bg-black transition-colors">Guardar Cambios</button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            renderBilling() {
+                return html`
+                    <h2 class="text-3xl font-bold text-gray-900 mb-2">Planes y Facturación</h2>
+                    <p class="text-gray-600 mb-8">Escala tu negocio. Ahorra $100 contratando el plan anual.</p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+                        <!-- Lite Plan -->
+                        <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-200 relative">
+                            <h3 class="text-xl font-bold text-gray-900">Negocio Lite</h3>
+                            <div class="mt-4 flex items-baseline text-4xl font-extrabold text-gray-900">
+                                $25<span class="text-lg font-medium text-gray-500 ml-1">/mes</span>
+                            </div>
+                            <p class="text-sm text-green-600 font-medium mt-1">O $200/año (Ahorro $100)</p>
+                            <p class="mt-4 text-gray-500 text-sm">Tu primer vendedor virtual.</p>
+                            <ul class="mt-6 space-y-4">
+                                <li class="flex"><span class="text-indigo-500 mr-3">✓</span><span class="text-gray-700">1 Número de WhatsApp</span></li>
+                                <li class="flex"><span class="text-indigo-500 mr-3">✓</span><span class="text-gray-700">TOMA DE PEDIDOS (500/mes)</span></li>
+                                <li class="flex"><span class="text-indigo-500 mr-3">✓</span><span class="text-gray-700">Atención 24/7</span></li>
+                                <li class="flex"><span class="text-indigo-500 mr-3">✓</span><span class="text-gray-700">Audios (Hasta 500/mes)</span></li>
+                            </ul>
+                            <button class="mt-8 w-full bg-indigo-50 text-indigo-700 font-bold py-3 rounded-xl hover:bg-indigo-100">Plan Actual</button>
+                        </div>
+
+                        <!-- Empresa Plan -->
+                        <div class="bg-indigo-900 p-8 rounded-2xl shadow-xl border border-indigo-700 relative transform md:-translate-y-4">
+                            <div class="absolute top-0 right-0 bg-yellow-400 text-yellow-900 text-xs font-bold px-3 py-1 rounded-bl-lg rounded-tr-xl uppercase tracking-wide">Más Recomendado</div>
+                            <h3 class="text-xl font-bold text-white">Empresa Total</h3>
+                            <div class="mt-4 flex items-baseline text-4xl font-extrabold text-white">
+                                $50<span class="text-lg font-medium text-indigo-300 ml-1">/mes</span>
+                            </div>
+                            <p class="text-sm text-yellow-400 font-medium mt-1">O $500/año (Ahorro $100)</p>
+                            <p class="mt-4 text-indigo-200 text-sm">Vendedor Virtual para órdenes reales.</p>
+                            <ul class="mt-6 space-y-4">
+                                <li class="flex"><span class="text-yellow-400 mr-3">✓</span><span class="text-white">Hasta 5 Números WA</span></li>
+                                <li class="flex"><span class="text-yellow-400 mr-3">✓</span><span class="text-white">PEDIDOS (1000/mes)</span></li>
+                                <li class="flex"><span class="text-yellow-400 mr-3">✓</span><span class="text-white">Audios (1000/mes)</span></li>
+                                <li class="flex"><span class="text-yellow-400 mr-3">✓</span><span class="text-white">Escaneo Imágenes (10/mes)</span></li>
+                                <li class="flex"><span class="text-yellow-400 mr-3">✓</span><span class="text-white">Gestión de entregas</span></li>
+                            </ul>
+                            <button class="mt-8 w-full bg-white text-indigo-900 font-bold py-3 rounded-xl hover:bg-gray-50 shadow-md">Mejorar Plan</button>
+                        </div>
+
+                        <!-- Corporativo -->
+                        <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-200">
+                            <h3 class="text-xl font-bold text-gray-900">Corporativo</h3>
+                            <div class="mt-4 flex items-baseline text-4xl font-extrabold text-gray-900">
+                                A medida
+                            </div>
+                            <p class="mt-4 text-gray-500 text-sm">Para grandes volúmenes.</p>
+                            <ul class="mt-6 space-y-4">
+                                <li class="flex"><span class="text-indigo-500 mr-3">✓</span><span class="text-gray-700">Múltiples líneas</span></li>
+                                <li class="flex"><span class="text-indigo-500 mr-3">✓</span><span class="text-gray-700">Integraciones personalizadas</span></li>
+                                <li class="flex"><span class="text-indigo-500 mr-3">✓</span><span class="text-gray-700">Seguridad Bancaria</span></li>
+                            </ul>
+                            <button class="mt-8 w-full bg-gray-900 text-white font-bold py-3 rounded-xl hover:bg-black">Hablar con Asesor</button>
+                        </div>
+                    </div>
+
+                    <!-- Extras / Addons -->
+                    <h3 class="text-2xl font-bold text-gray-900 mb-4">Complementos (Add-ons)</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl">
+                        <div class="flex items-center justify-between p-5 bg-white border border-gray-200 rounded-xl">
+                            <div>
+                                <h4 class="font-bold text-gray-900">Soporte para Audios Extra</h4>
+                                <p class="text-sm text-gray-500">+1000 audios adicionales por mes</p>
+                            </div>
+                            <div class="flex items-center">
+                                <span class="font-bold text-gray-900 mr-4">$15/mes</span>
+                                <button class="px-4 py-2 bg-gray-100 text-gray-800 font-medium rounded-lg hover:bg-gray-200">Añadir</button>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between p-5 bg-white border border-gray-200 rounded-xl">
+                            <div>
+                                <h4 class="font-bold text-gray-900">Número de WhatsApp Adicional</h4>
+                                <p class="text-sm text-gray-500">Añade 1 número extra a tu plan</p>
+                            </div>
+                            <div class="flex items-center">
+                                <span class="font-bold text-gray-900 mr-4">$10/mes</span>
+                                <button class="px-4 py-2 bg-gray-100 text-gray-800 font-medium rounded-lg hover:bg-gray-200">Añadir</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        customElements.define('admin-dashboard', AdminDashboard);
+    </script>
+</head>
+<body class="bg-gray-50 m-0 p-0 overflow-x-hidden">
+    <admin-dashboard></admin-dashboard>
+</body>
+</html>

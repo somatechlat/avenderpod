@@ -56,3 +56,11 @@ agent_history.gif
 *.db
 *.sqlite3
 
+
+# Playwright artifacts
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+*.spec.js.snap
+

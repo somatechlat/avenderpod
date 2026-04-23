@@ -200,13 +200,23 @@
 
         <!-- Step 4: Personalidad -->
         <div x-show="step === 4" x-transition.opacity style="display: none;">
-            <h2 class="text-2xl font-bold mb-2">Paso 4: Personalidad</h2>
+            <h2 class="text-2xl font-bold mb-2">Paso 4: Personalidad e Idioma</h2>
             <p class="text-gray-500 mb-6 text-sm">Dale vida a tu nuevo vendedor virtual.</p>
             <div class="space-y-6">
                 <div>
                     <label class="block text-base font-medium text-gray-700">¿Cómo se llamará?</label>
                     <p class="text-xs text-gray-500 mb-1">Un nombre humano genera más confianza que decir "Soy un bot".</p>
                     <input type="text" x-model="formData.agentName" placeholder="Ej: Sofía, Carlos, Asistente Estrella" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 text-base border">
+                </div>
+                <div>
+                    <label class="block text-base font-medium text-gray-700">¿En qué idioma debe responder? (i18n)</label>
+                    <select x-model="formData.language" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-4 text-base border bg-white">
+                        <option value="es">Español 🇪🇸/🇪🇨</option>
+                        <option value="en">Inglés 🇺🇸</option>
+                        <option value="pt">Portugués 🇧🇷</option>
+                        <option value="fr">Francés 🇫🇷</option>
+                        <option value="it">Italiano 🇮🇹</option>
+                    </select>
                 </div>
                 <div>
                     <label class="block text-base font-medium text-gray-700">¿Cómo debe hablar?</label>
@@ -227,7 +237,7 @@
                     <div class="flex items-center justify-between mt-4">
                         <span class="flex-grow flex flex-col">
                             <span class="text-base font-medium text-gray-900">Hablar como Ecuatoriano 🇪🇨</span>
-                            <span class="text-sm text-gray-500">Usar "Chévere", "Mi llave", "Pana".</span>
+                            <span class="text-sm text-gray-500">Usar "Chévere", "Mi llave", "Pana". (Solo aplica si el idioma es Español)</span>
                         </span>
                         <input type="checkbox" x-model="formData.useSlang" class="h-6 w-6 text-indigo-600 rounded">
                     </div>
@@ -238,12 +248,19 @@
         <!-- Step 5: WhatsApp y Seguridad -->
         <div x-show="step === 5" x-transition.opacity style="display: none;">
             <h2 class="text-2xl font-bold mb-2">Paso 5: WhatsApp y Seguridad</h2>
-            <p class="text-gray-500 mb-6 text-sm">Conecta tu número y decide quién puede chatear con tu vendedor.</p>
+            <p class="text-gray-500 mb-6 text-sm">Conecta tu número y configura tus credenciales de acceso.</p>
             <div class="space-y-6">
-                <div>
-                    <label class="block text-base font-medium text-gray-700">Tu Número de WhatsApp</label>
-                    <p class="text-xs text-gray-500 mb-1">El número donde quieres que funcione el asistente (Ej: +593912345678).</p>
-                    <input type="text" x-model="formData.whatsappNumber" placeholder="+593 9..." class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 text-base border">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-base font-medium text-gray-700">Tu Número de WhatsApp (Usuario)</label>
+                        <p class="text-xs text-gray-500 mb-1">Este será tu <strong>Usuario</strong> para el Panel de Control.</p>
+                        <input type="text" x-model="formData.whatsappNumber" placeholder="+593 9..." class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 text-base border bg-white">
+                    </div>
+                    <div>
+                        <label class="block text-base font-medium text-gray-700">Contraseña de Administrador</label>
+                        <p class="text-xs text-gray-500 mb-1">Crea una contraseña para acceder a tu Panel de Control.</p>
+                        <input type="password" x-model="formData.adminPassword" placeholder="••••••••" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 text-base border bg-white">
+                    </div>
                 </div>
                 
                 <div class="mt-4 bg-gray-50 p-4 rounded-lg border">
@@ -450,10 +467,12 @@
                     archetype: 'restaurant',
                     policies: '',
                     agentName: '',
+                    language: 'es',
                     tone: 'friendly',
                     useSlang: false,
                     emojis: 1,
                     whatsappNumber: '',
+                    adminPassword: '',
                     restrictAccess: false,
                     allowedNumbers: '',
                     catalogData: '',
