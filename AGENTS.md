@@ -61,6 +61,12 @@ When running in Docker, Agent Zero uses two distinct Python runtimes to isolate 
 - Purpose: Default environment for the interactive terminal and the agent's code execution tool.
 - Behavior: This is the environment active when you docker exec into the container. Packages installed by the agent via pip install during a task are stored here.
 
+### 3. Resource Limits
+- The `agent_zero` container must strictly operate under a constrained resource profile in production:
+  - **Memory:** Hard limit of `3G` with a reservation of `1G`.
+  - **CPU:** Hard limit of `2.0` cores with a reservation of `1.0` cores.
+  - This prevents the Agentic runtime from starving the Whisper or Chatwoot services during intensive tasks.
+
 ---
 
 ## Project Structure

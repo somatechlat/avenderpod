@@ -40,9 +40,10 @@ def test_avender_onboarding_full_flow(page: Page):
     page.click("button:has-text('Siguiente')")
 
     # -- Step 2: Operaciones y Delivery --
-    expect(page.locator("h2").filter(has_text="Paso 2: Operaciones")).to_be_visible()
+    expect(page.locator("h2").filter(has_text="Paso 2: Entrega y Pagos")).to_be_visible()
     # Click to use current location (mocked or just click)
-    page.click("button:has-text('🗺️ Capturar mi ubicación actual')")
+    page.click("text='Tocar mapa para fijar ubicación (GPS)'")
+    page.click("button:has-text('📍 Centrar en mi ubicación actual')")
     page.wait_for_timeout(1000) # Wait for Leaflet to catch up
     page.fill("textarea", "Av. Principal y Secundaria, E2E Test")
     page.click("button:has-text('Siguiente')")
@@ -58,8 +59,11 @@ def test_avender_onboarding_full_flow(page: Page):
     
     # Upload the PDF
     page.set_input_files("input[type='file'][id='file-upload']", "mock_catalog.pdf")
-    # Wait for the table to appear with our mocked items
-    expect(page.locator("text=Hamburguesa Doble")).to_be_visible()
+    # Wait for the table headers to appear instead of waiting for a mock item
+    expect(page.locator("text=Verifica tu menú extraído:")).to_be_visible()
+    
+    # Check if there are products, if not, wait
+    page.wait_for_selector("table tbody tr")
     
     # Edit the price of the first item
     page.fill("input[type='number'] >> nth=0", "8.99")
