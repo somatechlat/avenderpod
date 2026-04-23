@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>¡A VENDER! SaaS Control Plane</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+    </style>
+    <script type="module">
+        import { LitElement, html, css } from 'https://cdn.jsdelivr.net/gh/lit/dist@3/core/lit-core.min.js';
+
+        class SaaSControlPlane extends LitElement {
+            static properties = {
+                tenants: { type: Array },
+                loading: { type: Boolean }
+            };
+
+            constructor() {
+                super();
+                this.tenants = [];
+                this.loading = true;
+                this.fetchTenants();
+            }
+
+            createRenderRoot() {
+                return this; // Disable shadow DOM for Tailwind CSS
+            }
+
+            async fetchTenants() {
+                this.loading = true;
+                try {
+                    const res = await fetch('/api/saas/tenants');
+                    this.tenants = await res.json();
+                } catch (e) {
+                    console.error("Failed to load tenants", e);
+                }
+                this.loading = false;
+            }
+
+            async suspendTenant(id) {
+                if (!confirm("Are you sure you want to suspend this tenant?")) return;
+                await fetch(`/api/saas/tenants/${id}/suspend`, { method: 'POST' });
+                this.fetchTenants();
+            }
+
+            render() {
+                return html`
+                    <div class="min-h-screen p-8">
+                        <header class="mb-8">
+                            <h1 class="text-3xl font-extrabold text-gray-900">¡A VENDER! Control Plane</h1>
+                            <p class="text-gray-500">Gestión de Clientes y Facturación (Vultr + Vault)</p>
+                        </header>
+
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                            <div class="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+                                <h2 class="text-lg font-bold text-gray-800">Inquilinos (Tenants) Activos</h2>
+                                <button class="bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-indigo-700 transition">
+                                    + Crear Tenant
+                                </button>
+                            </div>
+                            
+                            ${this.loading ? html`<div class="p-8 text-center text-gray-500">Cargando...</div>` : ''}
+                            
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-gray-50 text-gray-600 text-sm border-b">
+                                        <th class="p-4 font-semibold">Negocio</th>
+                                        <th class="p-4 font-semibold">Email</th>
+                                        <th class="p-4 font-semibold">Estado</th>
+                                        <th class="p-4 font-semibold">Puerto Pod</th>
+                                        <th class="p-4 font-semibold">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100">
+                                    ${this.tenants.length === 0 && !this.loading ? html`
+                                        <tr><td colspan="5" class="p-8 text-center text-gray-500">No hay tenants registrados.</td></tr>
+                                    ` : ''}
+                                    ${this.tenants.map(t => html`
+                                        <tr class="hover:bg-gray-50 transition">
+                                            <td class="p-4 font-medium text-gray-900">${t.name}</td>
+                                            <td class="p-4 text-gray-600">${t.email}</td>
+                                            <td class="p-4">
+                                                <span class="px-2 py-1 text-xs font-bold rounded-full ${t.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">
+                                                    ${t.status.toUpperCase()}
+                                                </span>
+                                            </td>
+                                            <td class="p-4 text-gray-500">${t.assigned_port || '-'}</td>
+                                            <td class="p-4 space-x-2">
+                                                <button class="text-indigo-600 hover:underline font-medium text-sm">Gestionar</button>
+                                                ${t.status === 'active' ? html`
+                                                    <button @click=${() => this.suspendTenant(t.id)} class="text-red-600 hover:underline font-medium text-sm">Suspender</button>
+                                                ` : ''}
+                                            </td>
+                                        </tr>
+                                    `)}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        customElements.define('saas-control-plane', SaaSControlPlane);
+    </script>
+</head>
+<body>
+    <saas-control-plane></saas-control-plane>
+</body>
+</html>
