@@ -17,10 +17,10 @@
 
 ¡A VENDER! operates as an "Agent Pod", deployed via Docker, encapsulating multiple services:
 - **Core Orchestrator:** Agent Zero (Python) running custom `avender` plugins and extensions.
-- **Frontend / UI:** Alpine.js + TailwindCSS + LeafletJS (served via Python backend).
-- **Messaging Gateway:** Chatwoot.
-- **Audio Processing:** CPU-optimized Faster-Whisper server.
-- **Databases:** PostgreSQL (pgvector) and Redis for state handling and memory persistence.
+- **Frontend / UI:** Lit Web Components + TailwindCSS + LeafletJS (served via Python backend).
+- **WhatsApp Bridge:** Native Baileys integration via Agent Zero's `_whatsapp_integration` plugin (port 3100 internal).
+- **Audio Processing:** CPU-optimized Faster-Whisper server (port 45002).
+- **SysAdmin Control Plane:** Django + Ninja (port 45000) for tenant lifecycle management.
 - **LLM Provider:** Integration with OpenRouter (Nemotron 120B).
 
 ## Getting Started
@@ -32,7 +32,7 @@
    ```
 
 2. **Environment Configuration:**
-   Configure your `.env` variables including your `OPENROUTER_API_KEY`, Chatwoot credentials, and `WEBHOOK_SECRET`.
+   Configure your `.env` variables including your `OPENROUTER_API_KEY`, `VULTR_API_KEY`, and `DJANGO_SECRET_KEY`.
 
 3. **Start the Platform:**
    Use the provided Docker Compose or run the python UI script directly for local development:

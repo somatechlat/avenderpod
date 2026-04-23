@@ -1,5 +1,5 @@
 """
-handoff_to_human tool — Native WhatsApp implementation (Chatwoot-free).
+handoff_to_human tool — Native WhatsApp implementation via Baileys bridge.
 
 When triggered, this tool:
 1. Sets a flag in context.data so the WA polling loop STOPS auto-replying.

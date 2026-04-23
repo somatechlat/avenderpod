@@ -1,4 +1,5 @@
 import pandas as pd
+import os
 
 data = {
     "Producto": ["Aceite de CBD 500mg", "Gomitas Relajantes", "Bálsamo Muscular CBD", "Flores Aromáticas"],
@@ -8,5 +9,6 @@ data = {
 }
 
 df = pd.DataFrame(data)
-df.to_excel("mock_catalog.xlsx", index=False)
-print("Created mock_catalog.xlsx successfully")
+out_path = os.path.join(os.path.dirname(__file__), "mock_catalog.xlsx")
+df.to_excel(out_path, index=False)
+print(f"Created {out_path} successfully")

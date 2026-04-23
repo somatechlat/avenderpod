@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="es-EC">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>¡A VENDER! | SysAdmin Control Plane</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Space Grotesk', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            900: '#1e3a8a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        body {
+            background-color: #f8fafc;
+            background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div class="max-w-md w-full">
+        <!-- Logo Header -->
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-600 shadow-xl shadow-brand-500/30 mb-4 transform transition-transform hover:scale-105">
+                <span class="text-2xl font-display font-bold text-white tracking-tighter">AV</span>
+            </div>
+            <h1 class="font-display text-3xl font-bold text-slate-900 mb-2 tracking-tight">¡A VENDER!</h1>
+            <p class="text-slate-500 font-medium">SysAdmin Control Plane</p>
+        </div>
+
+        <!-- Login Card -->
+        <div class="bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 p-8">
+            
+            {% if form.errors %}
+            <div class="mb-6 bg-red-50 border border-red-100 rounded-2xl p-4 flex items-start">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm font-medium text-red-800">
+                        Credenciales incorrectas. Verifique su usuario y contraseña.
+                    </p>
+                </div>
+            </div>
+            {% endif %}
+
+            <form method="post" action="{% url 'login' %}" class="space-y-6">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ next|default:'/admin/' }}" />
+                
+                <div>
+                    <label for="id_username" class="block text-sm font-semibold text-slate-700 mb-2">Usuario</label>
+                    <div class="relative">
+                        <input type="text" id="id_username" name="username" required autofocus
+                            class="block w-full pl-4 pr-10 py-3 text-slate-900 placeholder-slate-400 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-shadow outline-none sm:text-sm"
+                            placeholder="admin">
+                    </div>
+                </div>
+
+                <div>
+                    <label for="id_password" class="block text-sm font-semibold text-slate-700 mb-2">Contraseña</label>
+                    <div class="relative">
+                        <input type="password" id="id_password" name="password" required
+                            class="block w-full pl-4 pr-10 py-3 text-slate-900 placeholder-slate-400 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition-shadow outline-none sm:text-sm"
+                            placeholder="••••••••">
+                    </div>
+                </div>
+
+                <div>
+                    <button type="submit" class="w-full flex justify-center py-3.5 px-4 border border-transparent rounded-xl shadow-sm text-sm font-bold text-white bg-slate-900 hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-900 transition-all active:scale-[0.98]">
+                        Iniciar Sesión Segura
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Footer -->
+        <div class="mt-8 text-center text-xs font-medium text-slate-500 flex flex-col gap-2">
+            <p>Acceso restringido a administradores del sistema.</p>
+            <p>
+                Powered by <a href="https://somatech.dev" class="text-slate-700 hover:text-brand-600 font-bold transition-colors">SomaTech</a> &middot; 
+                <a href="https://yachaq.ai" class="text-slate-700 hover:text-brand-600 font-bold transition-colors">Yachaq.ai</a>
+            </p>
+        </div>
+    </div>
+
+</body>
+</html>

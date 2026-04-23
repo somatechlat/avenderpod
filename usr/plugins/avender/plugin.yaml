@@ -1,6 +1,6 @@
 name: avender
 title: "¡A VENDER!"
-description: "Omni-Industry WhatsApp Sales Agent with Chatwoot integration and onboarding wizard."
+description: "Omni-Industry WhatsApp Sales Agent with native Baileys bridge and onboarding wizard."
 version: "1.0.0"
 always_enabled: true
 settings_sections:

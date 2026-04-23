@@ -1,14 +1,66 @@
 # ============================================================================
-# ¡A VENDER! — Production Docker Compose Orchestration (v2.0 — Chatwoot-Free)
+# ¡A VENDER! — Production Docker Compose Orchestration (v3.0)
 # ============================================================================
-# Port Range: 45001–45002 (isolated from host dev services)
-# Stack: 2 services only — agent_zero (Baileys native WA) + whisper
-# Startup Order: whisper → agent_zero
-# RAM Budget: ~4GB total (was ~6.5GB with Chatwoot)
+# Port Range: 45000–45002 (isolated from host dev services)
+# Stack: 3 services — sysadmin (Django Control Plane) + whisper + agent_zero
+# Startup Order: sysadmin → whisper → agent_zero
+# RAM Budget: ~5GB total
 # All services have: health checks, memory limits, restart policies, log rotation
 # ============================================================================
 
 services:
+
+  # ==========================================================================
+  # TIER 0 — SYSTEM ADMIN CONTROL PLANE (Django + Ninja)
+  # Manages tenant lifecycle, billing, Vultr provisioning, and platform health.
+  # Protected by Django's built-in auth — requires superuser login.
+  # ==========================================================================
+
+  sysadmin:
+    build:
+      context: ../..
+      dockerfile: deployments/avender/Dockerfile.sysadmin
+    restart: unless-stopped
+    container_name: avender_sysadmin
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    ports:
+      - "45000:8000"
+    volumes:
+      - sysadmin_db:/app/db
+      - ../../admin:/app
+      - ./sysadmin_entrypoint.sh:/app/entrypoint.sh
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-false}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,0.0.0.0}
+      DJANGO_SUPERUSER_USERNAME: ${DJANGO_SUPERUSER_USERNAME:-admin}
+      DJANGO_SUPERUSER_PASSWORD: ${DJANGO_SUPERUSER_PASSWORD:-avender2026}
+      DJANGO_SUPERUSER_EMAIL: ${DJANGO_SUPERUSER_EMAIL:-admin@avender.local}
+      VULTR_API_KEY: ${VULTR_API_KEY:-}
+      VULTR_REGION: ${VULTR_REGION:-mia}
+      VULTR_PLAN: ${VULTR_PLAN:-vc2-1c-1gb}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/admin/login/ || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - avender_network
+
+
 
   # ==========================================================================
   # TIER 1.5 — CENTRALIZED TRANSCRIPTION ENGINE (Whisper)
@@ -101,3 +153,5 @@ networks:
 volumes:
   a0_workdir:
     name: avender_a0_workdir
+  sysadmin_db:
+    name: avender_sysadmin_db

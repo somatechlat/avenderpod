@@ -60,8 +60,8 @@ class AvenderToolSandbox(Extension):
         allowed_tools = set(BASE_TOOLS)
         allowed_tools.update(ARCHETYPE_TOOLS.get(archetype, set()))
 
-        # Admin contexts are flagged via a property or session, but for now we also allow update_catalog_item if it's an admin (handled in chatwoot.py)
-        # We will allow update_catalog_item globally in the sandbox, but the LLM is only instructed to use it in Admin mode.
+        # Admin contexts are flagged via the WhatsApp admin backdoor session.
+        # update_catalog_item is globally allowed — the LLM is only instructed to use it in Admin mode.
         allowed_tools.add("update_catalog_item")
 
         if tool_name and tool_name not in allowed_tools:
