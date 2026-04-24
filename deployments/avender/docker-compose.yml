@@ -151,6 +151,8 @@ services:
       - a0_workdir:/a0/usr/workdir
     environment:
       AVENDER_SETUP_TOKEN: ${AVENDER_SETUP_TOKEN:-change_me_before_production}
+      WEB_UI_HOST: 0.0.0.0
+      WHISPER_API_URL: http://avender_whisper:8000/v1/audio/transcriptions
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:80 || exit 1"]
       interval: 15s

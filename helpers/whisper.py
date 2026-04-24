@@ -9,7 +9,7 @@ from helpers.print_style import PrintStyle
 from helpers.notification import NotificationManager, NotificationType, NotificationPriority
 
 # Whisper API Configuration — OpenAI-compatible endpoint on faster-whisper-server
-WHISPER_API_URL = "http://avender_whisper:8000/v1/audio/transcriptions"
+WHISPER_API_URL = os.environ.get("WHISPER_API_URL", "http://avender_whisper:8000/v1/audio/transcriptions")
 
 async def preload(model_name:str):
     # Remote API doesn't need preloading in the same way, but we'll keep the signature
