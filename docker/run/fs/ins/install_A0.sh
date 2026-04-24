@@ -1,4 +1,5 @@
 #!/bin/bash
+export UV_HTTP_TIMEOUT=300
 set -e
 
 # Exit immediately if a command exits with a non-zero status.
