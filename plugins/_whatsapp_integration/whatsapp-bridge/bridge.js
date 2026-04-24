@@ -228,6 +228,14 @@ async function startSocket() {
         body = msg.message.documentMessage.caption || '';
         hasMedia = true;
         mediaType = 'document';
+      } else if (msg.message.locationMessage) {
+        const loc = msg.message.locationMessage;
+        body = `[UBICACIÓN RECIBIDA] Coordenadas: ${loc.degreesLatitude}, ${loc.degreesLongitude}`;
+        if (loc.name) body += ` (Nombre: ${loc.name})`;
+        if (loc.address) body += ` (Dirección: ${loc.address})`;
+      } else if (msg.message.liveLocationMessage) {
+        const loc = msg.message.liveLocationMessage;
+        body = `[UBICACIÓN EN VIVO RECIBIDA] Coordenadas: ${loc.degreesLatitude}, ${loc.degreesLongitude}`;
       }
 
       // Download media to disk
