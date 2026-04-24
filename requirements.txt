@@ -34,10 +34,7 @@ python-docx
 python-pptx
 openpyxl
 pandas
-pytesseract
-pdf2image
 pypdf==6.0.0
-pymupdf==1.25.3
 # unstructured-client is light (API based)
 unstructured-client==0.31.0
 webcolors==24.6.0
@@ -48,9 +45,9 @@ pydantic==2.11.7
 pymupdf==1.25.3
 pytesseract==0.3.13
 pdf2image==1.17.0
-crontab==1.0.1
 pathspec>=0.12.1
 psutil>=7.0.0
+aiohttp>=3.9.0
 soundfile==0.13.1
 imapclient>=3.0.1
 html2text>=2024.2.26

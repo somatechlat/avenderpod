@@ -40,6 +40,9 @@ usr/*
 **/.DS_Store
 **/Thumbs.db
 
+# Node.js dependencies (reinstalled at runtime by bridge_manager.py)
+**/node_modules/
+
 # Python caches / compiled artefacts
 **/__pycache__/
 **/*.py[cod]

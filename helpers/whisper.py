@@ -1,94 +1,60 @@
 import base64
 import warnings
-import whisper
 import tempfile
 import asyncio
-from helpers import runtime, rfc, settings, files
+import os
+import requests
+from helpers import runtime, rfc, settings, files as file_helpers
 from helpers.print_style import PrintStyle
 from helpers.notification import NotificationManager, NotificationType, NotificationPriority
 
-# Suppress FutureWarning from torch.load
-warnings.filterwarnings("ignore", category=FutureWarning)
-
-_model = None
-_model_name = ""
-is_updating_model = False  # Tracks whether the model is currently updating
+# Whisper API Configuration — OpenAI-compatible endpoint on faster-whisper-server
+WHISPER_API_URL = "http://avender_whisper:8000/v1/audio/transcriptions"
 
 async def preload(model_name:str):
-    try:
-        # return await runtime.call_development_function(_preload, model_name)
-        return await _preload(model_name)
-    except Exception as e:
-        # if not runtime.is_development():
-        raise e
+    # Remote API doesn't need preloading in the same way, but we'll keep the signature
+    PrintStyle.standard(f"Whisper remote API active: {model_name}")
+    return True
         
 async def _preload(model_name:str):
-    global _model, _model_name, is_updating_model
-
-    while is_updating_model:
-        await asyncio.sleep(0.1)
-
-    try:
-        is_updating_model = True
-        if not _model or _model_name != model_name:
-            NotificationManager.send_notification(
-                NotificationType.INFO,
-                NotificationPriority.NORMAL,
-                "Loading Whisper model...",
-                display_time=99,
-                group="whisper-preload")
-            PrintStyle.standard(f"Loading Whisper model: {model_name}")
-            _model = whisper.load_model(name=model_name, download_root=files.get_abs_path("/tmp/models/whisper")) # type: ignore
-            _model_name = model_name
-            NotificationManager.send_notification(
-                NotificationType.INFO,
-                NotificationPriority.NORMAL,
-                "Whisper model loaded.",
-                display_time=2,
-                group="whisper-preload")
-    finally:
-        is_updating_model = False
+    return True
 
 async def is_downloading():
-    # return await runtime.call_development_function(_is_downloading)
-    return _is_downloading()
-
-def _is_downloading():
-    return is_updating_model
+    return False
 
 async def is_downloaded():
-    try:
-        # return await runtime.call_development_function(_is_downloaded)
-        return _is_downloaded()
-    except Exception as e:
-        # if not runtime.is_development():
-        raise e
-        # Fallback to direct execution if RFC fails in development
-        # return _is_downloaded()
-
-def _is_downloaded():
-    return _model is not None
+    return True
 
 async def transcribe(model_name:str, audio_bytes_b64: str):
-    # return await runtime.call_development_function(_transcribe, model_name, audio_bytes_b64)
     return await _transcribe(model_name, audio_bytes_b64)
 
-
 async def _transcribe(model_name:str, audio_bytes_b64: str):
-    await _preload(model_name)
-    
     # Decode audio bytes if encoded as a base64 string
     audio_bytes = base64.b64decode(audio_bytes_b64)
 
     # Create temp audio file
-    import os
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as audio_file:
         audio_file.write(audio_bytes)
         temp_path = audio_file.name
+    
     try:
-        # Transcribe the audio file
-        result = _model.transcribe(temp_path, fp16=False) # type: ignore
-        return result
+        # Transcribe using remote API (OpenAI-compatible multipart format)
+        with open(temp_path, 'rb') as f:
+            form_files = {'file': (os.path.basename(temp_path), f, 'audio/wav')}
+            form_data = {'model': 'whisper-1'}
+            response = requests.post(
+                WHISPER_API_URL, files=form_files, data=form_data, timeout=60
+            )
+            
+        if response.status_code == 200:
+            return response.json()
+        else:
+            PrintStyle.error(f"Whisper API error: {response.status_code} - {response.text}")
+            return {"text": "[Error en transcripción externa]"}
+            
+    except Exception as e:
+        PrintStyle.error(f"Failed to connect to Whisper API: {str(e)}")
+        return {"text": f"[Error de conexión: {str(e)}]"}
     finally:
         try:
             os.remove(temp_path)
