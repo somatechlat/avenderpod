@@ -9,6 +9,7 @@ import base64
 import os
 import re
 import uuid
+import aiohttp
 
 from agent import Agent, AgentContext, UserMessage
 from helpers import plugins, files, runtime
@@ -177,6 +178,14 @@ async def _start_new_chat(config: dict, msg: dict) -> None:
     msg_id = str(uuid.uuid4())
     media_urls = msg.get("mediaUrls", [])
     attachments = await _save_incoming_media(media_urls) if media_urls else []
+
+    # Process media enrichment
+    await _transcribe_audio(msg, attachments)
+    await _enrich_location(msg)
+
+    # Re-build user message if body changed (e.g. transcription or location)
+    user_msg = _build_user_message(context.agent0, msg)
+
     mq.log_user_message(
         context, user_msg, attachments, message_id=msg_id, source=" (whatsapp)",
     )
@@ -207,6 +216,14 @@ async def _route_to_chat(
     msg_id = str(uuid.uuid4())
     media_urls = msg.get("mediaUrls", [])
     attachments = await _save_incoming_media(media_urls) if media_urls else []
+
+    # Process media enrichment
+    await _transcribe_audio(msg, attachments)
+    await _enrich_location(msg)
+
+    # Re-build user message if body changed
+    user_msg = _build_user_message(context.agent0, msg)
+
     mq.log_user_message(
         context, user_msg, attachments, message_id=msg_id, source=" (whatsapp)",
     )
@@ -308,6 +325,65 @@ def _md_to_whatsapp(text: str) -> str:
         text = text.replace(f"\x00IC{i}\x00", code)
 
     return text
+
+
+# ------------------------------------------------------------------
+# Media enrichment
+# ------------------------------------------------------------------
+
+async def _transcribe_audio(msg: dict, attachments: list[str]) -> None:
+    """Transcribe audio/ptt messages via internal Whisper server."""
+    if msg.get("mediaType") in ("audio", "ptt") and attachments:
+        try:
+            audio_path = attachments[0]
+            # Verify file exists on host (bridge shares volume or uses absolute paths)
+            if os.path.exists(audio_path):
+                form = aiohttp.FormData()
+                with open(audio_path, "rb") as f:
+                    file_data = f.read()
+                form.add_field("file", file_data, filename=os.path.basename(audio_path), content_type="audio/ogg")
+                form.add_field("model", "whisper-1")
+
+                # avender_whisper is the container name in docker-compose
+                async with aiohttp.ClientSession() as session:
+                    async with session.post("http://avender_whisper:8000/v1/audio/transcriptions", data=form) as resp:
+                        if resp.status == 200:
+                            data = await resp.json()
+                            text = data.get("text", "").strip()
+                            if text:
+                                msg["body"] = f"[Nota de voz transcrita]: {text}"
+                        else:
+                            msg["body"] = f"[Nota de voz recibida (error transcripción: {resp.status})]"
+        except Exception as e:
+            PrintStyle.warning(f"WhatsApp: whisper error: {e}")
+
+
+async def _enrich_location(msg: dict) -> None:
+    """Enrich location messages with reverse geocoding via Nominatim."""
+    body = msg.get("body", "")
+    if "[UBICACIÓN RECIBIDA]" in body and "Coordenadas: " in body:
+        try:
+            match = re.search(r"Coordenadas:\s*(-?\d+\.\d+),\s*(-?\d+\.\d+)", body)
+            if match:
+                lat, lon = match.groups()
+                url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}"
+                headers = {"User-Agent": "AvenderAgent/1.0"}
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url, headers=headers) as resp:
+                        if resp.status == 200:
+                            data = await resp.json()
+                            address = data.get("display_name", "")
+                            if address:
+                                msg["body"] += f"\nGeolocalización Automática: {address}"
+                                # Inject instruction for agent to confirm location
+                                msg["body"] += (
+                                    "\n\n(SISTEMA: El usuario ha enviado su ubicación. "
+                                    "Debes usar la herramienta 'process_location' con estas coordenadas "
+                                    "para confirmar la zona de entrega y responder de forma corta "
+                                    "confirmando el sector/calle como se indica en tus reglas.)"
+                                )
+        except Exception as e:
+            PrintStyle.warning(f"WhatsApp: location enrichment error: {e}")
 
 
 # ------------------------------------------------------------------
