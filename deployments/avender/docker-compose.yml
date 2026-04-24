@@ -2,26 +2,52 @@
 # ¡A VENDER! — Production Docker Compose Orchestration (v3.0)
 # ============================================================================
 # Port Range: 45000–45002 (isolated from host dev services)
-# Stack: 3 services — sysadmin (Django Control Plane) + whisper + agent_zero
-# Startup Order: sysadmin → whisper → agent_zero
+# Stack: 4 services — sysadmin, db (postgres), whisper, agent_zero
+# Startup Order: db → sysadmin → whisper → agent_zero
 # RAM Budget: ~5GB total
-# All services have: health checks, memory limits, restart policies, log rotation
 # ============================================================================
 
 services:
 
   # ==========================================================================
-  # TIER 0 — SYSTEM ADMIN CONTROL PLANE (Django + Ninja)
-  # Manages tenant lifecycle, billing, Vultr provisioning, and platform health.
-  # Protected by Django's built-in auth — requires superuser login.
+  # TIER 0 — POSTGRESQL DATABASE
+  # 100% secure, production-grade storage for SysAdmin Control Plane
   # ==========================================================================
+  avender_postgres:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    container_name: avender_postgres
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-avender_db}
+      POSTGRES_USER: ${POSTGRES_USER:-avender_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-avender_pass}
+    volumes:
+      - avender_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-avender_user} -d ${POSTGRES_DB:-avender_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - avender_network
 
+  # ==========================================================================
+  # TIER 1 — SYSTEM ADMIN CONTROL PLANE (Django + Ninja)
+  # ==========================================================================
   sysadmin:
     build:
       context: ../..
       dockerfile: deployments/avender/Dockerfile.sysadmin
     restart: unless-stopped
     container_name: avender_sysadmin
+    depends_on:
+      avender_postgres:
+        condition: service_healthy
     deploy:
       resources:
         limits:
@@ -33,10 +59,14 @@ services:
     ports:
       - "45000:8000"
     volumes:
-      - sysadmin_db:/app/db
       - ../../admin:/app
       - ./sysadmin_entrypoint.sh:/app/entrypoint.sh
     environment:
+      POSTGRES_DB: ${POSTGRES_DB:-avender_db}
+      POSTGRES_USER: ${POSTGRES_USER:-avender_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-avender_pass}
+      POSTGRES_HOST: avender_postgres
+      POSTGRES_PORT: 5432
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-}
       DJANGO_DEBUG: ${DJANGO_DEBUG:-false}
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,0.0.0.0}
@@ -60,13 +90,9 @@ services:
     networks:
       - avender_network
 
-
-
   # ==========================================================================
   # TIER 1.5 — CENTRALIZED TRANSCRIPTION ENGINE (Whisper)
-  # CPU-only, handles OGG voice notes from WhatsApp customers
   # ==========================================================================
-
   whisper_server:
     image: fedirz/faster-whisper-server:latest-cpu
     restart: unless-stopped
@@ -101,11 +127,6 @@ services:
   # ==========================================================================
   # TIER 2 — COGNITIVE ENGINE (Agent Zero + Avender Plugin + Baileys WA Bridge)
   # ==========================================================================
-  # LLM API key: configured via Agent Zero's built-in settings UI.
-  # WhatsApp: uses native _whatsapp_integration plugin (Baileys bridge, port 3100 internal).
-  # Admin portals served at /plugins/avender/tenant_admin and /plugins/avender/system_admin
-  # ==========================================================================
-
   agent_zero:
     build:
       context: ../..
@@ -129,7 +150,6 @@ services:
       - ../../usr:/a0/usr
       - a0_workdir:/a0/usr/workdir
     environment:
-      # Avender setup token — prevents unauthorized onboarding calls
       AVENDER_SETUP_TOKEN: ${AVENDER_SETUP_TOKEN:-change_me_before_production}
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:80 || exit 1"]
@@ -153,5 +173,5 @@ networks:
 volumes:
   a0_workdir:
     name: avender_a0_workdir
-  sysadmin_db:
-    name: avender_sysadmin_db
+  avender_pg_data:
+    name: avender_pg_data

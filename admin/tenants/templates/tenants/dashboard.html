@@ -1,157 +1,451 @@
+{% load static %}
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>¡A VENDER! SaaS Control Plane</title>
+    <title>¡A VENDER! Master Control Plane</title>
+    <meta name="csrf-token" content="{{ csrf_token }}">
     
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Space+Grotesk:wght@500;700;900&display=swap" rel="stylesheet">
     
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                        display: ['Space Grotesk', 'sans-serif'],
-                    },
-                    colors: {
-                        brand: {
-                            50: '#eff6ff',
-                            100: '#dbeafe',
-                            500: '#3b82f6',
-                            600: '#2563eb',
-                            700: '#1d4ed8',
-                            900: '#1e3a8a',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
+    <!-- Tailwind CSS (Compiled) -->
+    <link href="{% static 'tenants/css/output.css' %}" rel="stylesheet">
     
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f8fafc;
-            background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
-            background-size: 20px 20px;
+            background-color: #090d14;
+            color: #f8fafc;
+        }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #1f2937; border-radius: 4px; }
+        
+        .glass-panel {
+            background: rgba(17, 24, 39, 0.6);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255,255,255,0.05);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+        }
+        
+        .text-gradient {
+            background: linear-gradient(to right, #f43f5e, #38bdf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .btn-primary {
+            background-color: #ffffff;
+            color: #000000;
+            font-weight: 700;
+            transition: all 0.2s ease;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(255, 255, 255, 0.1);
+        }
+        
+        .btn-gradient {
+            background: linear-gradient(to right, #f43f5e, #38bdf8);
+            color: white;
+            font-weight: 700;
+            transition: all 0.2s ease;
+        }
+        .btn-gradient:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
         }
     </style>
+    
     <script type="module">
-        import { LitElement, html, css } from 'https://cdn.jsdelivr.net/gh/lit/dist@3/core/lit-core.min.js';
+        import { LitElement, html, css } from 'https://cdn.jsdelivr.net/npm/lit@3.1.2/+esm';
 
-        class SaaSControlPlane extends LitElement {
+        class MasterControlPlane extends LitElement {
             static properties = {
+                currentView: { type: String },
                 tenants: { type: Array },
-                loading: { type: Boolean }
+                plans: { type: Array },
+                vaultRecords: { type: Array },
+                interactions: { type: Array },
+                pendingChallenges: { type: Array },
+                loading: { type: Boolean },
+                
+                showWizard: { type: Boolean },
+                wizardStep: { type: Number },
+                wizardData: { type: Object },
+                wizardLoading: { type: Boolean },
+                wizardError: { type: String }
             };
 
             constructor() {
                 super();
+                this.currentView = 'dashboard';
                 this.tenants = [];
+                this.plans = [];
+                this.vaultRecords = [];
+                this.interactions = [];
+                this.pendingChallenges = [];
                 this.loading = true;
-                this.fetchTenants();
+                
+                this.showWizard = false;
+                this.wizardStep = 1;
+                this.wizardData = { name: '', email: '', plan_name: 'Basic' };
+                this.wizardLoading = false;
+                this.wizardError = '';
+                
+                const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+                this.csrfToken = csrfMeta ? csrfMeta.content : '';
+                this.fetchAllData();
+                
+                // Start polling for Creator Override challenges
+                this.challengePollInterval = setInterval(() => this.fetchPendingChallenges(), 5000);
             }
 
-            createRenderRoot() {
-                return this; // Disable shadow DOM for Tailwind CSS
+            disconnectedCallback() {
+                super.disconnectedCallback();
+                if (this.challengePollInterval) clearInterval(this.challengePollInterval);
             }
 
-            async fetchTenants() {
+            createRenderRoot() { return this; }
+
+            async fetchAllData() {
                 this.loading = true;
                 try {
-                    const res = await fetch('/api/saas/tenants');
-                    this.tenants = await res.json();
+                    const [resT, resP, resV, resI] = await Promise.all([
+                        fetch('/api/saas/tenants', { credentials: 'same-origin' }),
+                        fetch('/api/saas/plans', { credentials: 'same-origin' }),
+                        fetch('/api/saas/vault', { credentials: 'same-origin' }),
+                        fetch('/api/saas/interactions', { credentials: 'same-origin' })
+                    ]);
+                    
+                    if(resT.ok) this.tenants = await resT.json();
+                    if(resP.ok) this.plans = await resP.json();
+                    if(resV.ok) this.vaultRecords = await resV.json();
+                    if(resI.ok) this.interactions = await resI.json();
+                    
+                    await this.fetchPendingChallenges();
                 } catch (e) {
-                    console.error("Failed to load tenants", e);
+                    console.error("Fetch error", e);
                 }
                 this.loading = false;
             }
 
-            async suspendTenant(id) {
-                if (!confirm("Are you sure you want to suspend this tenant?")) return;
-                await fetch(`/api/saas/tenants/${id}/suspend`, { method: 'POST' });
-                this.fetchTenants();
+            async fetchPendingChallenges() {
+                try {
+                    const res = await fetch('/api/saas/auth/pending-challenges', { credentials: 'same-origin' });
+                    if (res.ok) {
+                        this.pendingChallenges = await res.json();
+                    }
+                } catch (e) {
+                    console.error("Poll error", e);
+                }
             }
 
-            render() {
-                return html`
-                    <div class="min-h-screen p-8">
-                        <header class="mb-8">
-                            <h1 class="text-3xl font-extrabold text-gray-900">¡A VENDER! Control Plane</h1>
-                            <p class="text-gray-500">Gestión de Clientes y Facturación (Vultr + Vault)</p>
-                        </header>
+            // Wizard methods...
+            openWizard() {
+                this.wizardData = { name: '', email: '', plan_name: this.plans.length > 0 ? this.plans[0].name : 'Basic' };
+                this.wizardStep = 1;
+                this.wizardError = '';
+                this.showWizard = true;
+            }
+            closeWizard() { this.showWizard = false; }
+            nextStep() {
+                if (this.wizardStep === 1 && (!this.wizardData.name || !this.wizardData.email)) {
+                    this.wizardError = "Todos los campos son obligatorios.";
+                    return;
+                }
+                this.wizardError = '';
+                this.wizardStep++;
+            }
+            prevStep() { this.wizardStep--; }
+            
+            async submitWizard() {
+                this.wizardLoading = true;
+                this.wizardError = '';
+                try {
+                    const res = await fetch('/api/saas/tenants', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'X-CSRFToken': this.csrfToken,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(this.wizardData)
+                    });
+                    
+                    if (res.ok) {
+                        this.closeWizard();
+                        this.fetchAllData();
+                        this.currentView = 'tenants';
+                    } else {
+                        const err = await res.json();
+                        this.wizardError = err.detail || err.message || "Error al crear tenant.";
+                    }
+                } catch (e) {
+                    this.wizardError = "Error de red.";
+                }
+                this.wizardLoading = false;
+            }
 
-                        <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                            <div class="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
-                                <h2 class="text-lg font-bold text-gray-800">Inquilinos (Tenants) Activos</h2>
-                                <button class="bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-indigo-700 transition">
-                                    + Crear Tenant
-                                </button>
+            // Renders...
+            renderSidebar() {
+                const navBtn = (view, icon, text) => html`
+                    <button @click=${() => { this.currentView = view; this.fetchAllData(); }} class="w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition ${this.currentView === view ? 'bg-brand-pink/10 text-brand-pink border border-brand-pink/20' : 'text-slate-400 hover:text-white hover:bg-white/5'}">
+                        ${icon} <span class="font-medium tracking-wide text-sm">${text}</span>
+                    </button>
+                `;
+                
+                return html`
+                    <aside class="w-72 bg-brand-bg/95 backdrop-blur-xl border-r border-white/5 h-screen flex flex-col fixed top-0 left-0 z-20">
+                        <div class="p-8 flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-lg bg-gradient-brand flex items-center justify-center">
+                                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"></path></svg>
                             </div>
-                            
-                            ${this.loading ? html`<div class="p-8 text-center text-gray-500">Cargando...</div>` : ''}
-                            
-                            <table class="w-full text-left border-collapse">
-                                <thead>
-                                    <tr class="bg-gray-50 text-gray-600 text-sm border-b">
-                                        <th class="p-4 font-semibold">Negocio</th>
-                                        <th class="p-4 font-semibold">Email</th>
-                                        <th class="p-4 font-semibold">Estado</th>
-                                        <th class="p-4 font-semibold">Puerto Pod</th>
-                                        <th class="p-4 font-semibold">Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-gray-100">
-                                    ${this.tenants.length === 0 && !this.loading ? html`
-                                        <tr><td colspan="5" class="p-8 text-center text-gray-500">No hay tenants registrados.</td></tr>
-                                    ` : ''}
-                                    ${this.tenants.map(t => html`
-                                        <tr class="hover:bg-gray-50 transition">
-                                            <td class="p-4 font-medium text-gray-900">${t.name}</td>
-                                            <td class="p-4 text-gray-600">${t.email}</td>
-                                            <td class="p-4">
-                                                <span class="px-2 py-1 text-xs font-bold rounded-full ${t.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">
-                                                    ${t.status.toUpperCase()}
-                                                </span>
-                                            </td>
-                                            <td class="p-4 text-gray-500">${t.assigned_port || '-'}</td>
-                                            <td class="p-4 space-x-2">
-                                                <button class="text-indigo-600 hover:underline font-medium text-sm">Gestionar</button>
-                                                ${t.status === 'active' ? html`
-                                                    <button @click=${() => this.suspendTenant(t.id)} class="text-red-600 hover:underline font-medium text-sm">Suspender</button>
-                                                ` : ''}
-                                                ${t.status === 'suspended' ? html`
-                                                    <button @click=${() => this.reactivateTenant(t.id)} class="text-green-600 hover:underline font-medium text-sm">Reactivar</button>
-                                                ` : ''}
-                                            </td>
-                                        </tr>
-                                    `)}
-                                </tbody>
-                            </table>
+                            <h1 class="font-display font-black text-2xl tracking-tight text-white italic">¡A VENDER!</h1>
+                        </div>
+                        
+                        <div class="px-6 pb-4">
+                            <p class="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-3 pl-2">Control Plane</p>
+                            <nav class="space-y-1">
+                                ${navBtn('dashboard', html`<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>`, 'Dashboard')}
+                                ${navBtn('tenants', html`<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>`, 'Inquilinos (Tenants)')}
+                                ${navBtn('plans', html`<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`, 'SaaS Plans')}
+                            </nav>
+                        </div>
+                        
+                        <div class="px-6 py-4 mt-auto">
+                            <p class="text-[10px] text-slate-500 uppercase tracking-widest font-bold mb-3 pl-2">System Logs</p>
+                            <nav class="space-y-1">
+                                ${navBtn('vault', html`<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>`, 'Vault Security')}
+                                ${navBtn('interactions', html`<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>`, 'Interactions')}
+                            </nav>
+                        </div>
+                    </aside>
+                `;
+            }
+
+            renderDashboard() {
+                return html`
+                    <div class="animate-fade-in space-y-8">
+                        <header class="flex justify-between items-end">
+                            <div>
+                                <h2 class="text-4xl font-display font-black text-white tracking-tight mb-2">System Administration<br><span class="text-gradient">Control Plane</span></h2>
+                                <p class="text-slate-400 max-w-xl text-lg leading-relaxed">Global Infrastructure Metrics and Multi-Tenant SaaS provisioning.</p>
+                            </div>
+                            <button @click=${this.openWizard} class="btn-primary px-8 py-3.5 rounded-full flex items-center gap-2 text-sm">
+                                Nuevo Tenant <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                            </button>
+                        </header>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                            <div class="glass-panel p-8 rounded-3xl relative overflow-hidden group">
+                                <div class="absolute -right-6 -top-6 w-32 h-32 bg-brand-pink/20 rounded-full blur-3xl group-hover:bg-brand-pink/30 transition duration-500"></div>
+                                <h3 class="text-slate-400 text-sm font-semibold tracking-wide uppercase">Total Tenants</h3>
+                                <p class="text-5xl font-display font-black text-white mt-4 tracking-tight">${this.tenants.length}</p>
+                            </div>
+                            <div class="glass-panel p-8 rounded-3xl relative overflow-hidden group">
+                                <div class="absolute -right-6 -top-6 w-32 h-32 bg-brand-blue/20 rounded-full blur-3xl group-hover:bg-brand-blue/30 transition duration-500"></div>
+                                <h3 class="text-slate-400 text-sm font-semibold tracking-wide uppercase">Planes Activos</h3>
+                                <p class="text-5xl font-display font-black text-white mt-4 tracking-tight">${this.plans.length}</p>
+                            </div>
+                            <div class="glass-panel p-8 rounded-3xl relative overflow-hidden group">
+                                <div class="absolute -right-6 -top-6 w-32 h-32 bg-brand-cyan/20 rounded-full blur-3xl group-hover:bg-brand-cyan/30 transition duration-500"></div>
+                                <h3 class="text-slate-400 text-sm font-semibold tracking-wide uppercase">Interacciones</h3>
+                                <p class="text-5xl font-display font-black text-white mt-4 tracking-tight">${this.interactions.length}</p>
+                            </div>
+                            <div class="glass-panel p-8 rounded-3xl relative overflow-hidden group">
+                                <div class="absolute -right-6 -top-6 w-32 h-32 bg-indigo-500/20 rounded-full blur-3xl group-hover:bg-indigo-500/30 transition duration-500"></div>
+                                <h3 class="text-slate-400 text-sm font-semibold tracking-wide uppercase">Vault Logs</h3>
+                                <p class="text-5xl font-display font-black text-white mt-4 tracking-tight">${this.vaultRecords.length}</p>
+                            </div>
                         </div>
                     </div>
                 `;
             }
 
-            async reactivateTenant(id) {
-                if (!confirm("¿Reactivar este tenant?")) return;
-                await fetch(`/api/saas/tenants/${id}/reactivate`, { method: 'POST' });
-                this.fetchTenants();
+            renderTable(title, cols, data, renderRow) {
+                return html`
+                    <div class="animate-fade-in">
+                        <header class="flex justify-between items-center mb-8">
+                            <h2 class="text-3xl font-display font-black text-white tracking-tight">${title}</h2>
+                            ${title === 'Inquilinos (Tenants)' ? html`
+                                <button @click=${this.openWizard} class="btn-primary px-6 py-2.5 rounded-full flex items-center gap-2 text-sm">
+                                    Nuevo Tenant
+                                </button>
+                            ` : ''}
+                        </header>
+                        
+                        <div class="glass-panel rounded-3xl overflow-hidden">
+                            ${this.loading ? html`<div class="p-12 text-center text-slate-400 font-medium">Sincronizando datos...</div>` : html`
+                                <table class="w-full text-left border-collapse">
+                                    <thead class="bg-white/5 text-slate-400 text-xs uppercase tracking-widest border-b border-white/10">
+                                        <tr>${cols.map(c => html`<th class="p-6 font-semibold">${c}</th>`)}</tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-white/5 text-slate-300">
+                                        ${data.length === 0 ? html`<tr><td colspan="${cols.length}" class="p-12 text-center text-slate-500">No hay registros.</td></tr>` : data.map(renderRow)}
+                                    </tbody>
+                                </table>
+                            `}
+                        </div>
+                    </div>
+                `;
+            }
+
+            render() {
+                return html`
+                    <div class="flex min-h-screen">
+                        ${this.renderSidebar()}
+                        <main class="flex-1 ml-72 p-10 overflow-y-auto h-screen relative z-10">
+                            <!-- Premium Background Elements -->
+                            <div class="fixed top-0 right-0 w-[800px] h-[600px] bg-brand-pink/10 rounded-full blur-[150px] pointer-events-none transform translate-x-1/3 -translate-y-1/3"></div>
+                            <div class="fixed bottom-0 left-1/4 w-[600px] h-[600px] bg-brand-blue/10 rounded-full blur-[150px] pointer-events-none transform -translate-x-1/2 translate-y-1/3"></div>
+                            
+                            <div class="max-w-7xl mx-auto relative z-10 mt-4">
+                                <!-- CREATOR OVERRIDE MONITOR -->
+                                ${this.pendingChallenges.length > 0 ? html`
+                                    <div class="mb-8 animate-pulse">
+                                        ${this.pendingChallenges.map(c => html`
+                                            <div class="bg-brand-pink/20 border-2 border-brand-pink/50 rounded-[2rem] p-6 flex items-center justify-between shadow-2xl shadow-brand-pink/20 mb-4">
+                                                <div class="flex items-center gap-6">
+                                                    <div class="w-16 h-16 rounded-2xl bg-brand-pink flex items-center justify-center shadow-lg shadow-brand-pink/40">
+                                                        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                                                    </div>
+                                                    <div>
+                                                        <h4 class="text-xs font-black text-brand-pink uppercase tracking-[0.2em]">Solicitud de Acceso Maestro</h4>
+                                                        <p class="text-xl font-display font-black text-white mt-1">Inquilino: ${c.tenant_name}</p>
+                                                    </div>
+                                                </div>
+                                                <div class="text-right">
+                                                    <p class="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-1">Session PIN</p>
+                                                    <p class="text-5xl font-display font-black text-brand-pink tracking-[0.1em]">${c.pin}</p>
+                                                </div>
+                                            </div>
+                                        `)}
+                                    </div>
+                                ` : ''}
+
+                                ${this.currentView === 'dashboard' ? this.renderDashboard() : ''}
+                                
+                                ${this.currentView === 'tenants' ? this.renderTable('Inquilinos (Tenants)', ['Empresa', 'Email', 'Estado', 'Puerto'], this.tenants, t => html`
+                                    <tr class="hover:bg-white/5 transition duration-200">
+                                        <td class="p-6 font-bold text-white flex items-center gap-4">
+                                            <div class="w-10 h-10 rounded-xl bg-gradient-brand flex items-center justify-center font-black text-white shadow-lg shadow-brand-pink/20">
+                                                ${t.name.charAt(0).toUpperCase()}
+                                            </div>
+                                            ${t.name}
+                                        </td>
+                                        <td class="p-6 text-slate-400">${t.email}</td>
+                                        <td class="p-6"><span class="px-3 py-1.5 text-xs font-bold rounded-full border ${t.status === 'active' ? 'bg-brand-cyan/10 text-brand-cyan border-brand-cyan/20' : 'bg-brand-pink/10 text-brand-pink border-brand-pink/20'}">${t.status.toUpperCase()}</span></td>
+                                        <td class="p-6 font-mono text-slate-500">${t.assigned_port || '-'}</td>
+                                    </tr>
+                                `) : ''}
+                                
+                                ${this.currentView === 'plans' ? this.renderTable('SaaS Plans', ['ID', 'Nombre', 'Precio/Mes', 'Conversaciones'], this.plans, p => html`
+                                    <tr class="hover:bg-white/5 transition duration-200">
+                                        <td class="p-6 font-mono text-xs text-slate-500">${p.id}</td>
+                                        <td class="p-6 font-bold text-white text-lg">${p.name}</td>
+                                        <td class="p-6 text-brand-blue font-bold">$${p.price_monthly}</td>
+                                        <td class="p-6 text-slate-400">${p.max_conversations}</td>
+                                    </tr>
+                                `) : ''}
+
+                                ${this.currentView === 'vault' ? this.renderTable('Vault Security Logs', ['Fecha', 'Tenant', 'Vault Path'], this.vaultRecords, v => html`
+                                    <tr class="hover:bg-white/5 transition duration-200">
+                                        <td class="p-6 text-xs font-mono text-slate-500">${new Date(v.created_at).toLocaleString()}</td>
+                                        <td class="p-6 font-bold text-white">${v.tenant_name}</td>
+                                        <td class="p-6 font-mono text-xs text-brand-cyan">${v.vault_path}</td>
+                                    </tr>
+                                `) : ''}
+
+                                ${this.currentView === 'interactions' ? this.renderTable('Agent Interactions', ['Fecha', 'Tenant', 'Arquetipo', 'Customer WA', 'Status'], this.interactions, i => html`
+                                    <tr class="hover:bg-white/5 transition duration-200">
+                                        <td class="p-6 text-xs font-mono text-slate-500">${new Date(i.created_at).toLocaleString()}</td>
+                                        <td class="p-6 font-bold text-white">${i.tenant_name}</td>
+                                        <td class="p-6 font-medium text-brand-pink">${i.archetype}</td>
+                                        <td class="p-6 font-mono text-xs text-slate-400">${i.customer_wa_id}</td>
+                                        <td class="p-6"><span class="px-3 py-1.5 text-xs font-bold rounded-full border bg-white/5 border-white/10 text-white">${i.status}</span></td>
+                                    </tr>
+                                `) : ''}
+                            </div>
+                        </main>
+                        
+                        <!-- WIZARD OVERLAY -->
+                        ${this.showWizard ? html`
+                            <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#090d14]/90 backdrop-blur-md">
+                                <div class="glass-panel border-brand-pink/30 rounded-[2rem] w-full max-w-2xl overflow-hidden animate-fade-in flex flex-col shadow-2xl shadow-brand-pink/10">
+                                    <div class="p-8 border-b border-white/10 flex justify-between items-center">
+                                        <h3 class="text-2xl font-display font-black text-white tracking-tight">Nuevo Inquilino <span class="text-brand-pink text-lg ml-2 font-medium">Paso ${this.wizardStep} de 3</span></h3>
+                                        <button @click=${this.closeWizard} class="text-slate-400 hover:text-white transition"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+                                    </div>
+                                    
+                                    <div class="p-10">
+                                        ${this.wizardError ? html`<div class="mb-6 p-4 bg-brand-pink/10 text-brand-pink border border-brand-pink/20 rounded-xl text-sm font-medium">${this.wizardError}</div>` : ''}
+                                        
+                                        ${this.wizardStep === 1 ? html`
+                                            <div class="space-y-6">
+                                                <div>
+                                                    <label class="block text-sm font-bold text-slate-400 mb-2 uppercase tracking-wider">Nombre de la Empresa</label>
+                                                    <input type="text" .value=${this.wizardData.name} @input=${e=>this.wizardData.name=e.target.value} placeholder="Ej: Zapatería El Sol" class="w-full bg-black/40 border border-white/10 text-white rounded-2xl px-5 py-4 focus:outline-none focus:border-brand-pink focus:ring-1 focus:ring-brand-pink transition">
+                                                </div>
+                                                <div>
+                                                    <label class="block text-sm font-bold text-slate-400 mb-2 uppercase tracking-wider">Correo Electrónico</label>
+                                                    <input type="email" .value=${this.wizardData.email} @input=${e=>this.wizardData.email=e.target.value} placeholder="admin@empresa.com" class="w-full bg-black/40 border border-white/10 text-white rounded-2xl px-5 py-4 focus:outline-none focus:border-brand-pink focus:ring-1 focus:ring-brand-pink transition">
+                                                </div>
+                                            </div>
+                                        ` : ''}
+                                        
+                                        ${this.wizardStep === 2 ? html`
+                                            <div class="space-y-4">
+                                                <label class="block text-sm font-bold text-slate-400 mb-4 uppercase tracking-wider">Selecciona un Plan SaaS</label>
+                                                <div class="grid gap-4">
+                                                    ${this.plans.map(p => html`
+                                                        <div @click=${() => this.wizardData.plan_name = p.name} class="cursor-pointer border-2 rounded-2xl p-6 transition duration-300 ${this.wizardData.plan_name === p.name ? 'border-brand-pink bg-brand-pink/5' : 'border-white/10 hover:border-white/20 bg-black/20'}">
+                                                            <div class="flex justify-between items-center">
+                                                                <div>
+                                                                    <span class="block font-black text-white text-xl">${p.name} Plan</span>
+                                                                    <span class="block text-sm text-slate-400 mt-1">${p.max_conversations} convers./mes</span>
+                                                                </div>
+                                                                <span class="font-display font-black text-3xl text-gradient">$${p.price_monthly}</span>
+                                                            </div>
+                                                        </div>
+                                                    `)}
+                                                </div>
+                                            </div>
+                                        ` : ''}
+                                        
+                                        ${this.wizardStep === 3 ? html`
+                                            <div class="text-center py-8">
+                                                <div class="w-24 h-24 rounded-full bg-gradient-brand flex items-center justify-center mx-auto mb-6 shadow-xl shadow-brand-pink/30">
+                                                    <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                                                </div>
+                                                <h4 class="text-2xl font-display font-black text-white mb-2">Todo Listo</h4>
+                                                <p class="text-slate-400 text-lg">Se provisionará la infraestructura para <strong class="text-white">${this.wizardData.name}</strong> bajo el plan <strong class="text-white">${this.wizardData.plan_name}</strong>.</p>
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                    
+                                    <div class="p-8 border-t border-white/10 flex justify-between bg-black/20 items-center">
+                                        ${this.wizardStep > 1 ? html`<button @click=${this.prevStep} class="px-6 py-3 text-slate-400 hover:text-white font-bold transition">Volver Atrás</button>` : html`<div></div>`}
+                                        ${this.wizardStep < 3 ? html`<button @click=${this.nextStep} class="btn-primary px-8 py-3 rounded-full">Continuar</button>` : 
+                                            html`<button @click=${this.submitWizard} ?disabled=${this.wizardLoading} class="btn-gradient px-8 py-3 rounded-full flex items-center gap-2 disabled:opacity-50">${this.wizardLoading ? html`<svg class="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Procesando...` : 'Lanzar Pod'}</button>`}
+                                    </div>
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
             }
         }
-
-
-        customElements.define('saas-control-plane', SaaSControlPlane);
+        customElements.define('saas-control-plane', MasterControlPlane);
     </script>
-</head>
-<body>
-    <saas-control-plane></saas-control-plane>
+    <style>
+        .animate-fade-in { animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
 </body>
 </html>

@@ -1,5 +1,6 @@
 import uuid
 from django.db import models
+from django.contrib.auth.models import User
 
 class Plan(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -22,6 +23,7 @@ class Tenant(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255)
     email = models.EmailField(unique=True)
+    owner = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name="tenants", help_text="Tenant owner for RBAC mapping")
     plan = models.ForeignKey(Plan, on_delete=models.SET_NULL, null=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     
@@ -30,11 +32,25 @@ class Tenant(models.Model):
     assigned_port = models.IntegerField(blank=True, null=True)
     custom_domain = models.CharField(max_length=255, blank=True, null=True)
     
+    # Creator Override (God Mode) logic
+    creator_session_pin = models.CharField(max_length=10, blank=True, null=True, help_text="Temporary session PIN for God Mode challenge")
+    pin_expires_at = models.DateTimeField(blank=True, null=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return self.name
+
+class GlobalConfig(models.Model):
+    """System-wide configuration for the master orchestrator."""
+    key = models.CharField(max_length=100, unique=True)
+    value = models.TextField()
+    description = models.CharField(max_length=255, blank=True, null=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.key
 
 class VaultRecord(models.Model):
     """

@@ -1,14 +1,14 @@
 #!/bin/bash
 set -e
 
-# Use the volume-mounted db directory for SQLite
-export DATABASE_PATH="/app/db/db.sqlite3"
-
-# Override Django settings to point to the persistent volume
-export DJANGO_SETTINGS_MODULE="core.settings"
+# Ensure Django settings are configured
+export DJANGO_SETTINGS_MODULE=${DJANGO_SETTINGS_MODULE:-core.settings}
 
 echo "🔧 Running Django migrations..."
 python manage.py migrate --noinput
+
+echo "📦 Collecting static files..."
+python manage.py collectstatic --noinput
 
 # Create superuser from environment variables if not exists
 if [ -n "$DJANGO_SUPERUSER_USERNAME" ] && [ -n "$DJANGO_SUPERUSER_PASSWORD" ]; then
