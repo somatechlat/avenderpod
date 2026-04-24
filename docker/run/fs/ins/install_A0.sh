@@ -38,7 +38,7 @@ fi
 uv pip install --index-strategy unsafe-best-match -r /git/agent-zero/requirements.txt
 
 # install playwright
-bash /ins/install_playwright.sh "$@"
+# bash /ins/install_playwright.sh "$@"
 
 # Preload A0
 python /git/agent-zero/preload.py --dockerized=true

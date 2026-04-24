@@ -1,7 +1,10 @@
 --extra-index-url https://download.pytorch.org/whl/cpu
+python-dotenv==1.1.0
+pytz==2024.2
+tiktoken==0.8.0
 a2wsgi==1.10.8
 ansio==0.0.1
-browser-use
+# browser-use
 docker==7.1.0
 duckduckgo-search==6.1.12
 faiss-cpu==1.11.0
@@ -13,24 +16,28 @@ flaredantic==0.1.5
 GitPython==3.1.43
 giturlparse==0.14.0
 inputimeout==1.0.4
-kokoro>=0.9.2
+# kokoro>=0.9.2
 simpleeval==1.0.3
 langchain-core==0.3.49
 langchain-community==0.3.19
 langchain-unstructured==0.1.6
-openai-whisper==20250625
+# openai-whisper==20250625
 lxml_html_clean>=0.4.0  # CVE-2024-52595 fix: XSS CWE-79 CVSS 8.4
 markdown==3.7
 mcp==1.22.0
 newspaper3k==0.2.8
 paramiko==3.5.0
-playwright==1.52.0
+# playwright==1.52.0
+# Document Processing (Lightweight)
+python-docx
+python-pptx
+openpyxl
+pandas
+pytesseract
+pdf2image
 pypdf==6.0.0
-python-dotenv==1.1.0
-pytz==2024.2
-sentence-transformers==3.0.1
-tiktoken==0.8.0
-unstructured[all-docs]==0.16.23
+pymupdf==1.25.3
+# unstructured-client is light (API based)
 unstructured-client==0.31.0
 webcolors==24.6.0
 nest-asyncio==1.6.0
