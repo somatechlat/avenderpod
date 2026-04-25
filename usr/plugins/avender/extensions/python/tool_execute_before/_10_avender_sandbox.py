@@ -16,7 +16,7 @@ from helpers.extension import Extension
 from helpers.errors import HandledException
 from helpers.print_style import PrintStyle
 
-from usr.plugins.avender.helpers.db import get_tenant_config
+from usr.plugins.avender.helpers.config import get_setting
 
 # Base tools allowed for everyone
 BASE_TOOLS = {
@@ -29,8 +29,18 @@ BASE_TOOLS = {
 
 # Tools specific to archetypes
 ARCHETYPE_TOOLS = {
+    "restaurant": {"search_catalog", "calculate_total"},
     "retail": {"search_catalog", "calculate_total"},
-    "medical": {"search_catalog"},  # services catalog
+    "groceries": {"search_catalog", "calculate_total"},
+    "beauty": {"search_catalog", "calculate_total"},
+    "tech": {"search_catalog", "calculate_total"},
+    "services": {"search_catalog", "calculate_total"},
+    "doctor": {"search_catalog"},
+    "pharmacy": {"search_catalog", "calculate_total"},
+    "hardware": {"search_catalog", "calculate_total"},
+    "liquor": {"search_catalog", "calculate_total"},
+    "cbd": {"search_catalog", "calculate_total"},
+    "medical": {"search_catalog"},  # backward-compatible alias
     "real_estate": {"search_catalog"}, # properties catalog
     "subscriptions": {"search_catalog"},
 }
@@ -54,7 +64,7 @@ class AvenderToolSandbox(Extension):
         if agent_profile != AVENDER_AGENT_PROFILE:
             return
 
-        archetype = get_tenant_config("archetype") or "retail"
+        archetype = get_setting("archetype", "retail")
         
         # Build dynamic allowlist
         allowed_tools = set(BASE_TOOLS)

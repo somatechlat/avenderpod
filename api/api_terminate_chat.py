@@ -2,6 +2,7 @@ from agent import AgentContext
 from helpers.api import ApiHandler, Request, Response
 from helpers.persist_chat import remove_chat
 from helpers.print_style import PrintStyle
+from api._api_context_guard import is_external_api_context
 import json
 
 
@@ -41,6 +42,12 @@ class ApiTerminateChat(ApiHandler):
                     '{"error": "Chat context not found"}',
                     status=404,
                     mimetype="application/json"
+                )
+            if not is_external_api_context(context):
+                return Response(
+                    '{"error": "Context is not managed by external API"}',
+                    status=403,
+                    mimetype="application/json",
                 )
 
             # Delete the chat context

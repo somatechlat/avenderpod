@@ -59,6 +59,14 @@ def _init_schema(conn):
         )
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS auth_sessions (
+            token TEXT PRIMARY KEY,
+            role TEXT NOT NULL,
+            expires_at DATETIME NOT NULL
+        )
+    """)
+
     conn.commit()
 
 
@@ -91,3 +99,11 @@ def get_tenant_config(key: str = None):
         rows = cursor.fetchall()
         conn.close()
         return {row['key']: row['value'] for row in rows}
+
+
+def delete_tenant_config(key: str) -> None:
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM tenant_config WHERE key = ?", (key,))
+    conn.commit()
+    conn.close()

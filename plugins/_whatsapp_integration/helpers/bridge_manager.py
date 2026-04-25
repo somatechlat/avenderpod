@@ -11,6 +11,7 @@ import hashlib
 import json
 import os
 import platform
+import re
 import shutil
 import subprocess
 import threading
@@ -91,7 +92,17 @@ BRIDGE_DIR = str(Path(__file__).parent.parent / "whatsapp-bridge")
 BRIDGE_SCRIPT = os.path.join(BRIDGE_DIR, "bridge.js")
 BRIDGE_PACKAGE_JSON = os.path.join(BRIDGE_DIR, "package.json")
 BRIDGE_PACKAGE_LOCK = os.path.join(BRIDGE_DIR, "package-lock.json")
-BRIDGE_RUNTIME_DIR = os.path.join(REPO_ROOT, "usr", "whatsapp", "bridge-runtime")
+
+
+def _runtime_scope_component() -> str:
+    raw = os.environ.get("WHATSAPP_NUMBER_ID") or os.environ.get("TENANT_ID") or "default"
+    value = str(raw).strip() or "default"
+    return re.sub(r"[^a-zA-Z0-9_.-]", "_", value)[:80]
+
+
+BRIDGE_RUNTIME_DIR = os.path.join(
+    REPO_ROOT, "usr", "whatsapp", "bridge-runtime", _runtime_scope_component()
+)
 BRIDGE_INSTALL_STATE = os.path.join(BRIDGE_RUNTIME_DIR, "deps-state.json")
 BRIDGE_NPM_CACHE = os.path.join(BRIDGE_RUNTIME_DIR, "npm-cache")
 NODE_MODULES_DIR = os.path.join(BRIDGE_DIR, "node_modules")
@@ -529,12 +540,38 @@ def _kill_port_process(port: int) -> None:
 
 def _start_log_reader(process: _BridgeProcess) -> None:
     def _reader() -> None:
+        from helpers.notification import NotificationManager, NotificationType, NotificationPriority
+
         assert process.stdout
         for line in iter(process.stdout.readline, b""):
             text = line.decode("utf-8", errors="replace").rstrip()
             if text:
                 process.remember_output(text)
                 PrintStyle.standard(f"WhatsApp bridge: {text}")
+
+                # Detect QR codes or pairing status and broadcast to UI if needed
+                if "Scan this QR code" in text or "▄▄▄▄▄" in text:
+                    NotificationManager.send_notification(
+                        type=NotificationType.WARNING,
+                        priority=NotificationPriority.HIGH,
+                        title="WhatsApp Pairing Required",
+                        message="Please scan the QR code in the terminal to connect.",
+                        display_time=30,
+                        group="whatsapp_auth"
+                    )
+                elif "authenticated" in text.lower():
+                    NotificationManager.send_notification(
+                        type=NotificationType.SUCCESS,
+                        priority=NotificationPriority.HIGH,
+                        title="WhatsApp Connected",
+                        message="Your WhatsApp account has been successfully authenticated.",
+                        display_time=10,
+                        group="whatsapp_auth"
+                    )
+                elif "Waiting for scan" in text:
+                    # Avoid spamming but let UI know we are ready
+                    pass
+
         process.stdout.close()
 
     thread = threading.Thread(target=_reader, daemon=True)

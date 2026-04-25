@@ -13,6 +13,11 @@ from plugins._whatsapp_integration.helpers.storage_paths import (
 )
 
 
-def test_whatsapp_bridge_storage_paths_use_agent_zero_tmp():
-    assert get_bridge_session_dir() == files.get_abs_path(files.TEMP_DIR, "whatsapp", "session")
-    assert get_bridge_media_dir() == files.get_abs_path(files.TEMP_DIR, "whatsapp", "media")
+def test_whatsapp_bridge_storage_paths_are_plugin_owned_and_scoped(monkeypatch):
+    monkeypatch.setenv("TENANT_ID", "tenant/one")
+    assert get_bridge_session_dir() == files.get_abs_path(
+        "usr", "plugins", "_whatsapp_integration", "session", "tenant_one"
+    )
+    assert get_bridge_media_dir() == files.get_abs_path(
+        "usr", "plugins", "_whatsapp_integration", "media", "tenant_one"
+    )

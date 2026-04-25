@@ -1,8 +1,5 @@
-import base64
-from io import BytesIO
 import mimetypes
 import os
-from pathlib import Path
 
 from flask import Response
 from helpers.api import ApiHandler, Input, Output, Request
@@ -87,21 +84,8 @@ def make_disposition(download_name: str) -> str:
 
 
 def resolve_download_path(path: str) -> str:
-    """Resolve a requested download path and keep it within the runtime base dir."""
-    base_dir = Path(files.get_base_dir()).resolve()
-    candidate = Path(path)
-
-    if candidate.is_absolute():
-        resolved = candidate.resolve()
-    else:
-        resolved = (base_dir / candidate).resolve()
-
-    try:
-        resolved.relative_to(base_dir)
-    except ValueError as exc:
-        raise ValueError("Invalid file path") from exc
-
-    return str(resolved)
+    """Resolve a requested download path and keep it within the security root."""
+    return files.resolve_path_in_root(path, must_exist=True)
 
 
 class DownloadFile(ApiHandler):
@@ -114,8 +98,6 @@ class DownloadFile(ApiHandler):
         file_path = request.args.get("path", input.get("path", ""))
         if not file_path:
             raise ValueError("No file path provided")
-        if not file_path.startswith("/"):
-            file_path = f"/{file_path}"
 
         try:
             file_path = await runtime.call_development_function(
@@ -134,11 +116,9 @@ class DownloadFile(ApiHandler):
         if file["is_dir"]:
             zip_file = await runtime.call_development_function(files.zip_dir, file["abs_path"])
             if runtime.is_development():
-                b64 = await runtime.call_development_function(fetch_file, zip_file)
-                file_data = BytesIO(base64.b64decode(b64))
                 return stream_file_download(
-                    file_data,
-                    download_name=os.path.basename(zip_file)
+                    zip_file,
+                    download_name=os.path.basename(zip_file),
                 )
             else:
                 return stream_file_download(
@@ -147,11 +127,9 @@ class DownloadFile(ApiHandler):
                 )
         elif file["is_file"]:
             if runtime.is_development():
-                b64 = await runtime.call_development_function(fetch_file, file["abs_path"])
-                file_data = BytesIO(base64.b64decode(b64))
                 return stream_file_download(
-                    file_data,
-                    download_name=os.path.basename(file_path)
+                    file["abs_path"],
+                    download_name=os.path.basename(file_path),
                 )
             else:
                 return stream_file_download(
@@ -159,9 +137,3 @@ class DownloadFile(ApiHandler):
                     download_name=os.path.basename(file["file_name"])
                 )
         raise Exception(f"File {file_path} not found")
-
-
-async def fetch_file(path):
-    with open(path, "rb") as file:
-        file_content = file.read()
-        return base64.b64encode(file_content).decode("utf-8")

@@ -9,4 +9,5 @@ allow_group: false
 allowed_numbers: []
 # Example: ["34652029134", "1234567890"]
 project: ""
+agent_profile: ""
 agent_instructions: ""

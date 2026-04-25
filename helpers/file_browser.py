@@ -22,12 +22,8 @@ class FileBrowser:
     MAX_TEXT_FILE_SIZE = 1 * 1024 * 1024  # 1MB
 
     def __init__(self):
-        # if runtime.is_development():
-        #     base_dir = files.get_base_dir()
-        # else:
-        #     base_dir = "/"
-        base_dir = "/"
-        self.base_dir = Path(base_dir)
+        base_dir = files.get_security_root()
+        self.base_dir = Path(base_dir).resolve()
 
     def _check_file_size(self, file) -> bool:
         try:
@@ -342,9 +338,11 @@ class FileBrowser:
 
     def get_full_path(self, file_path: str, allow_dir: bool = False) -> str:
         """Get full file path if it exists and is within base_dir"""
-        full_path = files.get_abs_path(self.base_dir, file_path)
+        full_path = files.resolve_path_in_root(file_path, str(self.base_dir), must_exist=True)
         if not files.exists(full_path):
             raise ValueError(f"File {file_path} not found")
+        if not allow_dir and os.path.isdir(full_path):
+            raise ValueError(f"Path {file_path} is a directory")
         return full_path
 
     def _get_file_type(self, filename: str) -> str:

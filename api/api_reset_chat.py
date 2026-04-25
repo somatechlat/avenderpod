@@ -2,6 +2,7 @@ from agent import AgentContext
 from helpers.api import ApiHandler, Request, Response
 from helpers.print_style import PrintStyle
 from helpers import persist_chat
+from api._api_context_guard import is_external_api_context
 import json
 
 
@@ -41,6 +42,12 @@ class ApiResetChat(ApiHandler):
                     '{"error": "Chat context not found"}',
                     status=404,
                     mimetype="application/json"
+                )
+            if not is_external_api_context(context):
+                return Response(
+                    '{"error": "Context is not managed by external API"}',
+                    status=403,
+                    mimetype="application/json",
                 )
 
             # Reset the chat context (clears history but keeps context alive)

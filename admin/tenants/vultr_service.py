@@ -2,9 +2,9 @@
 Vultr Infrastructure Service — Real API integration.
 Docs: https://www.vultr.com/api/#tag/instances
 """
+import base64
 import os
 import requests
-from django.conf import settings
 from .models import Tenant
 
 VULTR_API_BASE = "https://api.vultr.com/v2"
@@ -33,7 +33,27 @@ def _vultr_headers() -> dict:
     }
 
 
-def deploy_tenant_pod(tenant: Tenant) -> dict:
+def _build_user_data_script(tenant: Tenant, bootstrap_env: dict[str, str]) -> str:
+    lines = [
+        "#!/bin/bash",
+        "set -euo pipefail",
+        "install -d -m 700 /etc/avender",
+        "cat >/etc/avender/tenant.env <<'EOF'",
+    ]
+    for key, value in bootstrap_env.items():
+        safe_value = str(value).replace("\n", "").replace("\r", "")
+        lines.append(f"{key}={safe_value}")
+    lines.extend(
+        [
+            "EOF",
+            "chmod 600 /etc/avender/tenant.env",
+            f"echo 'tenant={tenant.id}' >/etc/avender/provisioned.info",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def deploy_tenant_pod(tenant: Tenant, bootstrap_env: dict[str, str] | None = None) -> dict:
     """
     Deploy a new Vultr instance for this tenant using the Vultr REST API.
     https://www.vultr.com/api/#operation/create-instance
@@ -60,8 +80,11 @@ def deploy_tenant_pod(tenant: Tenant) -> dict:
         "label": f"avender-{tenant.name[:30]}-{tenant.id.hex[:8]}",
         "hostname": f"avender-{tenant.id.hex[:12]}",
         "tag": "avender-saas",
-        "user_data": "",  # Base64 startup script would go here
+        "user_data": "",
     }
+    if bootstrap_env:
+        script = _build_user_data_script(tenant, bootstrap_env)
+        payload["user_data"] = base64.b64encode(script.encode("utf-8")).decode("ascii")
 
     response = requests.post(
         f"{VULTR_API_BASE}/instances",

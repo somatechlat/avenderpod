@@ -40,6 +40,11 @@ usr/**
 usr/**/*
 # But allow .gitkeep files
 !usr/**/.gitkeep
+!usr/plugins/
+!usr/plugins/avender/
+!usr/plugins/avender/helpers/
+!usr/plugins/avender/helpers/auth.py
+!usr/plugins/avender/helpers/config.py
 
 
 # Global rule to include .gitkeep files anywhere
@@ -50,7 +55,6 @@ agent_history.gif
 
 .agent/**
 .claude/**
-!usr/plugins/avender/**
 
 # Ignore databases
 *.db
@@ -63,4 +67,3 @@ playwright-report/
 blob-report/
 playwright/.cache/
 *.spec.js.snap
-

@@ -73,9 +73,16 @@ services:
       DJANGO_SUPERUSER_USERNAME: ${DJANGO_SUPERUSER_USERNAME:-admin}
       DJANGO_SUPERUSER_PASSWORD: ${DJANGO_SUPERUSER_PASSWORD:-avender2026}
       DJANGO_SUPERUSER_EMAIL: ${DJANGO_SUPERUSER_EMAIL:-admin@avender.local}
+      SYSADMIN_API_KEY: ${SYSADMIN_API_KEY:-}
       VULTR_API_KEY: ${VULTR_API_KEY:-}
       VULTR_REGION: ${VULTR_REGION:-mia}
       VULTR_PLAN: ${VULTR_PLAN:-vc2-1c-1gb}
+      VAULT_ADDR: ${VAULT_ADDR:-}
+      VAULT_TOKEN: ${VAULT_TOKEN:-}
+      VAULT_KV_MOUNT: ${VAULT_KV_MOUNT:-secret}
+      VAULT_NAMESPACE: ${VAULT_NAMESPACE:-}
+      VAULT_TIMEOUT_SECONDS: ${VAULT_TIMEOUT_SECONDS:-10}
+      SYSADMIN_API_PUBLIC_URL: ${SYSADMIN_API_PUBLIC_URL:-}
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8000/admin/login/ || exit 1"]
       interval: 15s
@@ -153,6 +160,9 @@ services:
       AVENDER_SETUP_TOKEN: ${AVENDER_SETUP_TOKEN:-change_me_before_production}
       WEB_UI_HOST: 0.0.0.0
       WHISPER_API_URL: http://avender_whisper:8000/v1/audio/transcriptions
+      TENANT_ID: "2e121b7e-94ea-4511-abfc-ac8a36adcb8b"
+      SYSADMIN_API_URL: http://avender_sysadmin:8000/api/saas
+      SYSADMIN_API_KEY: ${SYSADMIN_API_KEY:-}
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:80 || exit 1"]
       interval: 15s

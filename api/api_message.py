@@ -9,6 +9,7 @@ from helpers.print_style import PrintStyle
 from helpers.projects import activate_project
 from helpers.security import safe_filename
 from initialize import initialize_agent
+from api._api_context_guard import mark_external_api_context, is_external_api_context
 import threading
 
 
@@ -80,6 +81,12 @@ class ApiMessage(ApiHandler):
             context = AgentContext.use(context_id)
             if not context:
                 return Response('{"error": "Context not found"}', status=404, mimetype="application/json")
+            if not is_external_api_context(context):
+                return Response(
+                    '{"error": "Context is not managed by external API"}',
+                    status=403,
+                    mimetype="application/json",
+                )
 
             # Validation: if agent profile is provided, it must match the exising
             if agent_profile and context.agent0.config.profile != agent_profile:
@@ -95,6 +102,7 @@ class ApiMessage(ApiHandler):
             context = AgentContext(config=config, type=AgentContextType.USER)
             AgentContext.use(context.id)
             context_id = context.id
+            mark_external_api_context(context)
             # Activate project if provided
             if project_name:
                 try:
@@ -108,13 +116,6 @@ class ApiMessage(ApiHandler):
                         status=500,
                         mimetype="application/json",
                     )
-
-            # Activate project if provided
-            if project_name:
-                try:
-                    projects.activate_project(context_id, project_name)
-                except Exception as e:
-                    return Response(f'{{"error": "Failed to activate project: {str(e)}"}}', status=400, mimetype="application/json")
 
         # Update chat lifetime
         with self._cleanup_lock:

@@ -42,7 +42,12 @@ def test_onboarding_wizard_and_catalog_ingestion():
         "policies": "Strictly no walk-ins.",
         "hours": "Mon-Fri 08:00-18:00",
         "payTransfer": "true",
-        "catalogData": "name,description,price\nGeneral Checkup,Routine physical,50\nX-Ray,Chest X-Ray,35"
+        "whatsappNumber": "+593987654321",
+        "adminPassword": "test-admin-password",
+        "catalogItems": [
+            {"name": "General Checkup", "description": "Routine physical", "price": 50, "metadata": {}},
+            {"name": "X-Ray", "description": "Chest X-Ray", "price": 35, "metadata": {}},
+        ],
     }
     
     print("[TEST] Sending Onboarding payload with Catalog Data...")

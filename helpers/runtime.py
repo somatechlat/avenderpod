@@ -29,12 +29,11 @@ def initialize():
     parser.add_argument("--host", type=str, default=None, help="Web UI host")
     parser.add_argument(
         "--cloudflare_tunnel",
-        type=bool,
-        default=False,
+        action="store_true",
         help="Use cloudflare tunnel for public URL",
     )
     parser.add_argument(
-        "--development", type=bool, default=False, help="Development mode"
+        "--development", action="store_true", help="Development mode"
     )
 
     known, unknown = parser.parse_known_args()

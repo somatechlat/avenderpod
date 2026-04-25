@@ -103,11 +103,18 @@
                 clearInterval(this.pollInterval);
             }
 
+            apiHeaders() {
+                return {
+                    'Content-Type': 'application/json',
+                    'X-Avender-Admin-Token': this.authToken || ''
+                };
+            }
+
             async _verifySession() {
                 try {
                     const res = await fetch('/api/plugins/avender/auth_api', {
                         method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
+                        headers: this.apiHeaders(),
                         body: JSON.stringify({ action: 'verify', token: this.authToken })
                     });
                     const data = await res.json();
@@ -120,7 +127,7 @@
                 try {
                     const res = await fetch('/api/plugins/avender/auth_api', {
                         method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
+                        headers: this.apiHeaders(),
                         body: JSON.stringify({ action: 'login', password: this.loginPassword })
                     });
                     const data = await res.json();
@@ -142,7 +149,7 @@
             async handleLogout() {
                 await fetch('/api/plugins/avender/auth_api', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: this.apiHeaders(),
                     body: JSON.stringify({ action: 'logout', token: this.authToken })
                 }).catch(() => {});
                 localStorage.removeItem('avender_admin_token');
@@ -172,7 +179,7 @@
                 try {
                     const res = await fetch('/api/plugins/avender/admin_conversations_api', {
                         method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
+                        headers: this.apiHeaders(),
                         body: JSON.stringify({ action: 'list' })
                     });
                     const data = await res.json();
@@ -184,7 +191,7 @@
                 try {
                     const res = await fetch('/api/plugins/avender/admin_conversations_api', {
                         method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
+                        headers: this.apiHeaders(),
                         body: JSON.stringify({ action: 'messages', context_id: contextId })
                     });
                     const data = await res.json();
@@ -196,7 +203,7 @@
                 try {
                     const res = await fetch('/api/plugins/avender/admin_catalog_api', {
                         method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
+                        headers: this.apiHeaders(),
                         body: JSON.stringify({ action: 'list' })
                     });
                     const data = await res.json();
@@ -208,7 +215,7 @@
                 try {
                     const res = await fetch('/api/plugins/avender/admin_interactions_api', {
                         method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
+                        headers: this.apiHeaders(),
                         body: JSON.stringify({ action: 'kpis' })
                     });
                     const data = await res.json();
@@ -220,7 +227,7 @@
                 try {
                     const res = await fetch('/api/plugins/avender/admin_settings_api', {
                         method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
+                        headers: this.apiHeaders(),
                         body: JSON.stringify({ action: 'get' })
                     });
                     const data = await res.json();
@@ -228,12 +235,25 @@
                 } catch (e) { console.error("Error loading settings", e); }
             }
 
+            async saveSettings() {
+                try {
+                    const res = await fetch('/api/plugins/avender/admin_settings_api', {
+                        method: 'POST',
+                        headers: this.apiHeaders(),
+                        body: JSON.stringify({ action: 'save', settings: this.settings })
+                    });
+                    const data = await res.json();
+                    if (!data.ok) console.error("Error saving settings", data.error);
+                    await this.loadSettings();
+                } catch (e) { console.error("Error saving settings", e); }
+            }
+
             async handleTakeover() {
                 if (!this.activeContextId) return;
                 try {
                     await fetch('/api/plugins/avender/admin_conversations_api', {
                         method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
+                        headers: this.apiHeaders(),
                         body: JSON.stringify({ action: 'takeover', context_id: this.activeContextId })
                     });
                     this.loadConversations();
@@ -245,7 +265,7 @@
                 try {
                     await fetch('/api/plugins/avender/admin_conversations_api', {
                         method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
+                        headers: this.apiHeaders(),
                         body: JSON.stringify({ action: 'release', context_id: this.activeContextId })
                     });
                     this.loadConversations();
@@ -262,7 +282,7 @@
                     input.value = '';
                     await fetch('/api/plugins/avender/admin_conversations_api', {
                         method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
+                        headers: this.apiHeaders(),
                         body: JSON.stringify({ action: 'send', context_id: this.activeContextId, message })
                     });
                     this.loadMessages(this.activeContextId);
@@ -505,7 +525,10 @@
                         <div class="bg-white p-8 rounded-2xl shadow-sm border border-gray-200 space-y-6">
                             <div>
                                 <label class="block text-sm font-bold text-gray-700 mb-1">Nombre del Vendedor</label>
-                                <input type="text" .value=${this.settings.agent_name || ''} class="w-full border-gray-300 rounded-lg p-3 border focus:ring-2 focus:ring-indigo-500">
+                                <input type="text"
+                                    .value=${this.settings.agent_name || ''}
+                                    @input=${(e) => this.settings = {...this.settings, agent_name: e.target.value}}
+                                    class="w-full border-gray-300 rounded-lg p-3 border focus:ring-2 focus:ring-indigo-500">
                             </div>
                             
                             <!-- Age Verification Lock Alert (For Liquor/CBD) -->
@@ -526,7 +549,7 @@
                             ` : ''}
 
                             <div class="pt-6 mt-6 border-t border-gray-100 flex justify-end">
-                                <button class="bg-gray-900 text-white px-6 py-3 rounded-lg font-bold hover:bg-black transition-colors shadow">
+                                <button @click=${this.saveSettings} class="bg-gray-900 text-white px-6 py-3 rounded-lg font-bold hover:bg-black transition-colors shadow">
                                     Guardar Cambios
                                 </button>
                             </div>

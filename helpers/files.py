@@ -6,6 +6,7 @@ import re
 import base64
 import shutil
 import tempfile
+from pathlib import Path
 from typing import Any, Literal
 import zipfile
 import glob
@@ -633,6 +634,55 @@ def is_dir(*relative_paths):
 
 def get_base_dir():
     return _base_dir
+
+
+def get_security_root() -> str:
+    """
+    Security boundary root for file APIs.
+
+    - Dockerized runtime defaults to /a0
+    - Development defaults to repository base dir
+    - Can be overridden with A0_SECURITY_ROOT
+    """
+    from helpers import runtime
+
+    custom = os.environ.get("A0_SECURITY_ROOT", "").strip()
+    if custom:
+        return os.path.abspath(custom)
+    if runtime.is_dockerized():
+        return os.path.abspath("/a0")
+    return os.path.abspath(get_base_dir())
+
+
+def resolve_path_in_root(
+    path: str, root: str | None = None, *, must_exist: bool = True
+) -> str:
+    """
+    Resolve a user-provided path inside a bounded root.
+    Raises ValueError if the resolved path escapes the root.
+    """
+    if not isinstance(path, str) or not path.strip():
+        raise ValueError("Path is required")
+
+    boundary = Path(os.path.abspath(root or get_security_root()))
+    candidate = Path(path)
+    if candidate.is_absolute() and str(candidate).startswith("/a0/"):
+        from helpers import runtime
+
+        if not runtime.is_dockerized():
+            candidate = Path(get_base_dir()) / str(candidate).removeprefix("/a0/")
+    if not candidate.is_absolute():
+        candidate = boundary / candidate
+
+    resolved = candidate.resolve(strict=False)
+    try:
+        resolved.relative_to(boundary)
+    except ValueError as exc:
+        raise ValueError("Invalid file path") from exc
+
+    if must_exist and not resolved.exists():
+        raise ValueError("Path does not exist")
+    return str(resolved)
 
 
 def basename(path: str, suffix: str | None = None):

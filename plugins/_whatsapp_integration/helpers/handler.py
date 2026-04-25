@@ -42,6 +42,7 @@ CTX_WA_LAST_MSG_ID = "wa_last_msg_id"
 CTX_WA_ATTACHMENTS = "_wa_response_attachments"
 CTX_WA_REPLY_TO = "_wa_reply_to"
 CTX_WA_TYPING_ACTIVE = "_wa_typing_active"
+CTX_AVENDER_HANDOFF = "avender_human_handoff"
 
 # Poll task — lives here (not in extension module) because
 # extension modules are re-executed on each job_loop tick,
@@ -128,6 +129,10 @@ async def _dispatch_message(config: dict, msg: dict) -> None:
         # Continue most recent chat for this JID
         if await _handle_control_message(config, msg, existing[0]):
             return
+        context = AgentContext.get(existing[0])
+        if context and context.data.get(CTX_AVENDER_HANDOFF):
+            await _log_handoff_message(msg, existing[0])
+            return
         port = int(config.get("bridge_port", 3100))
         base_url = bridge_manager.get_bridge_url(port)
         await wa_client.send_typing(base_url, chat_id)
@@ -148,7 +153,8 @@ async def _start_new_chat(config: dict, msg: dict) -> None:
     chat_id = msg.get("chatId", "")
     is_group = msg.get("isGroup", False)
 
-    agent_config = initialize_agent()
+    agent_profile = config.get("agent_profile") or "avender_sales"
+    agent_config = initialize_agent(override_settings={"agent_profile": agent_profile})
     context = AgentContext(agent_config, name=f"WhatsApp: {sender_name[:50]}")
 
     context.data[CTX_WA_CHAT_ID] = chat_id
@@ -207,6 +213,9 @@ async def _route_to_chat(
     context = AgentContext.get(context_id)
     if not context:
         return
+    if context.data.get(CTX_AVENDER_HANDOFF):
+        await _log_handoff_message(msg, context_id)
+        return
 
     context.data[CTX_WA_LAST_BODY] = msg.get("body", "")
     context.data[CTX_WA_LAST_MSG_ID] = msg.get("messageId", "")
@@ -235,6 +244,22 @@ async def _route_to_chat(
 
     save_tmp_chat(context)
     PrintStyle.info(f"WhatsApp: continuing chat {context_id}")
+
+
+async def _log_handoff_message(msg: dict, context_id: str) -> None:
+    context = AgentContext.get(context_id)
+    if not context:
+        return
+    context.data[CTX_WA_LAST_BODY] = msg.get("body", "")
+    context.data[CTX_WA_LAST_MSG_ID] = msg.get("messageId", "")
+    context.data[CTX_WA_TYPING_ACTIVE] = False
+    user_msg = _build_user_message(context.agent0, msg)
+    msg_id = str(uuid.uuid4())
+    mq.log_user_message(
+        context, user_msg, [], message_id=msg_id, source=" (whatsapp handoff)",
+    )
+    save_tmp_chat(context)
+    PrintStyle.info(f"WhatsApp: logged handoff message without AI response for {context_id}")
 
 
 async def _handle_control_message(

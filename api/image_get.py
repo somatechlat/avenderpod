@@ -1,10 +1,7 @@
-import base64
 import os
 from urllib.parse import quote
 from helpers.api import ApiHandler, Request, Response, send_file
 from helpers import files, runtime
-import io
-from mimetypes import guess_type
 
 
 class ImageGet(ApiHandler):
@@ -16,22 +13,14 @@ class ImageGet(ApiHandler):
     async def process(self, input: dict, request: Request) -> dict | Response:
         # input data
         path = input.get("path", request.args.get("path", ""))
-        metadata = (
-            input.get("metadata", request.args.get("metadata", "false")).lower()
-            == "true"
-        )
-
         if not path:
             raise ValueError("No path provided")
 
-        # no real need to check, we have the extension filter in place
-        # check if path is within base directory
-        # if runtime.is_development():
-        #     in_base = files.is_in_base_dir(files.fix_dev_path(path))
-        # else:
-        #     in_base = files.is_in_base_dir(path)
-        # if not in_base and not files.is_in_dir(path, "/root"):
-        #     raise ValueError("Path is outside of allowed directory")
+        # Security boundary: image reads must stay under security root.
+        try:
+            path = files.resolve_path_in_root(path, must_exist=True)
+        except ValueError as exc:
+            raise ValueError(str(exc))
 
         # get file extension and info
         file_ext = os.path.splitext(path)[1].lower()
@@ -48,31 +37,10 @@ class ImageGet(ApiHandler):
 
             # in development environment, try to serve the image from local file system if exists, otherwise from docker
             if runtime.is_development():
-                # Convert /a0/... Docker paths to local absolute paths
-                local_path = files.fix_dev_path(path)
-                if files.exists(local_path):
-                    response = send_file(local_path)
+                if files.exists(path):
+                    response = send_file(path)
                 else:
-                    # Try fetching from Docker via RFC as fallback
-                    try:
-                        if await runtime.call_development_function(files.exists, path):
-                            b64_content = await runtime.call_development_function(
-                                files.read_file_base64, path
-                            )
-                            file_content = base64.b64decode(b64_content)
-                            mime_type, _ = guess_type(filename)
-                            if not mime_type:
-                                mime_type = "application/octet-stream"
-                            response = send_file(
-                                io.BytesIO(file_content),
-                                mimetype=mime_type,
-                                as_attachment=False,
-                                download_name=filename,
-                            )
-                        else:
-                            response = _send_fallback_icon("image")
-                    except Exception:
-                        response = _send_fallback_icon("image")
+                    response = _send_fallback_icon("image")
             else:
                 if files.exists(path):
                     response = send_file(path)

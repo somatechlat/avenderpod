@@ -3,7 +3,7 @@ import json
 from typing import Any
 
 from helpers.extension import Extension
-from usr.plugins.avender.helpers.db import get_tenant_config
+from usr.plugins.avender.helpers.config import get_setting
 
 
 class AvenderBusinessRules(Extension):
@@ -15,31 +15,31 @@ class AvenderBusinessRules(Extension):
         if agent_profile != "avender_sales":
             return
 
-        archetype = get_tenant_config("archetype") or "retail"
-        trade_name = get_tenant_config("tradeName") or "Negocio"
-        policies = get_tenant_config("policies") or "No hay políticas adicionales."
-        hours = get_tenant_config("hours") or "24/7"
-        delivery_rules = get_tenant_config("deliveryRules") or "No definido."
-        agent_name = get_tenant_config("agentName") or "Asistente"
-        tone = get_tenant_config("tone") or "friendly"
+        archetype = get_setting("archetype", "retail")
+        trade_name = get_setting("trade_name", "Negocio")
+        policies = get_setting("policies", "No hay políticas adicionales.")
+        hours = get_setting("hours", "24/7")
+        delivery_rules = get_setting("delivery_rules", "No definido.")
+        agent_name = get_setting("agent_name", "Asistente")
+        tone = get_setting("agent_tone", "friendly")
         
         # Build payment methods
         methods = []
         # JSON strings from Alpine might be literally 'true' or 'false'
-        if str(get_tenant_config("payTransfer")).lower() == "true": 
+        if str(get_setting("payments_transfer", False)).lower() == "true":
             methods.append("Transferencia Bancaria")
-        if str(get_tenant_config("payCash")).lower() == "true": 
+        if str(get_setting("payments_cash", False)).lower() == "true":
             methods.append("Efectivo")
-        if str(get_tenant_config("payLink")).lower() == "true": 
-            methods.append(f"Link de Pago ({get_tenant_config('paymentUrl')})")
+        if str(get_setting("payments_link", False)).lower() == "true":
+            methods.append(f"Link de Pago ({get_setting('payment_link_url', '')})")
             
         methods_str = ", ".join(methods) if methods else "Acordar con el vendedor"
         
-        use_slang_val = str(get_tenant_config("useSlang")).lower() == "true"
+        use_slang_val = str(get_setting("agent_slang", False)).lower() == "true"
         slang_directive = "Puedes usar modismos locales moderadamente." if use_slang_val else "Mantén un lenguaje profesional sin modismos locales."
 
         # Age Verification Constraint (LOPDP / Ecuadorian Law)
-        require_age_verification = str(get_tenant_config("requireAgeVerification")).lower() == "true"
+        require_age_verification = str(get_setting("require_age_verification", False)).lower() == "true"
         age_verification_directive = ""
         if require_age_verification:
             age_verification_directive = (

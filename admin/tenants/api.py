@@ -1,25 +1,54 @@
 import random
+import hmac
+import os
 from django.utils import timezone
 from datetime import timedelta
 from ninja import Router, Schema
-from ninja.security import django_auth
 from django.shortcuts import get_object_or_404
 from django.http import HttpResponseForbidden
 from .models import Tenant, Plan, CatalogItem, TenantConfig, InteractionRecord, VaultRecord, GlobalConfig
 from .vultr_service import deploy_tenant_pod, suspend_tenant_pod, reactivate_tenant_pod
+from .vault_service import provision_tenant_secrets, build_tenant_bootstrap_env
 from common.messages import get_message
 
-# Enforce django_auth on all routes in this router
-router = Router(auth=django_auth)
+class SessionOrServiceAuth:
+    """
+    Accept either:
+    - authenticated Django session user
+    - X-API-KEY matching SYSADMIN_API_KEY (service-to-service)
+    """
+
+    def __call__(self, request):
+        user = getattr(request, "user", None)
+        if user is not None and user.is_authenticated:
+            return user
+
+        expected = os.environ.get("SYSADMIN_API_KEY", "").strip()
+        provided = request.headers.get("X-API-KEY", "").strip()
+        # Fail closed for weak keys.
+        if len(expected) >= 32 and provided and hmac.compare_digest(expected, provided):
+            return "service"
+        return None
+
+
+router = Router(auth=SessionOrServiceAuth())
+
+
+def is_service_request(request) -> bool:
+    return getattr(request, "auth", None) == "service"
 
 def check_sysadmin(request):
     """Ensure user is a superuser (SysAdmin)"""
+    if is_service_request(request):
+        return False
     if not request.user.is_superuser:
         return False
     return True
 
 def check_tenant_access(request, tenant: Tenant):
     """Ensure user is a SysAdmin OR the owner of the tenant."""
+    if is_service_request(request):
+        return False
     if request.user.is_superuser:
         return True
     if tenant.owner == request.user:
@@ -128,8 +157,10 @@ def create_tenant(request, payload: TenantIn):
     )
 
     try:
-        deploy_tenant_pod(tenant)
-    except (EnvironmentError, RuntimeError) as e:
+        tenant_secrets = provision_tenant_secrets(tenant)
+        bootstrap_env = build_tenant_bootstrap_env(tenant, tenant_secrets)
+        deploy_tenant_pod(tenant, bootstrap_env=bootstrap_env)
+    except (EnvironmentError, RuntimeError, ValueError) as e:
         tenant.status = 'pending'
         tenant.save()
         # Continuing despite error per original logic
@@ -224,6 +255,8 @@ def init_challenge(request, tenant_id: str):
     Generates a random 4-digit PIN for the dashboard.
     """
     tenant = get_object_or_404(Tenant, id=tenant_id)
+    if not (is_service_request(request) or check_tenant_access(request, tenant)):
+        return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
     pin = str(random.randint(1000, 9999))
     tenant.creator_session_pin = pin
     tenant.pin_expires_at = timezone.now() + timedelta(minutes=5)
@@ -235,18 +268,23 @@ def verify_challenge(request, payload: ChallengeIn):
     """
     Validates the Creator Password and the Session PIN.
     """
+    if not (is_service_request(request) or check_sysadmin(request)):
+        return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
+
     tenant = get_object_or_404(Tenant, id=payload.tenant_id)
     
     # 1. Verify Global Master Password
     master_pass_config = GlobalConfig.objects.filter(key="MASTER_CREATOR_PASSWORD").first()
-    if not master_pass_config or master_pass_config.value != payload.password:
+    if not master_pass_config or not hmac.compare_digest(
+        str(master_pass_config.value), str(payload.password)
+    ):
         return {"ok": False, "message": "Invalid Master Password."}
     
     # 2. Verify Session PIN
     if not tenant.creator_session_pin or tenant.creator_session_pin != payload.pin:
         return {"ok": False, "message": "Invalid or expired Session PIN."}
     
-    if tenant.pin_expires_at < timezone.now():
+    if not tenant.pin_expires_at or tenant.pin_expires_at < timezone.now():
         return {"ok": False, "message": "Session PIN has expired."}
     
     # Success - clear the PIN
@@ -261,6 +299,9 @@ def list_pending_challenges(request):
     """
     Returns active challenges for the Dashboard UI to display.
     """
+    if not (is_service_request(request) or check_sysadmin(request)):
+        return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
+
     active_tenants = Tenant.objects.filter(
         creator_session_pin__isnull=False,
         pin_expires_at__gt=timezone.now()

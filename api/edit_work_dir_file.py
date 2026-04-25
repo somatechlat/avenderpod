@@ -27,8 +27,6 @@ class EditWorkDirFile(ApiHandler):
                 file_path = request.args.get("path", "")
                 if not file_path:
                     return {"error": "Path is required"}
-                if not file_path.startswith("/"):
-                    file_path = f"/{file_path}"
 
                 data = await runtime.call_development_function(load_file, file_path)
                 return {"data": data}
@@ -36,8 +34,6 @@ class EditWorkDirFile(ApiHandler):
             file_path = input.get("path", "")
             if not file_path:
                 return {"error": "Path is required"}
-            if not file_path.startswith("/"):
-                file_path = f"/{file_path}"
 
             content = input.get("content", "")
             if not isinstance(content, str):

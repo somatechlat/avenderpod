@@ -1,4 +1,5 @@
 from abc import abstractmethod
+import hmac
 import json
 import threading
 from functools import wraps
@@ -108,14 +109,16 @@ def requires_api_key(f):
     async def decorated(*args, **kwargs):
         from helpers.settings import get_settings
 
-        valid_api_key = get_settings()["mcp_server_token"]
+        valid_api_key = str(get_settings().get("mcp_server_token", "")).strip()
+        if not valid_api_key:
+            return Response("API key is not configured", 503)
 
         if api_key := request.headers.get("X-API-KEY"):
-            if api_key != valid_api_key:
+            if not hmac.compare_digest(str(api_key), valid_api_key):
                 return Response("Invalid API key", 401)
         elif request.json and request.json.get("api_key"):
             api_key = request.json.get("api_key")
-            if api_key != valid_api_key:
+            if not hmac.compare_digest(str(api_key), valid_api_key):
                 return Response("Invalid API key", 401)
         else:
             return Response("API key required", 401)

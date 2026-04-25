@@ -1,5 +1,9 @@
 from helpers.api import ApiHandler, Request, Response
 from helpers.print_style import PrintStyle
+from helpers import plugins
+from plugins._whatsapp_integration.helpers.number_utils import normalize_allowed_numbers
+from usr.plugins.avender.helpers.auth import set_admin_password
+from usr.plugins.avender.helpers.config import normalize_settings, save_settings
 from usr.plugins.avender.helpers.db import save_tenant_config, get_tenant_config, get_connection
 import json
 import os
@@ -137,10 +141,12 @@ class AvenderOnboardingHandler(ApiHandler):
                 return {"ok": False, "error": "Onboarding already completed. Use the admin panel to modify settings."}
 
             # 2. Validate required fields
-            required_fields = ["idType", "idNumber", "tradeName", "archetype", "whatsappNumber"]
+            required_fields = ["idType", "idNumber", "tradeName", "archetype", "whatsappNumber", "adminPassword"]
             missing = [f for f in required_fields if not input.get(f)]
             if missing:
                 return {"ok": False, "error": f"Faltan campos obligatorios: {', '.join(missing)}"}
+            if len(str(input.get("adminPassword", ""))) < 8:
+                return {"ok": False, "error": "La contraseña de administrador debe tener al menos 8 caracteres."}
 
             # 2.1 Validate number restrictions
             restrict_access = input.get("restrictAccess", False)
@@ -150,8 +156,11 @@ class AvenderOnboardingHandler(ApiHandler):
                 if len(numbers_list) > 100:
                     return {"ok": False, "error": "No puedes agregar más de 100 números permitidos."}
 
-            # 3. Save all wizard data to tenant_config KV store
-            save_tenant_config(input)
+            # 3. Save normalized wizard data to tenant_config KV store.
+            normalized = normalize_settings(input)
+            save_settings(input)
+            set_admin_password(str(input["adminPassword"]))
+            self._configure_whatsapp(normalized)
 
             catalog_items = input.get("catalogItems", [])
             archetype = input.get("archetype", "default")
@@ -187,7 +196,7 @@ class AvenderOnboardingHandler(ApiHandler):
             conn.commit()
             conn.close()
 
-            # 5. Mark onboarding as complete
+            # 5. Mark onboarding as complete. Never persist plaintext admin password.
             save_tenant_config({"onboarding_complete": "true"})
 
             PrintStyle.success(
@@ -206,3 +215,17 @@ class AvenderOnboardingHandler(ApiHandler):
             PrintStyle.error(f"Avender Onboarding Error: {e}")
             return {"ok": False, "error": str(e)}
 
+    def _configure_whatsapp(self, settings: dict) -> None:
+        config = plugins.get_plugin_config("_whatsapp_integration") or {}
+        allowed_numbers = []
+        if settings.get("restrict_access"):
+            allowed_numbers = sorted(normalize_allowed_numbers(settings.get("allowed_numbers", "")))
+        config.update(
+            {
+                "enabled": True,
+                "mode": config.get("mode", "dedicated"),
+                "allowed_numbers": allowed_numbers,
+                "agent_profile": "avender_sales",
+            }
+        )
+        plugins.save_plugin_config("_whatsapp_integration", "", "", config)

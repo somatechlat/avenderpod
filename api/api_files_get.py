@@ -46,27 +46,11 @@ class ApiFilesGet(ApiHandler):
 
             for path in paths:
                 try:
-                    # Convert internal paths to external paths
-                    if path.startswith("/a0/tmp/uploads/"):
-                        # Internal path - convert to external
-                        filename = path.replace("/a0/tmp/uploads/", "")
-                        external_path = files.get_abs_path("usr/uploads", filename)
-                        filename = os.path.basename(external_path)
-                    elif path.startswith("/a0/"):
-                        # Other internal Agent Zero paths
-                        relative_path = path.replace("/a0/", "")
-                        external_path = files.get_abs_path(relative_path)
-                        filename = os.path.basename(external_path)
-                    else:
-                        # Assume it's already an external/absolute path
-                        external_path = path
-                        filename = os.path.basename(path)
+                    # Resolve strictly inside the configured security root.
+                    external_path = files.resolve_path_in_root(path, must_exist=True)
+                    filename = os.path.basename(external_path)
 
                     # Check if file exists
-                    if not os.path.exists(external_path):
-                        PrintStyle.warning(f"File not found: {path}")
-                        continue
-
                     # Read and encode file
                     with open(external_path, "rb") as f:
                         file_content = f.read()

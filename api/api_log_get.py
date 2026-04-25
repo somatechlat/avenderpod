@@ -1,5 +1,6 @@
 from agent import AgentContext
 from helpers.api import ApiHandler, Request, Response
+from api._api_context_guard import is_external_api_context
 
 
 class ApiLogGet(ApiHandler):
@@ -35,6 +36,12 @@ class ApiLogGet(ApiHandler):
         context = AgentContext.use(context_id)
         if not context:
             return Response('{"error": "Context not found"}', status=404, mimetype="application/json")
+        if not is_external_api_context(context):
+            return Response(
+                '{"error": "Context is not managed by external API"}',
+                status=403,
+                mimetype="application/json",
+            )
 
         try:
             # Get total number of log items
