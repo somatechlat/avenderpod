@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# ruff: noqa: E402
+
 import sys
 from pathlib import Path
 
@@ -15,7 +17,11 @@ from usr.plugins.avender.helpers.auth import (
     verify_admin_password,
     verify_session,
 )
-from usr.plugins.avender.helpers.config import get_setting, normalize_settings, save_settings
+from usr.plugins.avender.helpers.config import (
+    get_setting,
+    normalize_settings,
+    save_settings,
+)
 
 
 def _use_temp_db(monkeypatch, tmp_path: Path) -> None:
@@ -23,7 +29,9 @@ def _use_temp_db(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setattr(db, "_db_initialized", False)
 
 
-def test_normalize_settings_maps_onboarding_payload_and_forces_age_gate(monkeypatch, tmp_path):
+def test_normalize_settings_maps_onboarding_payload_and_forces_age_gate(
+    monkeypatch, tmp_path
+):
     _use_temp_db(monkeypatch, tmp_path)
 
     normalized = normalize_settings(

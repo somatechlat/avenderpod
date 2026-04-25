@@ -1,12 +1,12 @@
 import mimetypes
 import os
+from io import BytesIO
 
 from flask import Response
 from helpers.api import ApiHandler, Input, Output, Request
 from helpers import files, runtime
 from api import file_info
 from urllib.parse import quote
-
 
 
 def stream_file_download(file_source, download_name, chunk_size=8192):
@@ -37,7 +37,7 @@ def stream_file_download(file_source, download_name, chunk_size=8192):
     def generate():
         if isinstance(file_source, str):
             # File path - open and stream from disk
-            with open(file_source, 'rb') as f:
+            with open(file_source, "rb") as f:
                 while True:
                     chunk = f.read(chunk_size)
                     if not chunk:
@@ -55,7 +55,7 @@ def stream_file_download(file_source, download_name, chunk_size=8192):
     # Detect content type based on file extension
     content_type, _ = mimetypes.guess_type(download_name)
     if not content_type:
-        content_type = 'application/octet-stream'
+        content_type = "application/octet-stream"
 
     # Create streaming response with proper headers for immediate streaming
     response = Response(
@@ -63,12 +63,12 @@ def stream_file_download(file_source, download_name, chunk_size=8192):
         content_type=content_type,
         direct_passthrough=True,  # Prevent Flask from buffering the response
         headers={
-            'Content-Disposition': make_disposition(download_name),
-            'Content-Length': str(file_size),  # Critical for browser progress bars
-            'Cache-Control': 'no-cache',
-            'X-Accel-Buffering': 'no',  # Disable nginx buffering
-            'Accept-Ranges': 'bytes'  # Allow browser to resume downloads
-        }
+            "Content-Disposition": make_disposition(download_name),
+            "Content-Length": str(file_size),  # Critical for browser progress bars
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",  # Disable nginx buffering
+            "Accept-Ranges": "bytes",  # Allow browser to resume downloads
+        },
     )
 
     return response
@@ -76,11 +76,13 @@ def stream_file_download(file_source, download_name, chunk_size=8192):
 
 def make_disposition(download_name: str) -> str:
     # Basic ASCII fallback (strip or replace weird chars)
-    ascii_fallback = download_name.encode("ascii", "ignore").decode("ascii") or "download"
+    ascii_fallback = (
+        download_name.encode("ascii", "ignore").decode("ascii") or "download"
+    )
     utf8_name = quote(download_name)  # URL-encode UTF-8 bytes
 
     # RFC 5987: filename* with UTF-8
-    return f'attachment; filename="{ascii_fallback}"; filename*=UTF-8\'\'{utf8_name}'
+    return f"attachment; filename=\"{ascii_fallback}\"; filename*=UTF-8''{utf8_name}"
 
 
 def resolve_download_path(path: str) -> str:
@@ -114,7 +116,9 @@ class DownloadFile(ApiHandler):
             raise Exception(f"File {file_path} not found")
 
         if file["is_dir"]:
-            zip_file = await runtime.call_development_function(files.zip_dir, file["abs_path"])
+            zip_file = await runtime.call_development_function(
+                files.zip_dir, file["abs_path"]
+            )
             if runtime.is_development():
                 return stream_file_download(
                     zip_file,
@@ -122,8 +126,7 @@ class DownloadFile(ApiHandler):
                 )
             else:
                 return stream_file_download(
-                    zip_file,
-                    download_name=f"{os.path.basename(file_path)}.zip"
+                    zip_file, download_name=f"{os.path.basename(file_path)}.zip"
                 )
         elif file["is_file"]:
             if runtime.is_development():
@@ -133,7 +136,6 @@ class DownloadFile(ApiHandler):
                 )
             else:
                 return stream_file_download(
-                    file["abs_path"],
-                    download_name=os.path.basename(file["file_name"])
+                    file["abs_path"], download_name=os.path.basename(file["file_name"])
                 )
         raise Exception(f"File {file_path} not found")

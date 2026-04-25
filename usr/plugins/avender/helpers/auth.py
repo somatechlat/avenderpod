@@ -6,7 +6,11 @@ import secrets
 from datetime import datetime, timedelta
 
 from helpers.api import Request
-from usr.plugins.avender.helpers.db import get_connection, get_tenant_config, save_tenant_config
+from usr.plugins.avender.helpers.db import (
+    get_connection,
+    get_tenant_config,
+    save_tenant_config,
+)
 
 
 SESSION_HOURS = 12
@@ -18,7 +22,9 @@ def _hash_password(password: str, *, salt: str | None = None) -> str:
     if not password:
         raise ValueError("Password is required")
     salt = salt or secrets.token_hex(16)
-    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("ascii"), 200_000)
+    digest = hashlib.pbkdf2_hmac(
+        "sha256", password.encode("utf-8"), salt.encode("ascii"), 200_000
+    )
     return f"pbkdf2_sha256$200000${salt}${digest.hex()}"
 
 
@@ -44,7 +50,7 @@ def set_admin_password(password: str) -> None:
 
 def verify_admin_password(password: str) -> bool:
     encoded = get_tenant_config(PASSWORD_KEY)
-    if encoded and _verify_hash(password, encoded):
+    if isinstance(encoded, str) and _verify_hash(password, encoded):
         return True
 
     legacy = get_tenant_config(LEGACY_PASSWORD_KEY)
@@ -74,7 +80,9 @@ def verify_session(token: str) -> tuple[bool, str]:
         return False, ""
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT role, expires_at FROM auth_sessions WHERE token = ?", (token,))
+    cursor.execute(
+        "SELECT role, expires_at FROM auth_sessions WHERE token = ?", (token,)
+    )
     row = cursor.fetchone()
     if not row:
         conn.close()
@@ -85,7 +93,7 @@ def verify_session(token: str) -> tuple[bool, str]:
         conn.commit()
         conn.close()
         return False, ""
-    role = row["role"]
+    role = str(row["role"])
     conn.close()
     return True, role
 

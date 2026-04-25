@@ -1,6 +1,5 @@
 import sqlite3
 import json
-import os
 from pathlib import Path
 
 # The DB will live inside the user's workspace, perfectly isolated for this tenant.
@@ -28,16 +27,19 @@ def _init_schema(conn):
     cursor = conn.cursor()
 
     # 1. Tenant Config (Key-Value for Onboarding Data)
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS tenant_config (
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
         )
-    """)
+    """
+    )
 
     # 2. Universal Catalog (EAV / JSONB style)
     # The 'metadata' column holds industry-specific JSON (e.g., calories, duration)
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS catalog_item (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -45,10 +47,12 @@ def _init_schema(conn):
             description TEXT,
             metadata TEXT DEFAULT '{}'
         )
-    """)
+    """
+    )
 
     # 3. Universal Interaction Record (Orders, Bookings, Leads)
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS interaction_record (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             customer_wa_id TEXT NOT NULL,
@@ -57,15 +61,18 @@ def _init_schema(conn):
             payload TEXT NOT NULL, -- JSON data of the interaction
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
-    """)
+    """
+    )
 
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS auth_sessions (
             token TEXT PRIMARY KEY,
             role TEXT NOT NULL,
             expires_at DATETIME NOT NULL
         )
-    """)
+    """
+    )
 
     conn.commit()
 
@@ -79,13 +86,13 @@ def save_tenant_config(config_dict: dict):
         val_str = json.dumps(value) if isinstance(value, (dict, list)) else str(value)
         cursor.execute(
             "INSERT INTO tenant_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-            (key, val_str)
+            (key, val_str),
         )
     conn.commit()
     conn.close()
 
 
-def get_tenant_config(key: str = None):
+def get_tenant_config(key: str | None = None):
     """Retrieves config. If key is None, returns all as dict."""
     conn = get_connection()
     cursor = conn.cursor()
@@ -93,12 +100,12 @@ def get_tenant_config(key: str = None):
         cursor.execute("SELECT value FROM tenant_config WHERE key = ?", (key,))
         row = cursor.fetchone()
         conn.close()
-        return row['value'] if row else None
+        return row["value"] if row else None
     else:
         cursor.execute("SELECT key, value FROM tenant_config")
         rows = cursor.fetchall()
         conn.close()
-        return {row['key']: row['value'] for row in rows}
+        return {row["key"]: row["value"] for row in rows}
 
 
 def delete_tenant_config(key: str) -> None:

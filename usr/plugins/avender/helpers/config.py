@@ -99,7 +99,8 @@ def get_settings() -> dict[str, Any]:
     result: dict[str, Any] = {}
     for key, value in raw.items():
         canonical = LEGACY_TO_CANONICAL.get(key, key)
-        result[canonical] = _parse_value(value)
+        if canonical:
+            result[canonical] = _parse_value(value)
     return result
 
 

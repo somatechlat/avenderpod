@@ -6,10 +6,19 @@ from datetime import timedelta
 from ninja import Router, Schema
 from django.shortcuts import get_object_or_404
 from django.http import HttpResponseForbidden
-from .models import Tenant, Plan, CatalogItem, TenantConfig, InteractionRecord, VaultRecord, GlobalConfig
+from .models import (
+    Tenant,
+    Plan,
+    CatalogItem,
+    TenantConfig,
+    InteractionRecord,
+    VaultRecord,
+    GlobalConfig,
+)
 from .vultr_service import deploy_tenant_pod, suspend_tenant_pod, reactivate_tenant_pod
 from .vault_service import provision_tenant_secrets, build_tenant_bootstrap_env
 from common.messages import get_message
+
 
 class SessionOrServiceAuth:
     """
@@ -37,6 +46,7 @@ router = Router(auth=SessionOrServiceAuth())
 def is_service_request(request) -> bool:
     return getattr(request, "auth", None) == "service"
 
+
 def check_sysadmin(request):
     """Ensure user is a superuser (SysAdmin)"""
     if is_service_request(request):
@@ -44,6 +54,7 @@ def check_sysadmin(request):
     if not request.user.is_superuser:
         return False
     return True
+
 
 def check_tenant_access(request, tenant: Tenant):
     """Ensure user is a SysAdmin OR the owner of the tenant."""
@@ -55,12 +66,15 @@ def check_tenant_access(request, tenant: Tenant):
         return True
     return False
 
+
 # --- SCHEMAS ---
+
 
 class TenantIn(Schema):
     name: str
     email: str
     plan_name: str
+
 
 class TenantOut(Schema):
     id: str
@@ -69,11 +83,13 @@ class TenantOut(Schema):
     status: str
     assigned_port: int | None
 
+
 class CatalogItemIn(Schema):
     name: str
     price: float
     description: str | None = None
     metadata: dict | None = None
+
 
 class CatalogItemOut(Schema):
     id: str
@@ -82,9 +98,11 @@ class CatalogItemOut(Schema):
     description: str | None
     metadata: dict
 
+
 class ConfigIn(Schema):
     key: str
     value: str
+
 
 class PlanOut(Schema):
     id: str
@@ -92,11 +110,13 @@ class PlanOut(Schema):
     price_monthly: float
     max_conversations: int
 
+
 class VaultRecordOut(Schema):
     id: str
     tenant_name: str
     vault_path: str
     created_at: str
+
 
 class InteractionRecordOut(Schema):
     id: str
@@ -106,10 +126,12 @@ class InteractionRecordOut(Schema):
     status: str
     created_at: str
 
+
 class ChallengeIn(Schema):
     tenant_id: str
     password: str
     pin: str
+
 
 class PendingChallengeOut(Schema):
     tenant_id: str
@@ -117,7 +139,9 @@ class PendingChallengeOut(Schema):
     pin: str
     expires_at: str
 
+
 # --- SYSTEM ENDPOINTS (SysAdmin Only) ---
+
 
 @router.get("/plans", response=list[PlanOut])
 def list_plans(request):
@@ -125,21 +149,47 @@ def list_plans(request):
         return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
     return Plan.objects.all()
 
+
 @router.get("/vault", response=list[VaultRecordOut])
 def list_vault_records(request):
     if not check_sysadmin(request):
         return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
-    records = VaultRecord.objects.select_related('tenant').all().order_by('-created_at')[:100]
-    return [{"id": str(r.id), "tenant_name": r.tenant.name, "vault_path": r.vault_path, "created_at": r.created_at.isoformat()} for r in records]
+    records = (
+        VaultRecord.objects.select_related("tenant").all().order_by("-created_at")[:100]
+    )
+    return [
+        {
+            "id": str(r.id),
+            "tenant_name": r.tenant.name,
+            "vault_path": r.vault_path,
+            "created_at": r.created_at.isoformat(),
+        }
+        for r in records
+    ]
+
 
 @router.get("/interactions", response=list[InteractionRecordOut])
 def list_interactions(request):
     if not check_sysadmin(request):
         return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
-    records = InteractionRecord.objects.select_related('tenant').order_by('-created_at')[:100]
-    return [{"id": str(r.id), "tenant_name": r.tenant.name, "customer_wa_id": r.customer_wa_id, "archetype": r.archetype, "status": r.status, "created_at": r.created_at.isoformat()} for r in records]
+    records = InteractionRecord.objects.select_related("tenant").order_by(
+        "-created_at"
+    )[:100]
+    return [
+        {
+            "id": str(r.id),
+            "tenant_name": r.tenant.name,
+            "customer_wa_id": r.customer_wa_id,
+            "archetype": r.archetype,
+            "status": r.status,
+            "created_at": r.created_at.isoformat(),
+        }
+        for r in records
+    ]
+
 
 # --- TENANT LIFECYCLE (SysAdmin Only) ---
+
 
 @router.post("/tenants", response=TenantOut)
 def create_tenant(request, payload: TenantIn):
@@ -152,21 +202,22 @@ def create_tenant(request, payload: TenantIn):
         name=payload.name,
         email=payload.email,
         plan=plan,
-        status='pending',
-        owner=request.user # The sysadmin creating it is assigned owner for now, can be changed later
+        status="pending",
+        owner=request.user,  # The sysadmin creating it is assigned owner for now, can be changed later
     )
 
     try:
         tenant_secrets = provision_tenant_secrets(tenant)
         bootstrap_env = build_tenant_bootstrap_env(tenant, tenant_secrets)
         deploy_tenant_pod(tenant, bootstrap_env=bootstrap_env)
-    except (EnvironmentError, RuntimeError, ValueError) as e:
-        tenant.status = 'pending'
+    except (EnvironmentError, RuntimeError, ValueError):
+        tenant.status = "pending"
         tenant.save()
         # Continuing despite error per original logic
         return tenant
 
     return tenant
+
 
 @router.get("/tenants", response=list[TenantOut])
 def list_tenants(request):
@@ -174,6 +225,7 @@ def list_tenants(request):
         return Tenant.objects.all()
     # If not superuser, return only their tenants
     return Tenant.objects.filter(owner=request.user)
+
 
 @router.post("/tenants/{tenant_id}/suspend")
 def suspend_tenant(request, tenant_id: str):
@@ -183,11 +235,19 @@ def suspend_tenant(request, tenant_id: str):
     tenant = get_object_or_404(Tenant, id=tenant_id)
     try:
         result = suspend_tenant_pod(tenant)
-        return {"ok": True, "message": get_message("SUCCESS_POD_SUSPENDED", name=tenant.name), "detail": result}
+        return {
+            "ok": True,
+            "message": get_message("SUCCESS_POD_SUSPENDED", name=tenant.name),
+            "detail": result,
+        }
     except (EnvironmentError, RuntimeError, ValueError) as e:
-        tenant.status = 'suspended'
+        tenant.status = "suspended"
         tenant.save()
-        return {"ok": True, "message": get_message("ERR_VULTR_API_FAILED", detail=str(e))}
+        return {
+            "ok": True,
+            "message": get_message("ERR_VULTR_API_FAILED", detail=str(e)),
+        }
+
 
 @router.post("/tenants/{tenant_id}/reactivate")
 def reactivate_tenant(request, tenant_id: str):
@@ -197,18 +257,28 @@ def reactivate_tenant(request, tenant_id: str):
     tenant = get_object_or_404(Tenant, id=tenant_id)
     try:
         result = reactivate_tenant_pod(tenant)
-        return {"ok": True, "message": get_message("SUCCESS_POD_REACTIVATED", name=tenant.name), "detail": result}
+        return {
+            "ok": True,
+            "message": get_message("SUCCESS_POD_REACTIVATED", name=tenant.name),
+            "detail": result,
+        }
     except (EnvironmentError, RuntimeError, ValueError) as e:
-        return {"ok": False, "message": get_message("ERR_VULTR_API_FAILED", detail=str(e))}
+        return {
+            "ok": False,
+            "message": get_message("ERR_VULTR_API_FAILED", detail=str(e)),
+        }
+
 
 # --- TENANT DATA (SysAdmin or Tenant Owner) ---
+
 
 @router.get("/tenants/{tenant_id}/catalog", response=list[CatalogItemOut])
 def list_catalog(request, tenant_id: str):
     tenant = get_object_or_404(Tenant, id=tenant_id)
     if not check_tenant_access(request, tenant):
         return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
-    return tenant.catalog_items.all()
+    return CatalogItem.objects.filter(tenant=tenant)
+
 
 @router.post("/tenants/{tenant_id}/catalog", response=CatalogItemOut)
 def create_catalog_item(request, tenant_id: str, payload: CatalogItemIn):
@@ -221,9 +291,10 @@ def create_catalog_item(request, tenant_id: str, payload: CatalogItemIn):
         name=payload.name,
         price=payload.price,
         description=payload.description,
-        metadata=payload.metadata or {}
+        metadata=payload.metadata or {},
     )
     return item
+
 
 @router.get("/tenants/{tenant_id}/config")
 def get_tenant_config(request, tenant_id: str):
@@ -231,8 +302,9 @@ def get_tenant_config(request, tenant_id: str):
     if not check_tenant_access(request, tenant):
         return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
 
-    configs = tenant.configs.all()
+    configs = TenantConfig.objects.filter(tenant=tenant)
     return {c.key: c.value for c in configs}
+
 
 @router.post("/tenants/{tenant_id}/config")
 def set_tenant_config(request, tenant_id: str, payload: ConfigIn):
@@ -241,12 +313,18 @@ def set_tenant_config(request, tenant_id: str, payload: ConfigIn):
         return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
 
     config, created = TenantConfig.objects.update_or_create(
-        tenant=tenant, key=payload.key,
-        defaults={'value': payload.value}
+        tenant=tenant, key=payload.key, defaults={"value": payload.value}
     )
-    return {"ok": True, "key": config.key, "value": config.value, "message": get_message("SUCCESS_CONFIG_SAVED")}
+    return {
+        "ok": True,
+        "key": config.key,
+        "value": config.value,
+        "message": get_message("SUCCESS_CONFIG_SAVED"),
+    }
+
 
 # --- CREATOR OVERRIDE (GOD MODE) ENDPOINTS ---
+
 
 @router.post("/auth/init-challenge")
 def init_challenge(request, tenant_id: str):
@@ -263,6 +341,7 @@ def init_challenge(request, tenant_id: str):
     tenant.save()
     return {"ok": True, "message": "Challenge initiated."}
 
+
 @router.post("/auth/verify-challenge")
 def verify_challenge(request, payload: ChallengeIn):
     """
@@ -272,27 +351,30 @@ def verify_challenge(request, payload: ChallengeIn):
         return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
 
     tenant = get_object_or_404(Tenant, id=payload.tenant_id)
-    
+
     # 1. Verify Global Master Password
-    master_pass_config = GlobalConfig.objects.filter(key="MASTER_CREATOR_PASSWORD").first()
+    master_pass_config = GlobalConfig.objects.filter(
+        key="MASTER_CREATOR_PASSWORD"
+    ).first()
     if not master_pass_config or not hmac.compare_digest(
         str(master_pass_config.value), str(payload.password)
     ):
         return {"ok": False, "message": "Invalid Master Password."}
-    
+
     # 2. Verify Session PIN
     if not tenant.creator_session_pin or tenant.creator_session_pin != payload.pin:
         return {"ok": False, "message": "Invalid or expired Session PIN."}
-    
+
     if not tenant.pin_expires_at or tenant.pin_expires_at < timezone.now():
         return {"ok": False, "message": "Session PIN has expired."}
-    
+
     # Success - clear the PIN
     tenant.creator_session_pin = None
     tenant.pin_expires_at = None
     tenant.save()
-    
+
     return {"ok": True, "message": "Creator access granted."}
+
 
 @router.get("/auth/pending-challenges", response=list[PendingChallengeOut])
 def list_pending_challenges(request):
@@ -303,15 +385,14 @@ def list_pending_challenges(request):
         return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
 
     active_tenants = Tenant.objects.filter(
-        creator_session_pin__isnull=False,
-        pin_expires_at__gt=timezone.now()
+        creator_session_pin__isnull=False, pin_expires_at__gt=timezone.now()
     )
     return [
         {
             "tenant_id": str(t.id),
             "tenant_name": t.name,
             "pin": t.creator_session_pin,
-            "expires_at": t.pin_expires_at.isoformat()
+            "expires_at": t.pin_expires_at.isoformat(),
         }
         for t in active_tenants
     ]

@@ -1,57 +1,94 @@
 ###############################################################################
-# Project‑specific exclusions / re‑includes
+# Production Docker context hygiene
 ###############################################################################
 
-# Obsolete
-memory/**
-instruments/**
-knowledge/custom/**
-
-# Logs, tmp, usr
-logs/*
-tmp/*
-usr/*
-
-
-# Keep .gitkeep markers anywhere
-!**/.gitkeep
-
-
-###############################################################################
-# Environment / tooling
-###############################################################################
-.conda/
-.cursor/
-.venv/
+# VCS and local agents
 .git/
+.github/
+.agent/
+.claude/
+.cursor/
+.windsurf/
+.idea/
+.vscode/
 
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+!.env.sample
+**/.env
+**/.env.*
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+id_rsa
+id_ed25519
 
-###############################################################################
-# Tests (root‑level only)
-###############################################################################
-/*.test.py
-
-
-###############################################################################
-# ─── LAST SECTION: universal junk / caches (MUST BE LAST) ───
-#   Put these at the *bottom* so they override any ! re‑includes above
-###############################################################################
-# OS / editor junk
-**/.DS_Store
-**/Thumbs.db
-
-# Node.js dependencies (reinstalled at runtime by bridge_manager.py)
-**/node_modules/
-
-# Python caches / compiled artefacts
+# Python environments, caches, and compiled artifacts
+.conda/
+.venv/
+venv/
+env/
 **/__pycache__/
 **/*.py[cod]
 **/*.pyo
 **/*.pyd
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/.pyright/
 
-# Environment files anywhere
-*.env
+# Node dependencies and package-manager caches
+**/node_modules/
+**/.npm/
+**/.yarn/
+**/.pnpm-store/
 
-.env
+# Runtime data and local state
+logs/**
+tmp/**
+usr/**
+!usr/
+!usr/plugins/
+!usr/plugins/avender/
+!usr/plugins/avender/**
+usr/workdir/**
+usr/**/*.db
+usr/**/*.sqlite
+usr/**/*.sqlite3
+memory/**
+instruments/**
+knowledge/custom/**
 *.db
+*.sqlite
+*.sqlite3
 
+# Django generated static output. SysAdmin runs collectstatic at startup.
+admin/staticfiles/**
+
+# Test, coverage, and browser artifacts
+tests/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+*.spec.js.snap
+htmlcov/
+.coverage
+coverage.xml
+/*.test.py
+
+# OS/editor junk
+**/.DS_Store
+**/Thumbs.db
+*~
+*.bak
+*.backup
+*.old
+*.orig
+
+# Keep intentional empty directory markers when their parent is included.
+!**/.gitkeep

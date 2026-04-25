@@ -1,20 +1,34 @@
 # Ignore common unwanted files globally
 **/.DS_Store
+**/Thumbs.db
 **/.env
+**/.env.*
+!.env.example
+!.env.sample
 **/__pycache__/
 *.py[cod]
+*.pyo
+*.pyd
 **/.conda/
 **/node_modules/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/.pyright/
 
-#Ignore IDE files
+# Ignore IDE files
 .cursor/
 .windsurf/
+.idea/
+.vscode/
 
 # ignore test files in root dir
 /*.test.py
 
 # Ignore all contents of the virtual environment directory
 .venv/
+venv/
+env/
 
 # obsolete folders
 /memory/
@@ -45,6 +59,11 @@ usr/**/*
 !usr/plugins/avender/helpers/
 !usr/plugins/avender/helpers/auth.py
 !usr/plugins/avender/helpers/config.py
+!usr/plugins/avender/webui/
+!usr/plugins/avender/webui/onboarding.css
+!usr/plugins/avender/webui/onboarding_lit.js
+!usr/plugins/avender/webui/onboarding_actions.js
+!usr/plugins/avender/webui/onboarding_views.js
 
 
 # Global rule to include .gitkeep files anywhere
@@ -56,9 +75,27 @@ agent_history.gif
 .agent/**
 .claude/**
 
-# Ignore databases
+# Ignore databases and runtime state
 *.db
 *.sqlite3
+*.sqlite
+admin/db.sqlite3
+usr/workdir/
+usr/**/*.db
+usr/**/*.sqlite
+usr/**/*.sqlite3
+
+# Django generated assets
+admin/staticfiles/
+
+# Secrets and private keys
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+id_rsa
+id_ed25519
 
 
 # Playwright artifacts
@@ -67,3 +104,10 @@ playwright-report/
 blob-report/
 playwright/.cache/
 *.spec.js.snap
+
+# Build and coverage artifacts
+dist/
+build/
+htmlcov/
+.coverage
+coverage.xml
