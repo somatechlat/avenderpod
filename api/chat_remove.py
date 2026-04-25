@@ -1,4 +1,4 @@
-from helpers.api import ApiHandler, Input, Output, Request, Response
+from helpers.api import ApiHandler, Input, Output, Request
 from agent import AgentContext
 from helpers import persist_chat
 from helpers.task_scheduler import TaskScheduler
@@ -27,6 +27,7 @@ class RemoveChat(ApiHandler):
 
         # Context removal affects global chat/task lists in all tabs.
         from helpers.state_monitor_integration import mark_dirty_all
+
         mark_dirty_all(reason="api.chat_remove.RemoveChat")
 
         return {

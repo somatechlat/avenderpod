@@ -6,6 +6,7 @@ Requires agent context.
 
 import asyncio
 import base64
+import mimetypes
 import os
 import re
 import uuid
@@ -22,6 +23,7 @@ from initialize import initialize_agent
 
 from plugins._whatsapp_integration.helpers import wa_client
 from plugins._whatsapp_integration.helpers import bridge_manager
+from plugins._whatsapp_integration.helpers.storage_paths import get_bridge_media_dir
 from plugins._whatsapp_integration.helpers.number_utils import (
     normalize_allowed_numbers,
     normalize_number,
@@ -53,6 +55,7 @@ _poll_task: asyncio.Task | None = None  # type: ignore[type-arg]
 # ------------------------------------------------------------------
 # Poll loop
 # ------------------------------------------------------------------
+
 
 async def _refresh_typing(base_url: str) -> None:
     """Re-send composing for all contexts with active typing flag."""
@@ -94,7 +97,9 @@ async def poll_messages(config: dict) -> None:
         try:
             # Filter by allowed numbers if configured
             if allowed_set:
-                sender_num = normalize_number(msg.get("senderNumber", "") or msg.get("senderId", ""))
+                sender_num = normalize_number(
+                    msg.get("senderNumber", "") or msg.get("senderId", "")
+                )
                 if sender_num not in allowed_set:
                     PrintStyle.debug(
                         f"WhatsApp: ignored message from {sender_num} "
@@ -110,6 +115,7 @@ async def poll_messages(config: dict) -> None:
 # Dispatch a single inbound message
 # ------------------------------------------------------------------
 
+
 async def _dispatch_message(config: dict, msg: dict) -> None:
     chat_id = msg.get("chatId", "")
     is_group = msg.get("isGroup", False)
@@ -117,10 +123,12 @@ async def _dispatch_message(config: dict, msg: dict) -> None:
     # Group filtering: skip unless allow_group enabled AND bot was mentioned or replied to
     if is_group:
         if not config.get("allow_group", False):
-            PrintStyle.debug(f"WhatsApp: skipping group message (allow_group disabled)")
+            PrintStyle.debug("WhatsApp: skipping group message (allow_group disabled)")
             return
         if not msg.get("mentionedMe", False) and not msg.get("repliedToMe", False):
-            PrintStyle.debug(f"WhatsApp: skipping group message (not mentioned or replied to)")
+            PrintStyle.debug(
+                "WhatsApp: skipping group message (not mentioned or replied to)"
+            )
             return
 
     existing = _find_chats_by_jid(chat_id)
@@ -145,11 +153,14 @@ async def _dispatch_message(config: dict, msg: dict) -> None:
 # Chat creation and routing
 # ------------------------------------------------------------------
 
+
 async def _start_new_chat(config: dict, msg: dict) -> None:
     from helpers import projects
 
     sender_name = msg.get("senderName", "Unknown")
-    sender_number = msg.get("senderNumber", "") or normalize_number(msg.get("senderId", ""))
+    sender_number = msg.get("senderNumber", "") or normalize_number(
+        msg.get("senderId", "")
+    )
     chat_id = msg.get("chatId", "")
     is_group = msg.get("isGroup", False)
 
@@ -193,14 +204,20 @@ async def _start_new_chat(config: dict, msg: dict) -> None:
     user_msg = _build_user_message(context.agent0, msg)
 
     mq.log_user_message(
-        context, user_msg, attachments, message_id=msg_id, source=" (whatsapp)",
+        context,
+        user_msg,
+        attachments,
+        message_id=msg_id,
+        source=" (whatsapp)",
     )
-    context.communicate(UserMessage(
-        message=user_msg,
-        system_message=[system_ctx],
-        attachments=attachments,
-        id=msg_id,
-    ))
+    context.communicate(
+        UserMessage(
+            message=user_msg,
+            system_message=[system_ctx],
+            attachments=attachments,
+            id=msg_id,
+        )
+    )
 
     PrintStyle.success(
         f"WhatsApp: new chat {context.id} for {sender_name} ({sender_number})"
@@ -208,7 +225,8 @@ async def _start_new_chat(config: dict, msg: dict) -> None:
 
 
 async def _route_to_chat(
-    msg: dict, context_id: str,
+    msg: dict,
+    context_id: str,
 ) -> None:
     context = AgentContext.get(context_id)
     if not context:
@@ -234,13 +252,19 @@ async def _route_to_chat(
     user_msg = _build_user_message(context.agent0, msg)
 
     mq.log_user_message(
-        context, user_msg, attachments, message_id=msg_id, source=" (whatsapp)",
+        context,
+        user_msg,
+        attachments,
+        message_id=msg_id,
+        source=" (whatsapp)",
     )
-    context.communicate(UserMessage(
-        message=user_msg,
-        attachments=attachments,
-        id=msg_id,
-    ))
+    context.communicate(
+        UserMessage(
+            message=user_msg,
+            attachments=attachments,
+            id=msg_id,
+        )
+    )
 
     save_tmp_chat(context)
     PrintStyle.info(f"WhatsApp: continuing chat {context_id}")
@@ -256,10 +280,16 @@ async def _log_handoff_message(msg: dict, context_id: str) -> None:
     user_msg = _build_user_message(context.agent0, msg)
     msg_id = str(uuid.uuid4())
     mq.log_user_message(
-        context, user_msg, [], message_id=msg_id, source=" (whatsapp handoff)",
+        context,
+        user_msg,
+        [],
+        message_id=msg_id,
+        source=" (whatsapp handoff)",
     )
     save_tmp_chat(context)
-    PrintStyle.info(f"WhatsApp: logged handoff message without AI response for {context_id}")
+    PrintStyle.info(
+        f"WhatsApp: logged handoff message without AI response for {context_id}"
+    )
 
 
 async def _handle_control_message(
@@ -298,6 +328,7 @@ async def _handle_control_message(
 # Chat discovery
 # ------------------------------------------------------------------
 
+
 def _find_chats_by_jid(chat_id: str) -> list[str]:
     """Return context IDs for chats matching the given WhatsApp JID, newest first."""
     results = []
@@ -316,20 +347,25 @@ def _find_chats_by_jid(chat_id: str) -> list[str]:
 # Markdown to WhatsApp formatting
 # ------------------------------------------------------------------
 
+
 def _md_to_whatsapp(text: str) -> str:
     """Convert markdown formatting to WhatsApp formatting."""
     # Protect code blocks from conversion
     code_blocks: list[str] = []
+
     def _save_code(m: re.Match) -> str:
         code_blocks.append(m.group(0))
         return f"\x00CB{len(code_blocks) - 1}\x00"
+
     text = re.sub(r"```[\s\S]*?```", _save_code, text)
 
     # Protect inline code
     inline_codes: list[str] = []
+
     def _save_inline(m: re.Match) -> str:
         inline_codes.append(m.group(0))
         return f"\x00IC{len(inline_codes) - 1}\x00"
+
     text = re.sub(r"`[^`]+`", _save_inline, text)
 
     # Bold+italic ***text*** → *_text_*
@@ -356,29 +392,41 @@ def _md_to_whatsapp(text: str) -> str:
 # Media enrichment
 # ------------------------------------------------------------------
 
+
 async def _transcribe_audio(msg: dict, attachments: list[str]) -> None:
     """Transcribe audio/ptt messages via internal Whisper server."""
     if msg.get("mediaType") in ("audio", "ptt") and attachments:
         try:
-            audio_path = attachments[0]
-            # Verify file exists on host (bridge shares volume or uses absolute paths)
+            audio_path = files.fix_dev_path(attachments[0])
             if os.path.exists(audio_path):
                 form = aiohttp.FormData()
                 with open(audio_path, "rb") as f:
                     file_data = f.read()
-                form.add_field("file", file_data, filename=os.path.basename(audio_path), content_type="audio/ogg")
+                content_type = mimetypes.guess_type(audio_path)[0] or "audio/ogg"
+                form.add_field(
+                    "file",
+                    file_data,
+                    filename=os.path.basename(audio_path),
+                    content_type=content_type,
+                )
                 form.add_field("model", "whisper-1")
+                form.add_field("language", "es")
 
-                # avender_whisper is the container name in docker-compose
+                whisper_url = os.environ.get(
+                    "WHISPER_API_URL",
+                    "http://avender_whisper:8000/v1/audio/transcriptions",
+                )
                 async with aiohttp.ClientSession() as session:
-                    async with session.post("http://avender_whisper:8000/v1/audio/transcriptions", data=form) as resp:
+                    async with session.post(whisper_url, data=form) as resp:
                         if resp.status == 200:
                             data = await resp.json()
                             text = data.get("text", "").strip()
                             if text:
                                 msg["body"] = f"[Nota de voz transcrita]: {text}"
                         else:
-                            msg["body"] = f"[Nota de voz recibida (error transcripción: {resp.status})]"
+                            msg["body"] = (
+                                f"[Nota de voz recibida (error transcripción: {resp.status})]"
+                            )
         except Exception as e:
             PrintStyle.warning(f"WhatsApp: whisper error: {e}")
 
@@ -399,7 +447,9 @@ async def _enrich_location(msg: dict) -> None:
                             data = await resp.json()
                             address = data.get("display_name", "")
                             if address:
-                                msg["body"] += f"\nGeolocalización Automática: {address}"
+                                msg[
+                                    "body"
+                                ] += f"\nGeolocalización Automática: {address}"
                                 # Inject instruction for agent to confirm location
                                 msg["body"] += (
                                     "\n\n(SISTEMA: El usuario ha enviado su ubicación. "
@@ -415,9 +465,12 @@ async def _enrich_location(msg: dict) -> None:
 # Message builders
 # ------------------------------------------------------------------
 
+
 def _build_user_message(agent: Agent, msg: dict) -> str:
     sender_name = msg.get("senderName", "Unknown")
-    sender_number = msg.get("senderNumber", "") or normalize_number(msg.get("senderId", ""))
+    sender_number = msg.get("senderNumber", "") or normalize_number(
+        msg.get("senderId", "")
+    )
     is_group = msg.get("isGroup", False)
     prompt = "fw.wa.user_message_group.md" if is_group else "fw.wa.user_message.md"
     text = agent.read_prompt(
@@ -434,6 +487,7 @@ def _build_user_message(agent: Agent, msg: dict) -> str:
 # ------------------------------------------------------------------
 # Reply sending (called from process_chain_end extension)
 # ------------------------------------------------------------------
+
 
 async def send_wa_reply(
     context: AgentContext,
@@ -461,12 +515,15 @@ async def send_wa_reply(
     mode = config.get("mode", "self-chat")
     if mode == "self-chat":
         response_text = context.agent0.read_prompt(
-            "fw.wa.self_chat_prefix.md", response_text=response_text,
+            "fw.wa.self_chat_prefix.md",
+            response_text=response_text,
         )
 
     # Send text
     try:
-        result = await wa_client.send_message(base_url, chat_id, response_text, reply_to=reply_to)
+        result = await wa_client.send_message(
+            base_url, chat_id, response_text, reply_to=reply_to
+        )
         if result.get("error"):
             return result["error"]
     except Exception as e:
@@ -475,15 +532,26 @@ async def send_wa_reply(
     # Send attachments via RFC (files may live in execution runtime)
     if attachments:
         host_paths = await _read_attachments_to_host(attachments)
+        first_error = ""
         for host_path in host_paths:
             try:
                 result = await wa_client.send_media(
-                    base_url, chat_id, host_path,
+                    base_url,
+                    chat_id,
+                    host_path,
+                    media_type=_infer_media_type(host_path),
+                    file_name=os.path.basename(host_path),
                 )
                 if result.get("error"):
+                    if not first_error:
+                        first_error = result["error"]
                     PrintStyle.warning(f"WhatsApp: attachment error: {result['error']}")
             except Exception as e:
+                if not first_error:
+                    first_error = str(e)
                 PrintStyle.warning(f"WhatsApp: attachment error: {e}")
+        if first_error:
+            return first_error
 
     # Typing: restart if agent is still working, stop if final reply
     if keep_typing:
@@ -499,27 +567,43 @@ async def send_wa_reply(
 # Attachment reading (via RFC into execution runtime)
 # ------------------------------------------------------------------
 
+
 async def _read_attachments_to_host(
     paths: list[str],
 ) -> list[str]:
-    """Read files from execution runtime and write to host media cache."""
+    """Read files from execution runtime and write to bridge-readable media cache."""
     from plugins._whatsapp_integration.helpers.attachment_reader import read_attachment
 
     host_paths: list[str] = []
+    bridge_media_dir = (
+        bridge_manager.get_running_config().get("cache_dir") or get_bridge_media_dir()
+    )
     for path in paths:
         data = await runtime.call_development_function(read_attachment, path)
         if data["error"]:
             PrintStyle.warning(f"WhatsApp attachment: {data['error']}")
             continue
         # Write decoded bytes to host-side media cache
+        safe_name = os.path.basename(data["name"]) or f"attachment_{uuid.uuid4().hex}"
         host_path = os.path.join(
-            files.get_abs_path(MEDIA_FOLDER), data["name"],
+            bridge_media_dir, f"out_{uuid.uuid4().hex[:8]}_{safe_name}"
         )
         os.makedirs(os.path.dirname(host_path), exist_ok=True)
         with open(host_path, "wb") as f:
             f.write(base64.b64decode(data["content_b64"]))
         host_paths.append(host_path)
     return host_paths
+
+
+def _infer_media_type(path: str) -> str:
+    ext = os.path.splitext(path.lower())[1]
+    if ext in {".jpg", ".jpeg", ".png", ".webp", ".gif"}:
+        return "image"
+    if ext in {".mp4", ".mov", ".avi", ".mkv", ".3gp"}:
+        return "video"
+    if ext in {".ogg", ".opus", ".mp3", ".wav", ".m4a"}:
+        return "audio"
+    return "document"
 
 
 async def _save_incoming_media(
@@ -537,7 +621,9 @@ async def _save_incoming_media(
             content_b64 = base64.b64encode(f.read()).decode()
         rel_path = os.path.join(MEDIA_FOLDER, name)
         result = await runtime.call_development_function(
-            write_attachment, rel_path, content_b64,
+            write_attachment,
+            rel_path,
+            content_b64,
         )
         if result.get("error"):
             PrintStyle.warning(f"WhatsApp media save: {result['error']}")

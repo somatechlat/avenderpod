@@ -31,20 +31,26 @@ class TestConnection(ApiHandler):
             uptime = health.get("uptime", 0)
 
             if status == "connected":
-                results.append({
-                    "test": "WhatsApp bridge",
-                    "ok": True,
-                    "message": f"Connected and ready (uptime: {uptime:.0f}s, queue: {queue})",
-                })
+                results.append(
+                    {
+                        "test": "WhatsApp bridge",
+                        "ok": True,
+                        "message": f"Connected and ready (uptime: {uptime:.0f}s, queue: {queue})",
+                    }
+                )
             else:
-                results.append({
+                results.append(
+                    {
+                        "test": "WhatsApp bridge",
+                        "ok": False,
+                        "message": f"The bridge is running, but WhatsApp is not fully connected yet (status: {status}).",
+                    }
+                )
+        except Exception as e:
+            results.append(
+                {
                     "test": "WhatsApp bridge",
                     "ok": False,
-                    "message": f"The bridge is running, but WhatsApp is not fully connected yet (status: {status}).",
-                })
-        except Exception as e:
-            results.append({
-                "test": "WhatsApp bridge",
-                "ok": False,
-                "message": f"Could not reach the local WhatsApp bridge: {format_error(e)}",
-            })
+                    "message": f"Could not reach the local WhatsApp bridge: {format_error(e)}",
+                }
+            )

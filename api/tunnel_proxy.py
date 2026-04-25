@@ -1,12 +1,12 @@
 from helpers.api import ApiHandler, Request, Response
 from helpers import dotenv, runtime
-from helpers.tunnel_manager import TunnelManager
 import requests
 
 
 class TunnelProxy(ApiHandler):
     async def process(self, input: dict, request: Request) -> dict | Response:
         return await process(input)
+
 
 async def process(input: dict) -> dict | Response:
     # Get configuration from environment
@@ -19,10 +19,12 @@ async def process(input: dict) -> dict | Response:
     # first verify the service is running:
     service_ok = False
     try:
-        response = requests.post(f"http://localhost:{tunnel_api_port}/", json={"action": "health"})
+        response = requests.post(
+            f"http://localhost:{tunnel_api_port}/", json={"action": "health"}
+        )
         if response.status_code == 200:
             service_ok = True
-    except Exception as e:
+    except Exception:
         service_ok = False
 
     # forward this request to the tunnel service if OK
@@ -35,4 +37,5 @@ async def process(input: dict) -> dict | Response:
     else:
         # forward to API handler directly
         from api.tunnel import process as local_process
+
         return await local_process(input)

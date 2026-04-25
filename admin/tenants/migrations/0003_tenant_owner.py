@@ -8,14 +8,20 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('tenants', '0002_catalogitem_interactionrecord_tenantconfig'),
+        ("tenants", "0002_catalogitem_interactionrecord_tenantconfig"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='tenant',
-            name='owner',
-            field=models.ForeignKey(help_text='Tenant owner for RBAC mapping', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='tenants', to=settings.AUTH_USER_MODEL),
+            model_name="tenant",
+            name="owner",
+            field=models.ForeignKey(
+                help_text="Tenant owner for RBAC mapping",
+                null=True,
+                on_delete=django.db.models.deletion.SET_NULL,
+                related_name="tenants",
+                to=settings.AUTH_USER_MODEL,
+            ),
         ),
     ]

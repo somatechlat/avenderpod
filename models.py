@@ -17,16 +17,16 @@ from typing import (
 from litellm import completion, acompletion, embedding
 import litellm
 import openai
-from litellm.types.utils import ModelResponse
 
 from helpers import dotenv
-from helpers import settings, dirty_json
+from helpers import settings
 from helpers.dotenv import load_dotenv
 from helpers.providers import ModelType as ProviderModelType, get_provider_config
 from helpers.rate_limiter import RateLimiter
 from helpers.tokens import approximate_tokens
-from helpers import dirty_json
-from helpers.extension import extensible  # extensible: allows plugins to intercept get_api_key()
+from helpers.extension import (
+    extensible,
+)  # extensible: allows plugins to intercept get_api_key()
 
 from langchain_core.language_models.chat_models import SimpleChatModel
 from langchain_core.outputs.chat_generation import ChatGenerationChunk
@@ -41,6 +41,7 @@ from langchain_core.messages import (
     SystemMessage,
 )
 from langchain.embeddings.base import Embeddings
+
 # from sentence_transformers import SentenceTransformer (moved to lazy import)
 from pydantic import ConfigDict
 
@@ -58,6 +59,7 @@ def turn_off_logging():
 # init
 load_dotenv()
 turn_off_logging()
+
 
 class ModelType(Enum):
     CHAT = "Chat"
@@ -89,12 +91,15 @@ class ModelConfig:
 
 class ChatChunk(TypedDict):
     """Simplified response chunk for chat models."""
+
     response_delta: str
     reasoning_delta: str
 
+
 class ChatGenerationResult:
     """Chat generation result object"""
-    def __init__(self, chunk: ChatChunk|None = None):
+
+    def __init__(self, chunk: ChatChunk | None = None):
         self.reasoning = ""
         self.response = ""
         self.thinking = False
@@ -111,7 +116,10 @@ class ChatGenerationResult:
 
         # if native reasoning detection works, there's no need to worry about thinking tags
         if self.native_reasoning:
-            processed_chunk = ChatChunk(response_delta=chunk["response_delta"], reasoning_delta=chunk["reasoning_delta"])
+            processed_chunk = ChatChunk(
+                response_delta=chunk["response_delta"],
+                reasoning_delta=chunk["reasoning_delta"],
+            )
         else:
             # if the model outputs thinking tags, we ned to parse them manually as reasoning
             processed_chunk = self._process_thinking_chunk(chunk)
@@ -131,7 +139,7 @@ class ChatGenerationResult:
             close_pos = response.find(self.thinking_tag)
             if close_pos != -1:
                 reasoning += response[:close_pos]
-                response = response[close_pos + len(self.thinking_tag):]
+                response = response[close_pos + len(self.thinking_tag) :]
                 self.thinking = False
                 self.thinking_tag = ""
             else:
@@ -144,14 +152,14 @@ class ChatGenerationResult:
         else:
             for opening_tag, closing_tag in self.thinking_pairs:
                 if response.startswith(opening_tag):
-                    response = response[len(opening_tag):]
+                    response = response[len(opening_tag) :]
                     self.thinking = True
                     self.thinking_tag = closing_tag
 
                     close_pos = response.find(closing_tag)
                     if close_pos != -1:
                         reasoning += response[:close_pos]
-                        response = response[close_pos + len(closing_tag):]
+                        response = response[close_pos + len(closing_tag) :]
                         self.thinking = False
                         self.thinking_tag = ""
                     else:
@@ -162,7 +170,9 @@ class ChatGenerationResult:
                             reasoning += response
                             response = ""
                     break
-                elif len(response) < len(opening_tag) and self._is_partial_opening_tag(response, opening_tag):
+                elif len(response) < len(opening_tag) and self._is_partial_opening_tag(
+                    response, opening_tag
+                ):
                     self.unprocessed = response
                     response = ""
                     break
@@ -283,7 +293,8 @@ def apply_rate_limiter_sync(
 ):
     if not model_config:
         return
-    import asyncio, nest_asyncio
+    import asyncio
+    import nest_asyncio
 
     nest_asyncio.apply()
     return asyncio.run(
@@ -318,7 +329,9 @@ class LiteLLMChatWrapper(SimpleChatModel):
     def _llm_type(self) -> str:
         return "litellm-chat"
 
-    def _convert_messages(self, messages: List[BaseMessage], explicit_caching: bool = False) -> List[dict]:
+    def _convert_messages(
+        self, messages: List[BaseMessage], explicit_caching: bool = False
+    ) -> List[dict]:
         result = []
         # Map LangChain message types to LiteLLM roles
         role_mapping = {
@@ -365,7 +378,9 @@ class LiteLLMChatWrapper(SimpleChatModel):
 
             # fix messages with empty content, this breaks some LLMs
             content = message_dict.get("content")
-            has_content = bool(content) if not isinstance(content, list) else len(content) > 0
+            has_content = (
+                bool(content) if not isinstance(content, list) else len(content) > 0
+            )
             if not has_content:
                 message_dict["content"] = "empty"
 
@@ -388,7 +403,6 @@ class LiteLLMChatWrapper(SimpleChatModel):
         run_manager: Optional[CallbackManagerForLLMRun] = None,
         **kwargs: Any,
     ) -> str:
-        import asyncio
 
         msgs = self._convert_messages(messages)
 
@@ -412,7 +426,6 @@ class LiteLLMChatWrapper(SimpleChatModel):
         run_manager: Optional[CallbackManagerForLLMRun] = None,
         **kwargs: Any,
     ) -> Iterator[ChatGenerationChunk]:
-        import asyncio
 
         msgs = self._convert_messages(messages)
 
@@ -429,8 +442,8 @@ class LiteLLMChatWrapper(SimpleChatModel):
             **{**self.kwargs, **kwargs},
         ):
             # parse chunk
-            parsed = _parse_chunk(chunk) # chunk parsing
-            output = result.add_chunk(parsed) # chunk processing
+            parsed = _parse_chunk(chunk)  # chunk parsing
+            output = result.add_chunk(parsed)  # chunk processing
 
             # Only yield chunks with non-None content
             if output["response_delta"]:
@@ -461,8 +474,8 @@ class LiteLLMChatWrapper(SimpleChatModel):
         )
         async for chunk in response:  # type: ignore
             # parse chunk
-            parsed = _parse_chunk(chunk) # chunk parsing
-            output = result.add_chunk(parsed) # chunk processing
+            parsed = _parse_chunk(chunk)  # chunk parsing
+            output = result.add_chunk(parsed)  # chunk processing
 
             # Only yield chunks with non-None content
             if output["response_delta"]:
@@ -507,7 +520,11 @@ class LiteLLMChatWrapper(SimpleChatModel):
         call_kwargs: dict[str, Any] = {**self.kwargs, **kwargs}
         max_retries: int = int(call_kwargs.pop("a0_retry_attempts", 2))
         retry_delay_s: float = float(call_kwargs.pop("a0_retry_delay_seconds", 1.5))
-        stream = reasoning_callback is not None or response_callback is not None or tokens_callback is not None
+        stream = (
+            reasoning_callback is not None
+            or response_callback is not None
+            or tokens_callback is not None
+        )
 
         # results
         result = ChatGenerationResult()
@@ -537,7 +554,9 @@ class LiteLLMChatWrapper(SimpleChatModel):
                             # collect reasoning delta and call callbacks
                             if output["reasoning_delta"]:
                                 if reasoning_callback:
-                                    await reasoning_callback(output["reasoning_delta"], result.reasoning)
+                                    await reasoning_callback(
+                                        output["reasoning_delta"], result.reasoning
+                                    )
                                 if tokens_callback:
                                     await tokens_callback(
                                         output["reasoning_delta"],
@@ -545,7 +564,11 @@ class LiteLLMChatWrapper(SimpleChatModel):
                                     )
                                 # Add output tokens to rate limiter if configured
                                 if limiter:
-                                    limiter.add(output=approximate_tokens(output["reasoning_delta"]))
+                                    limiter.add(
+                                        output=approximate_tokens(
+                                            output["reasoning_delta"]
+                                        )
+                                    )
                             # collect response delta and call callbacks
                             if output["response_delta"]:
                                 if response_callback:
@@ -559,7 +582,11 @@ class LiteLLMChatWrapper(SimpleChatModel):
                                     )
                                 # Add output tokens to rate limiter if configured
                                 if limiter:
-                                    limiter.add(output=approximate_tokens(output["response_delta"]))
+                                    limiter.add(
+                                        output=approximate_tokens(
+                                            output["response_delta"]
+                                        )
+                                    )
                             if stop_response is not None:
                                 result.response = stop_response
                                 break
@@ -573,9 +600,13 @@ class LiteLLMChatWrapper(SimpleChatModel):
                     output = result.add_chunk(parsed)
                     if limiter:
                         if output["response_delta"]:
-                            limiter.add(output=approximate_tokens(output["response_delta"]))
+                            limiter.add(
+                                output=approximate_tokens(output["response_delta"])
+                            )
                         if output["reasoning_delta"]:
-                            limiter.add(output=approximate_tokens(output["reasoning_delta"]))
+                            limiter.add(
+                                output=approximate_tokens(output["reasoning_delta"])
+                            )
 
                 # Successful completion of stream
                 return result.response, result.reasoning
@@ -584,7 +615,11 @@ class LiteLLMChatWrapper(SimpleChatModel):
                 import asyncio
 
                 # Retry only if no chunks received and error is transient
-                if got_any_chunk or not _is_transient_litellm_error(e) or attempt >= max_retries:
+                if (
+                    got_any_chunk
+                    or not _is_transient_litellm_error(e)
+                    or attempt >= max_retries
+                ):
                     raise
                 attempt += 1
                 await asyncio.sleep(retry_delay_s)
@@ -654,6 +689,7 @@ class LocalSentenceTransformerWrapper(Embeddings):
         st_kwargs = {k: v for k, v in (kwargs or {}).items() if k in st_allowed_keys}
 
         from sentence_transformers import SentenceTransformer
+
         self.model = SentenceTransformer(model, **st_kwargs)
         self.model_name = model
         self.a0_model_conf = model_config
@@ -740,26 +776,33 @@ def _parse_chunk(chunk: Any) -> ChatChunk:
         "model_extra", {}
     ).get("message", {})
     response_delta = (
-        delta.get("content", "")
-        if isinstance(delta, dict)
-        else getattr(delta, "content", "")
-    ) or (
-        message.get("content", "")
-        if isinstance(message, dict)
-        else getattr(message, "content", "")
-    ) or ""
+        (
+            delta.get("content", "")
+            if isinstance(delta, dict)
+            else getattr(delta, "content", "")
+        )
+        or (
+            message.get("content", "")
+            if isinstance(message, dict)
+            else getattr(message, "content", "")
+        )
+        or ""
+    )
     reasoning_delta = (
-        delta.get("reasoning_content", "")
-        if isinstance(delta, dict)
-        else getattr(delta, "reasoning_content", "")
-    ) or (
-        message.get("reasoning_content", "")
-        if isinstance(message, dict)
-        else getattr(message, "reasoning_content", "")
-    ) or ""
+        (
+            delta.get("reasoning_content", "")
+            if isinstance(delta, dict)
+            else getattr(delta, "reasoning_content", "")
+        )
+        or (
+            message.get("reasoning_content", "")
+            if isinstance(message, dict)
+            else getattr(message, "reasoning_content", "")
+        )
+        or ""
+    )
 
     return ChatChunk(reasoning_delta=reasoning_delta, response_delta=response_delta)
-
 
 
 def _adjust_call_args(provider_name: str, model_name: str, kwargs: dict):
@@ -827,6 +870,7 @@ def get_chat_model(
     return _get_litellm_chat(
         LiteLLMChatWrapper, name, provider_name, model_config, **kwargs
     )
+
 
 def get_embedding_model(
     provider: str, name: str, model_config: Optional[ModelConfig] = None, **kwargs: Any

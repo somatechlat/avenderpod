@@ -22,6 +22,7 @@ from helpers.print_style import PrintStyle
 
 SMTP_TIMEOUT: int = 30
 
+
 @dataclass
 class SmtpConfig:
     server: str
@@ -34,6 +35,7 @@ class SmtpConfig:
 # ------------------------------------------------------------------
 # Send reply
 # ------------------------------------------------------------------
+
 
 async def send_reply(
     config: SmtpConfig,
@@ -48,8 +50,8 @@ async def send_reply(
 
     def _sync_send():
         import markdown
-        
-        html_body = markdown.markdown(body, extensions=['extra', 'nl2br'])
+
+        html_body = markdown.markdown(body, extensions=["extra", "nl2br"])
         html_content = f"""
         <html>
         <head>
@@ -69,12 +71,12 @@ async def send_reply(
 
         if attachments:
             msg = MIMEMultipart("mixed")
-            
+
             alt_part = MIMEMultipart("alternative")
             alt_part.attach(MIMEText(body, "plain", "utf-8"))
             alt_part.attach(MIMEText(html_content, "html", "utf-8"))
             msg.attach(alt_part)
-            
+
             for filename, content in attachments:
                 part = MIMEBase("application", "octet-stream")
                 part.set_payload(content)
@@ -98,14 +100,18 @@ async def send_reply(
             msg["References"] = references or in_reply_to
 
         if config.use_tls:
-            with smtplib.SMTP(config.server, config.port, timeout=SMTP_TIMEOUT) as server:
+            with smtplib.SMTP(
+                config.server, config.port, timeout=SMTP_TIMEOUT
+            ) as server:
                 server.ehlo()
                 server.starttls()
                 server.ehlo()
                 server.login(config.username, config.password)
                 server.send_message(msg)
         else:
-            with smtplib.SMTP_SSL(config.server, config.port, timeout=SMTP_TIMEOUT) as server:
+            with smtplib.SMTP_SSL(
+                config.server, config.port, timeout=SMTP_TIMEOUT
+            ) as server:
                 server.login(config.username, config.password)
                 server.send_message(msg)
 
@@ -123,18 +129,23 @@ async def send_reply(
 # Connection test (auth only, no email sent)
 # ------------------------------------------------------------------
 
+
 async def test_smtp(config: SmtpConfig) -> str | None:
     loop = asyncio.get_event_loop()
 
     def _sync_test():
         if config.use_tls:
-            with smtplib.SMTP(config.server, config.port, timeout=SMTP_TIMEOUT) as server:
+            with smtplib.SMTP(
+                config.server, config.port, timeout=SMTP_TIMEOUT
+            ) as server:
                 server.ehlo()
                 server.starttls()
                 server.ehlo()
                 server.login(config.username, config.password)
         else:
-            with smtplib.SMTP_SSL(config.server, config.port, timeout=SMTP_TIMEOUT) as server:
+            with smtplib.SMTP_SSL(
+                config.server, config.port, timeout=SMTP_TIMEOUT
+            ) as server:
                 server.login(config.username, config.password)
 
     try:

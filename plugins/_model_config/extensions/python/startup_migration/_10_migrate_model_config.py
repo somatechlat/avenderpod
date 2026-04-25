@@ -1,7 +1,7 @@
 import json
 import os
 from helpers.extension import Extension
-from helpers import settings as settings_helper, files, plugins
+from helpers import files, plugins
 from helpers.print_style import PrintStyle
 
 
@@ -13,19 +13,40 @@ class MigrateModelConfig(Extension):
     """
 
     LEGACY_FIELDS = [
-        "chat_model_provider", "chat_model_name", "chat_model_api_base",
-        "chat_model_kwargs", "chat_model_ctx_length", "chat_model_vision",
-        "chat_model_rl_requests", "chat_model_rl_input", "chat_model_rl_output",
+        "chat_model_provider",
+        "chat_model_name",
+        "chat_model_api_base",
+        "chat_model_kwargs",
+        "chat_model_ctx_length",
+        "chat_model_vision",
+        "chat_model_rl_requests",
+        "chat_model_rl_input",
+        "chat_model_rl_output",
         "chat_model_ctx_history",
-        "util_model_provider", "util_model_name", "util_model_api_base",
-        "util_model_kwargs", "util_model_ctx_length",
-        "util_model_rl_requests", "util_model_rl_input", "util_model_rl_output",
+        "util_model_provider",
+        "util_model_name",
+        "util_model_api_base",
+        "util_model_kwargs",
+        "util_model_ctx_length",
+        "util_model_rl_requests",
+        "util_model_rl_input",
+        "util_model_rl_output",
         "util_model_ctx_input",
-        "embed_model_provider", "embed_model_name", "embed_model_api_base",
-        "embed_model_kwargs", "embed_model_rl_requests", "embed_model_rl_input",
-        "browser_model_provider", "browser_model_name", "browser_model_api_base",
-        "browser_model_vision", "browser_model_rl_requests", "browser_model_rl_input",
-        "browser_model_rl_output", "browser_model_kwargs", "browser_http_headers",
+        "embed_model_provider",
+        "embed_model_name",
+        "embed_model_api_base",
+        "embed_model_kwargs",
+        "embed_model_rl_requests",
+        "embed_model_rl_input",
+        "browser_model_provider",
+        "browser_model_name",
+        "browser_model_api_base",
+        "browser_model_vision",
+        "browser_model_rl_requests",
+        "browser_model_rl_input",
+        "browser_model_rl_output",
+        "browser_model_kwargs",
+        "browser_http_headers",
     ]
 
     def execute(self, **kwargs):
@@ -77,7 +98,9 @@ class MigrateModelConfig(Extension):
             },
             "embedding_model": {
                 "provider": raw.get("embed_model_provider", "huggingface"),
-                "name": raw.get("embed_model_name", "sentence-transformers/all-MiniLM-L6-v2"),
+                "name": raw.get(
+                    "embed_model_name", "sentence-transformers/all-MiniLM-L6-v2"
+                ),
                 "api_base": raw.get("embed_model_api_base", ""),
                 "rl_requests": raw.get("embed_model_rl_requests", 0),
                 "rl_input": raw.get("embed_model_rl_input", 0),

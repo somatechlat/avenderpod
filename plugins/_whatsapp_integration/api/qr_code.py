@@ -34,7 +34,10 @@ class QrCode(ApiHandler):
         if not is_process_alive():
             try:
                 ok = await ensure_bridge_http_up(
-                    port, session_dir, cache_dir, mode=mode,
+                    port,
+                    session_dir,
+                    cache_dir,
+                    mode=mode,
                 )
                 if not ok:
                     return {

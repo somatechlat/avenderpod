@@ -32,9 +32,7 @@ def initialize():
         action="store_true",
         help="Use cloudflare tunnel for public URL",
     )
-    parser.add_argument(
-        "--development", action="store_true", help="Development mode"
-    )
+    parser.add_argument("--development", action="store_true", help="Development mode")
 
     known, unknown = parser.parse_known_args()
     args = vars(known)
@@ -135,7 +133,7 @@ def _get_rfc_password() -> str:
 def _get_rfc_url() -> str:
     set = settings.get_settings()
     url = set["rfc_url"]
-    if not "://" in url:
+    if "://" not in url:
         url = "http://" + url
     if url.endswith("/"):
         url = url[:-1]

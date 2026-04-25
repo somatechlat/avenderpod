@@ -11,4 +11,4 @@ class MemoryInit(Extension):
         if not self.agent:
             return
 
-        db = await memory.Memory.get(self.agent)
+        await memory.Memory.get(self.agent)

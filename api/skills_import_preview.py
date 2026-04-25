@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import time
 import uuid
 from pathlib import Path
@@ -62,7 +61,9 @@ class SkillsImportPreview(ApiHandler):
 
             imported = [files.deabsolute_path(str(p)) for p in result.imported]
             skipped = [files.deabsolute_path(str(p)) for p in result.skipped]
-            dest_root = files.deabsolute_path(str(result.destination_root / result.namespace))
+            dest_root = files.deabsolute_path(
+                str(result.destination_root / result.namespace)
+            )
 
             return {
                 "success": True,
@@ -79,4 +80,3 @@ class SkillsImportPreview(ApiHandler):
                 tmp_path.unlink(missing_ok=True)  # type: ignore[arg-type]
             except Exception:
                 pass
-

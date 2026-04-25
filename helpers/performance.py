@@ -2,6 +2,7 @@ import functools
 import inspect
 from pyinstrument import Profiler
 
+
 def trace_performance(*, show_all=False, color=True, unicode=True):
     """
     Decorator that profiles a function and prints a call tree when it finishes.
@@ -20,7 +21,9 @@ def trace_performance(*, show_all=False, color=True, unicode=True):
                 return await func(*args, **kwargs)
             finally:
                 profiler.stop()
-                print(f"\n=== Performance trace: {func.__module__}.{func.__qualname__} (async) ===")
+                print(
+                    f"\n=== Performance trace: {func.__module__}.{func.__qualname__} (async) ==="
+                )
                 print(
                     profiler.output_text(
                         color=color,
@@ -37,7 +40,9 @@ def trace_performance(*, show_all=False, color=True, unicode=True):
                 return func(*args, **kwargs)
             finally:
                 profiler.stop()
-                print(f"\n=== Performance trace: {func.__module__}.{func.__qualname__} ===")
+                print(
+                    f"\n=== Performance trace: {func.__module__}.{func.__qualname__} ==="
+                )
                 print(
                     profiler.output_text(
                         color=color,

@@ -72,6 +72,7 @@ class CodeExecution(Tool):
 
     def get_log_object(self):
         import uuid
+
         return self.agent.context.log.log(
             type="code_exe",
             heading=self.get_heading(),
@@ -88,7 +89,12 @@ class CodeExecution(Tool):
         return f"icon://terminal {session_text}{truncate_text_string(text, 200)}"
 
     async def after_execution(self, response, **kwargs):
-        self.agent.hist_add_tool_result(self.name, response.message, id=self.log.id if self.log else "", **(response.additional or {}))
+        self.agent.hist_add_tool_result(
+            self.name,
+            response.message,
+            id=self.log.id if self.log else "",
+            **(response.additional or {}),
+        )
 
     async def prepare_state(self, cfg: dict, reset=False, session: int | None = None):
         self.state: State | None = self.agent.get_data("_cet_state")
@@ -133,13 +139,17 @@ class CodeExecution(Tool):
         self.agent.set_data("_cet_state", self.state)
         return self.state
 
-    async def execute_python_code(self, cfg: dict, session: int, code: str, reset: bool = False):
+    async def execute_python_code(
+        self, cfg: dict, session: int, code: str, reset: bool = False
+    ):
         escaped_code = shlex.quote(code)
         command = f"ipython -c {escaped_code}"
         prefix = "python> " + self.format_command_for_output(code) + "\n\n"
         return await self.terminal_session(cfg, session, command, reset, prefix)
 
-    async def execute_nodejs_code(self, cfg: dict, session: int, code: str, reset: bool = False):
+    async def execute_nodejs_code(
+        self, cfg: dict, session: int, code: str, reset: bool = False
+    ):
         escaped_code = shlex.quote(code)
         command = f"node /exe/node_eval.js {escaped_code}"
         prefix = "node> " + self.format_command_for_output(code) + "\n\n"
@@ -156,7 +166,13 @@ class CodeExecution(Tool):
         return await self.terminal_session(cfg, session, command, reset, prefix)
 
     async def terminal_session(
-        self, cfg: dict, session: int, command: str, reset: bool = False, prefix: str = "", timeouts: dict | None = None
+        self,
+        cfg: dict,
+        session: int,
+        command: str,
+        reset: bool = False,
+        prefix: str = "",
+        timeouts: dict | None = None,
     ):
         self.state = await self.prepare_state(cfg, reset=reset, session=session)
 
@@ -175,10 +191,14 @@ class CodeExecution(Tool):
 
                 locl = (
                     " (local)"
-                    if isinstance(self.state.shells[session].session, LocalInteractiveSession)
+                    if isinstance(
+                        self.state.shells[session].session, LocalInteractiveSession
+                    )
                     else (
                         " (remote)"
-                        if isinstance(self.state.shells[session].session, SSHInteractiveSession)
+                        if isinstance(
+                            self.state.shells[session].session, SSHInteractiveSession
+                        )
                         else " (unknown)"
                     )
                 )
@@ -204,7 +224,9 @@ class CodeExecution(Tool):
     def format_command_for_output(self, command: str):
         short_cmd = command[:250]
         short_cmd = " ".join(short_cmd.split())
-        short_cmd = secrets.get_secrets_manager(self.agent.context).mask_values(short_cmd)
+        short_cmd = secrets.get_secrets_manager(self.agent.context).mask_values(
+            short_cmd
+        )
         short_cmd = truncate_text_string(short_cmd, 100)
         return f"{short_cmd}"
 
@@ -225,8 +247,12 @@ class CodeExecution(Tool):
 
         # Override timeouts if a dict is provided
         if timeouts:
-            first_output_timeout = timeouts.get("first_output_timeout", first_output_timeout)
-            between_output_timeout = timeouts.get("between_output_timeout", between_output_timeout)
+            first_output_timeout = timeouts.get(
+                "first_output_timeout", first_output_timeout
+            )
+            between_output_timeout = timeouts.get(
+                "between_output_timeout", between_output_timeout
+            )
             dialog_timeout = timeouts.get("dialog_timeout", dialog_timeout)
             max_exec_timeout = timeouts.get("max_exec_timeout", max_exec_timeout)
 
@@ -245,9 +271,9 @@ class CodeExecution(Tool):
 
         while True:
             await asyncio.sleep(sleep_time)
-            full_output, partial_output = await self.state.shells[session].session.read_output(
-                timeout=1, reset_full_output=reset_full_output
-            )
+            full_output, partial_output = await self.state.shells[
+                session
+            ].session.read_output(timeout=1, reset_full_output=reset_full_output)
             reset_full_output = False  # only reset once
 
             await self.agent.handle_intervention()
@@ -269,7 +295,9 @@ class CodeExecution(Tool):
                 last_lines.reverse()
                 for idx, line in enumerate(last_lines):
                     line = line.strip()
-                    line = line if len(line) <= 500 else line[:250] + line[-250:] # only check start and end on long lines
+                    line = (
+                        line if len(line) <= 500 else line[:250] + line[-250:]
+                    )  # only check start and end on long lines
                     for pat in prompt_patterns:
                         if pat.search(line):
                             PrintStyle.info(
@@ -350,11 +378,7 @@ class CodeExecution(Tool):
                                 return response
 
     async def handle_running_session(
-        self,
-        cfg: dict,
-        session=0,
-        reset_full_output=True,
-        prefix=""
+        self, cfg: dict, session=0, reset_full_output=True, prefix=""
     ):
         if not self.state or session not in self.state.shells:
             return None
@@ -371,16 +395,12 @@ class CodeExecution(Tool):
         self.set_progress(truncated_output)
         heading = self.get_heading_from_output(truncated_output, 0)
 
-        last_lines = (
-            truncated_output.splitlines()[-3:] if truncated_output else []
-        )
+        last_lines = truncated_output.splitlines()[-3:] if truncated_output else []
         last_lines.reverse()
         for line in last_lines:
             for pat in prompt_patterns:
                 if pat.search(line.strip()):
-                    PrintStyle.info(
-                        "Detected shell prompt, returning output early."
-                    )
+                    PrintStyle.info("Detected shell prompt, returning output early.")
                     self.mark_session_idle(session)
                     return None
 
@@ -466,6 +486,7 @@ class CodeExecution(Tool):
 # Internal
 # ------------------------------------------------------------------
 
+
 def _resolve_ssh_enabled(raw_value) -> bool:
     val = str(raw_value).strip().lower()
     if val == "auto":
@@ -498,7 +519,12 @@ def _parse_patterns(raw, flags=0) -> list[re.Pattern]:
     return [re.compile(p.strip(), flags) for p in lines if p.strip()]
 
 
-_TIMEOUT_KEYS = ("first_output_timeout", "between_output_timeout", "max_exec_timeout", "dialog_timeout")
+_TIMEOUT_KEYS = (
+    "first_output_timeout",
+    "between_output_timeout",
+    "max_exec_timeout",
+    "dialog_timeout",
+)
 
 
 def _parse_timeouts(cfg: dict, prefix: str, defaults: tuple[int, ...]) -> dict:
@@ -520,10 +546,13 @@ def _get_config(agent) -> dict:
         "code_exec_timeouts": _parse_timeouts(cfg, "code_exec", (30, 15, 180, 5)),
         "output_timeouts": _parse_timeouts(cfg, "output", (90, 45, 300, 5)),
         "prompt_patterns": _parse_patterns(cfg.get("prompt_patterns", "")),
-        "dialog_patterns": _parse_patterns(cfg.get("dialog_patterns", ""), re.IGNORECASE),
+        "dialog_patterns": _parse_patterns(
+            cfg.get("dialog_patterns", ""), re.IGNORECASE
+        ),
     }
 
 
 def make_dir(path: str):
     import os
+
     os.makedirs(path, exist_ok=True)

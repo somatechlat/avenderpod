@@ -4,7 +4,11 @@ import asyncio
 from helpers.extension import Extension
 from helpers.print_style import PrintStyle
 from agent import AgentContext, LoopData, UserMessage
-from plugins._whatsapp_integration.helpers.handler import CTX_WA_CHAT_ID, CTX_WA_ATTACHMENTS, CTX_WA_REPLY_TO
+from plugins._whatsapp_integration.helpers.handler import (
+    CTX_WA_CHAT_ID,
+    CTX_WA_ATTACHMENTS,
+    CTX_WA_REPLY_TO,
+)
 
 MAX_SEND_RETRIES: int = 2
 CTX_SEND_FAILURES: str = "_wa_send_failures"
@@ -27,15 +31,25 @@ class WhatsAppAutoReply(Extension):
         attachments = context.data.pop(CTX_WA_ATTACHMENTS, [])
         reply_to = context.data.pop(CTX_WA_REPLY_TO, "")
         if attachments:
-            PrintStyle.info(f"WhatsApp: sending reply with {len(attachments)} attachment(s)")
-        asyncio.create_task(self._send_reply(context, response_text, attachments, reply_to))
+            PrintStyle.info(
+                f"WhatsApp: sending reply with {len(attachments)} attachment(s)"
+            )
+        asyncio.create_task(
+            self._send_reply(context, response_text, attachments, reply_to)
+        )
 
     async def _send_reply(
-        self, context: AgentContext, response_text: str, attachments: list[str],
+        self,
+        context: AgentContext,
+        response_text: str,
+        attachments: list[str],
         reply_to: str = "",
     ):
         from plugins._whatsapp_integration.helpers.handler import send_wa_reply
-        error = await send_wa_reply(context, response_text, attachments, reply_to=reply_to)
+
+        error = await send_wa_reply(
+            context, response_text, attachments, reply_to=reply_to
+        )
         if not error:
             context.data[CTX_SEND_FAILURES] = 0
             return
@@ -58,6 +72,7 @@ class WhatsAppAutoReply(Extension):
 # Helpers
 # ------------------------------------------------------------------
 
+
 def _extract_last_response(context: AgentContext) -> str:
     with context.log._lock:
         logs = list(context.log.logs)
@@ -70,10 +85,14 @@ def _extract_last_response(context: AgentContext) -> str:
 
 
 def _notify_agent_of_failure(
-    context: AgentContext, error: str, attempt: int,
+    context: AgentContext,
+    error: str,
+    attempt: int,
 ):
     msg = context.agent0.read_prompt(
-        "fw.wa.send_failed.md", error=error, attempt=str(attempt),
+        "fw.wa.send_failed.md",
+        error=error,
+        attempt=str(attempt),
         max_retries=str(MAX_SEND_RETRIES),
     )
     context.log.log(type="error", heading="WhatsApp send failed", content=error)

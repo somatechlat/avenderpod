@@ -1,11 +1,15 @@
 import initialize
 from helpers import dotenv, extension, runtime
+from helpers.api import csrf_protect, requires_auth
 from helpers.print_style import PrintStyle
 from helpers.server_startup import run_uvicorn_with_retries
 from helpers.ui_server import UiServerRuntime, configure_process_environment
 
 
+__all__ = ["csrf_protect", "requires_auth"]
+
 configure_process_environment()
+socketio_server = UiServerRuntime.create().socketio_server
 
 
 def run():

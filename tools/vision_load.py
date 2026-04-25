@@ -17,11 +17,12 @@ class VisionLoad(Tool):
         self.images_dict = {}
         self.loaded_paths: list[str] = []
         self.skipped_paths: list[str] = []
-        template: list[dict[str, str]] = []  # type: ignore
 
         max_embeds = self._get_max_embeds()
         limited_paths = paths if max_embeds <= 0 else paths[-max_embeds:]
-        self.skipped_paths = paths[:-max_embeds] if max_embeds > 0 and len(paths) > max_embeds else []
+        self.skipped_paths = (
+            paths[:-max_embeds] if max_embeds > 0 and len(paths) > max_embeds else []
+        )
 
         for path in limited_paths:
             if not await runtime.call_development_function(files.exists, str(path)):
@@ -54,7 +55,9 @@ class VisionLoad(Tool):
                     except Exception as e:
                         self.images_dict[path] = None
                         PrintStyle().error(f"Error processing image {path}: {e}")
-                        self.agent.context.log.log("warning", f"Error processing image {path}: {e}")
+                        self.agent.context.log.log(
+                            "warning", f"Error processing image {path}: {e}"
+                        )
 
         return Response(message="dummy", break_loop=False)
 
@@ -71,7 +74,9 @@ class VisionLoad(Tool):
         loaded_count = len(self.loaded_paths)
         skipped_count = len(self.skipped_paths)
         loaded_summary = "\n".join(self.loaded_paths) if self.loaded_paths else "none"
-        skipped_summary = "\n".join(self.skipped_paths) if self.skipped_paths else "none"
+        skipped_summary = (
+            "\n".join(self.skipped_paths) if self.skipped_paths else "none"
+        )
         summary = (
             f"Loaded images: {loaded_count}\n"
             f"Loaded images:\n{loaded_summary}\n\n"
@@ -79,7 +84,9 @@ class VisionLoad(Tool):
             f"Skipped images (max {self._get_max_embeds()} loaded at a time according to model configuration):\n{skipped_summary}"
         )
         if self.images_dict:
-            self.agent.hist_add_tool_result(self.name, summary, id=self.log.id if self.log else "")
+            self.agent.hist_add_tool_result(
+                self.name, summary, id=self.log.id if self.log else ""
+            )
             for path, image in self.images_dict.items():
                 if image:
                     content.append(
@@ -96,12 +103,18 @@ class VisionLoad(Tool):
                         }
                     )
             # append as raw message content for LLMs with vision tokens estimate
-            msg = history.RawMessage(raw_content=content, preview="<Base64 encoded image data>")
+            msg = history.RawMessage(
+                raw_content=content, preview="<Base64 encoded image data>"
+            )
             self.agent.hist_add_message(
                 False, content=msg, tokens=TOKENS_ESTIMATE * len(content)
             )
         else:
-            self.agent.hist_add_tool_result(self.name, summary if self.skipped_paths else "No images processed", id=self.log.id if self.log else "")
+            self.agent.hist_add_tool_result(
+                self.name,
+                summary if self.skipped_paths else "No images processed",
+                id=self.log.id if self.log else "",
+            )
 
         # print and log short version
         message = (

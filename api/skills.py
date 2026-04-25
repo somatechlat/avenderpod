@@ -1,4 +1,4 @@
-from helpers.api import ApiHandler, Input, Output, Request, Response
+from helpers.api import ApiHandler, Input, Output, Request
 from helpers import runtime, skills, projects, files
 
 
@@ -44,7 +44,9 @@ class Skills(ApiHandler):
             ]
             if project_name:
                 roots.append(
-                    projects.get_project_meta(project_name, "agents", agent_profile, "skills")
+                    projects.get_project_meta(
+                        project_name, "agents", agent_profile, "skills"
+                    )
                 )
 
             skill_list = [
@@ -55,11 +57,13 @@ class Skills(ApiHandler):
 
         result = []
         for skill in skill_list:
-            result.append({
-                "name": skill.name,
-                "description": skill.description,
-                "path": str(skill.path),
-            })
+            result.append(
+                {
+                    "name": skill.name,
+                    "description": skill.description,
+                    "path": str(skill.path),
+                }
+            )
         result.sort(key=lambda x: (x["name"], x["path"]))
         return result
 

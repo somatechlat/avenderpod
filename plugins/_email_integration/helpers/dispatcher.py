@@ -71,6 +71,7 @@ def build_chat_summary(context_id: str, data: dict) -> ChatSummary:
 # Dispatcher prompt builders
 # ------------------------------------------------------------------
 
+
 def truncate_body(body: str) -> str:
     if len(body) <= BODY_PREVIEW_MAX_CHARS:
         return body

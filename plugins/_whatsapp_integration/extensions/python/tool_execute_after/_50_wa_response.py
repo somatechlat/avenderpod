@@ -3,13 +3,20 @@
 from helpers.extension import Extension
 from helpers.print_style import PrintStyle
 from helpers.tool import Response
-from plugins._whatsapp_integration.helpers.handler import CTX_WA_CHAT_ID, CTX_WA_ATTACHMENTS, CTX_WA_REPLY_TO
+from plugins._whatsapp_integration.helpers.handler import (
+    CTX_WA_CHAT_ID,
+    CTX_WA_ATTACHMENTS,
+    CTX_WA_REPLY_TO,
+)
 
 
 class WhatsAppResponseIntercept(Extension):
 
     async def execute(
-        self, tool_name: str = "", response: Response | None = None, **kwargs,
+        self,
+        tool_name: str = "",
+        response: Response | None = None,
+        **kwargs,
     ):
         if tool_name != "response":
             return
@@ -37,7 +44,10 @@ class WhatsAppResponseIntercept(Extension):
             await self._send_inline(context, tool, response)
 
     async def _send_inline(
-        self, context, tool, response: Response,
+        self,
+        context,
+        tool,
+        response: Response,
     ):
         from plugins._whatsapp_integration.helpers.handler import send_wa_reply
 
@@ -49,9 +59,13 @@ class WhatsAppResponseIntercept(Extension):
         reply_to = context.data.pop(CTX_WA_REPLY_TO, "")
 
         if attachments:
-            PrintStyle.info(f"WhatsApp: sending update with {len(attachments)} attachment(s)")
+            PrintStyle.info(
+                f"WhatsApp: sending update with {len(attachments)} attachment(s)"
+            )
 
-        error = await send_wa_reply(context, text, attachments or None, reply_to=reply_to, keep_typing=True)
+        error = await send_wa_reply(
+            context, text, attachments or None, reply_to=reply_to, keep_typing=True
+        )
 
         if error:
             result = agent.read_prompt("fw.wa.update_error.md", error=error)

@@ -219,9 +219,7 @@ class DeferredTask:
         loop = asyncio.get_running_loop()
         current_task = asyncio.current_task(loop=loop)
         pending = [
-            task
-            for task in asyncio.all_tasks(loop=loop)
-            if task is not current_task
+            task for task in asyncio.all_tasks(loop=loop) if task is not current_task
         ]
         if not pending:
             return

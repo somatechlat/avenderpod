@@ -10,6 +10,7 @@ from plugins._plugin_installer.helpers.install import (
     update_from_git,
 )
 
+
 class PluginInstall(ApiHandler):
     """Plugin installation API. Handles ZIP upload, Git clone, and index fetch."""
 
@@ -50,7 +51,12 @@ class PluginInstall(ApiHandler):
         if not git_url:
             return {"success": False, "error": "Git URL is required"}
 
-        return install_from_git(url=git_url, token=git_token, plugin_name=plugin_name, thumbnail_url=thumbnail_url)
+        return install_from_git(
+            url=git_url,
+            token=git_token,
+            plugin_name=plugin_name,
+            thumbnail_url=thumbnail_url,
+        )
 
     def _update_git(self, input: dict) -> dict:
         return update_from_git(input.get("plugin_name", ""))

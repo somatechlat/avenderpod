@@ -1,4 +1,5 @@
 """POST /api/plugins/_a0_connector/v1/chat_create."""
+
 from __future__ import annotations
 
 from helpers.api import Request, Response
@@ -11,7 +12,9 @@ class ChatCreate(connector_base.ProtectedConnectorApiHandler):
         from plugins._a0_connector.helpers.chat_context import create_context
 
         current_context_id = (
-            str(input.get("current_context", input.get("current_context_id", ""))).strip()
+            str(
+                input.get("current_context", input.get("current_context_id", ""))
+            ).strip()
             or None
         )
         project_name = str(input.get("project_name", "")).strip() or None
@@ -35,6 +38,7 @@ class ChatCreate(connector_base.ProtectedConnectorApiHandler):
         return {
             "context_id": context.id,
             "created_at": context_data.get("created_at"),
-            "agent_profile": agent_profile or getattr(context.agent0.config, "profile", "default"),
+            "agent_profile": agent_profile
+            or getattr(context.agent0.config, "profile", "default"),
             "project_name": context.get_data(projects.CONTEXT_DATA_KEY_PROJECT),
         }

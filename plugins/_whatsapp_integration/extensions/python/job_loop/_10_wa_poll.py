@@ -19,6 +19,7 @@ MAX_CONSECUTIVE_FAILURES: int = 5
 # Extension entry point
 # ------------------------------------------------------------------
 
+
 class WhatsAppAutoPoll(Extension):
 
     async def execute(self, **kwargs: Any) -> None:
@@ -40,6 +41,7 @@ class WhatsAppAutoPoll(Extension):
 # ------------------------------------------------------------------
 # Poll loop
 # ------------------------------------------------------------------
+
 
 async def _poll_loop() -> None:
     from plugins._whatsapp_integration.helpers import bridge_manager
@@ -66,10 +68,20 @@ async def _poll_loop() -> None:
             mode = config.get("mode", "self-chat")
 
             # Detect config changes that require bridge restart
-            desired = {"port": port, "mode": mode}
+            desired = {
+                "port": port,
+                "mode": mode,
+                "session_dir": session_dir,
+                "cache_dir": cache_dir,
+            }
             running = bridge_manager.get_running_config()
-            if bridge_started and bridge_manager.is_process_alive() and running != desired:
-                PrintStyle.info(f"WhatsApp: config changed, restarting bridge")
+            if (
+                bridge_started
+                and bridge_manager.is_process_alive()
+                and running
+                and running != desired
+            ):
+                PrintStyle.info("WhatsApp: config changed, restarting bridge")
                 await bridge_manager.stop_bridge()
                 bridge_started = False
                 consecutive_failures = 0
@@ -78,7 +90,10 @@ async def _poll_loop() -> None:
             if not bridge_started or not bridge_manager.is_process_alive():
                 try:
                     bridge_started = await bridge_manager.start_bridge(
-                        port, session_dir, cache_dir, mode=mode,
+                        port,
+                        session_dir,
+                        cache_dir,
+                        mode=mode,
                     )
                     if bridge_started:
                         consecutive_failures = 0
@@ -110,7 +125,9 @@ async def _poll_loop() -> None:
             except Exception as e:
                 PrintStyle.error(f"WhatsApp poll error: {format_error(e)}")
 
-            sleep_sec = max(config.get("poll_interval_seconds", DEFAULT_INTERVAL), MIN_INTERVAL)
+            sleep_sec = max(
+                config.get("poll_interval_seconds", DEFAULT_INTERVAL), MIN_INTERVAL
+            )
             await asyncio.sleep(sleep_sec)
     finally:
         # Ensure bridge stops when poll loop exits (plugin disabled or task cancelled)

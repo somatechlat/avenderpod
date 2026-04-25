@@ -33,11 +33,14 @@ class ModelConfigSet(ApiHandler):
             section.pop("api_key", None)
 
         # Read previous config BEFORE saving so we can detect changes
-        prev_config = plugins.get_plugin_config(
-            "_model_config",
-            project_name=project_name or None,
-            agent_profile=agent_profile or None,
-        ) or {}
+        prev_config = (
+            plugins.get_plugin_config(
+                "_model_config",
+                project_name=project_name or None,
+                agent_profile=agent_profile or None,
+            )
+            or {}
+        )
 
         plugins.save_plugin_config(
             "_model_config",

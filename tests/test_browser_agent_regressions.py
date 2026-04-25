@@ -1,4 +1,3 @@
-import asyncio
 import importlib
 import json
 import sys
@@ -18,7 +17,7 @@ def test_gemini_clean_and_conform_normalizes_known_single_action_shapes():
     raw = (
         '{"action":['
         '{"complete_task":{"title":"T","response":"R","page_summary":"S"}}'
-        ']}'
+        "]}"
     )
 
     cleaned = browser_use_monkeypatch.gemini_clean_and_conform(raw)

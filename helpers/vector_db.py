@@ -2,7 +2,6 @@ from typing import Any, List, Sequence
 from langchain_community.vectorstores import FAISS
 
 # faiss needs to be patched for python 3.12 on arm #TODO remove once not needed
-from helpers import faiss_monkey_patch
 import faiss
 
 
@@ -143,7 +142,7 @@ def get_comparator(condition: str):
         try:
             result = simple_eval(condition, names=data)
             return result
-        except Exception as e:
+        except Exception:
             # PrintStyle.error(f"Error evaluating condition: {e}")
             return False
 

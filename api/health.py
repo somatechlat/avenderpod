@@ -1,6 +1,7 @@
 from helpers.api import ApiHandler, Request, Response
 from helpers import errors, git
 
+
 class HealthCheck(ApiHandler):
 
     @classmethod

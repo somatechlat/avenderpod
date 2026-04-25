@@ -1,4 +1,5 @@
-import sys, os
+import sys
+import os
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -8,7 +9,9 @@ from helpers.email_client import read_messages
 from helpers.dotenv import get_dotenv_value, load_dotenv
 
 
-@pytest.mark.skip(reason="This test is disabled as it has eternal dependencies and tests nothing automatically, please move it to a script or a manual test")
+@pytest.mark.skip(
+    reason="This test is disabled as it has eternal dependencies and tests nothing automatically, please move it to a script or a manual test"
+)
 @pytest.mark.asyncio
 async def test():
     load_dotenv()

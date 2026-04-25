@@ -14,13 +14,18 @@ from agent import AgentContext, UserMessage
 from helpers import plugins, files, projects
 from helpers import message_queue as mq
 from helpers import integration_commands
-from helpers.notification import NotificationManager, NotificationType, NotificationPriority
+from helpers.notification import (
+    NotificationManager,
+    NotificationType,
+    NotificationPriority,
+)
 from helpers.persist_chat import save_tmp_chat
 from helpers.print_style import PrintStyle
 from helpers.errors import format_error
 from initialize import initialize_agent
 
 from plugins._telegram_integration.helpers import telegram_client as tc
+from plugins._telegram_integration.helpers import media_enrichment
 from plugins._telegram_integration.helpers.bot_manager import get_bot
 from plugins._telegram_integration.helpers.constants import (
     PLUGIN_NAME,
@@ -33,8 +38,6 @@ from plugins._telegram_integration.helpers.constants import (
     CTX_TG_USERNAME,
     CTX_TG_TYPING_STOP,
     CTX_TG_REPLY_TO,
-    CTX_TG_ATTACHMENTS,
-    CTX_TG_KEYBOARD,
 )
 
 # Chat mapping: (bot_name, tg_user_id) → AgentContext ID
@@ -92,7 +95,9 @@ def cleanup_old_attachments():
     if total_removed:
         PrintStyle.info(f"Telegram: cleaned up {total_removed} old attachment(s)")
 
+
 # Access control
+
 
 def _is_allowed(bot_cfg: dict, user_id: int, username: str | None) -> bool:
     allowed = bot_cfg.get("allowed_users") or []
@@ -120,7 +125,9 @@ def _get_project(bot_cfg: dict, user_id: int) -> str:
         project = bot_cfg.get("default_project", "")
     return project
 
+
 # Message handlers (registered with aiogram by bot_manager)
+
 
 async def handle_start(message: TgMessage, bot_name: str, bot_cfg: dict):
     """Handle /start command."""
@@ -137,7 +144,8 @@ async def handle_start(message: TgMessage, bot_name: str, bot_cfg: dict):
         return
 
     await _send_with_temp_bot(
-        instance.bot.token, message.chat.id,
+        instance.bot.token,
+        message.chat.id,
         f"\U0001f44b Hello {user.first_name}! I'm connected to Agent Zero.\n\n"
         "Send me a message and I'll process it.\n"
         "Use /clear to reset the conversation.\n"
@@ -167,12 +175,15 @@ async def handle_clear(message: TgMessage, bot_name: str, bot_cfg: dict):
             ctx = AgentContext.get(ctx_id)
             if ctx:
                 ctx.reset()
-                PrintStyle.info(f"Telegram ({bot_name}): cleared chat for user {user.id}")
+                PrintStyle.info(
+                    f"Telegram ({bot_name}): cleared chat for user {user.id}"
+                )
 
     instance = get_bot(bot_name)
     if instance:
         await _send_with_temp_bot(
-            instance.bot.token, message.chat.id,
+            instance.bot.token,
+            message.chat.id,
             "Chat cleared. Send a new message to start fresh.",
             parse_mode=None,
         )
@@ -203,11 +214,12 @@ async def handle_message(message: TgMessage, bot_name: str, bot_cfg: dict):
     if not instance:
         return
 
-    text = _extract_message_content(message)
+    text = media_enrichment.extract_message_content(message)
     context = await _get_or_create_context(bot_name, bot_cfg, message)
     if not context:
         await _send_with_temp_bot(
-            instance.bot.token, message.chat.id,
+            instance.bot.token,
+            message.chat.id,
             "Failed to create chat session.",
             parse_mode=None,
         )
@@ -215,7 +227,9 @@ async def handle_message(message: TgMessage, bot_name: str, bot_cfg: dict):
 
     command_reply = integration_commands.try_handle_command(context, text)
     if command_reply is not None:
-        await _send_with_temp_bot(instance.bot.token, message.chat.id, command_reply, parse_mode=None)
+        await _send_with_temp_bot(
+            instance.bot.token, message.chat.id, command_reply, parse_mode=None
+        )
         return
 
     # Start persistent typing indicator (thread-based, works across event loops)
@@ -227,15 +241,20 @@ async def handle_message(message: TgMessage, bot_name: str, bot_cfg: dict):
     # In group chats, if user replied to the bot's message, reply to the user's message
     reply_to_id = None
     if message.chat.type != "private" and instance.bot_info:
-        if (message.reply_to_message
-                and message.reply_to_message.from_user
-                and message.reply_to_message.from_user.id == instance.bot_info.id):
+        if (
+            message.reply_to_message
+            and message.reply_to_message.from_user
+            and message.reply_to_message.from_user.id == instance.bot_info.id
+        ):
             reply_to_id = message.message_id
     context.data[CTX_TG_REPLY_TO] = reply_to_id
 
     # Use temp bot for downloads (cross-event-loop safe)
     async with _temp_bot(instance.bot.token) as dl_bot:
-        attachments = await _download_attachments(dl_bot, message, bot_name=bot_name)
+        attachments = await media_enrichment.download_attachments(
+            dl_bot, message, bot_name=bot_name
+        )
+    text = await media_enrichment.enrich_message_text(message, text, attachments)
 
     # Build user message with prompt
     agent = context.agent0
@@ -246,12 +265,16 @@ async def handle_message(message: TgMessage, bot_name: str, bot_cfg: dict):
     )
 
     msg_id = str(uuid.uuid4())
-    mq.log_user_message(context, user_msg, attachments, message_id=msg_id, source=" (telegram)")
-    context.communicate(UserMessage(
-        message=user_msg,
-        attachments=attachments,
-        id=msg_id,
-    ))
+    mq.log_user_message(
+        context, user_msg, attachments, message_id=msg_id, source=" (telegram)"
+    )
+    context.communicate(
+        UserMessage(
+            message=user_msg,
+            attachments=attachments,
+            id=msg_id,
+        )
+    )
 
     save_tmp_chat(context)
 
@@ -287,7 +310,11 @@ async def handle_callback_query(query: CallbackQuery, bot_name: str, bot_cfg: di
         return
 
     context = await _get_or_create_context_from_user(
-        bot_name, bot_cfg, user.id, user.username, query.message.chat.id,
+        bot_name,
+        bot_cfg,
+        user.id,
+        user.username,
+        query.message.chat.id,
     )
     if not context:
         return
@@ -296,7 +323,12 @@ async def handle_callback_query(query: CallbackQuery, bot_name: str, bot_cfg: di
     if command_reply is not None:
         instance = get_bot(bot_name)
         if instance:
-            await _send_with_temp_bot(instance.bot.token, query.message.chat.id, command_reply, parse_mode=None)
+            await _send_with_temp_bot(
+                instance.bot.token,
+                query.message.chat.id,
+                command_reply,
+                parse_mode=None,
+            )
         return
 
     agent = context.agent0
@@ -334,9 +366,13 @@ async def handle_new_members(message: TgMessage, bot_name: str, bot_cfg: dict):
             continue
         name = member.full_name or member.first_name or str(member.id)
         text = template.replace("{name}", name)
-        await _send_with_temp_bot(instance.bot.token, message.chat.id, text, parse_mode=None)
+        await _send_with_temp_bot(
+            instance.bot.token, message.chat.id, text, parse_mode=None
+        )
+
 
 # Context management
+
 
 async def _get_or_create_context(
     bot_name: str,
@@ -347,7 +383,11 @@ async def _get_or_create_context(
     if not user:
         return None
     return await _get_or_create_context_from_user(
-        bot_name, bot_cfg, user.id, user.username, message.chat.id,
+        bot_name,
+        bot_cfg,
+        user.id,
+        user.username,
+        message.chat.id,
     )
 
 
@@ -404,80 +444,9 @@ async def _get_or_create_context_from_user(
             PrintStyle.error(f"Telegram: failed to create context: {format_error(e)}")
             return None
 
-# Message content extraction
-
-def _extract_message_content(message: TgMessage) -> str:
-    parts = []
-
-    if message.text:
-        parts.append(message.text)
-    elif message.caption:
-        parts.append(message.caption)
-
-    if message.location:
-        loc = message.location
-        parts.append(f"[Location: {loc.latitude}, {loc.longitude}]")
-
-    if message.contact:
-        c = message.contact
-        parts.append(f"[Contact: {c.first_name} {c.last_name or ''} phone={c.phone_number}]")
-
-    if message.sticker:
-        parts.append(f"[Sticker: {message.sticker.emoji or ''}]")
-
-    # Simple attachment indicators
-    for attr, label in [("voice", "Voice message"), ("video_note", "Video note")]:
-        if getattr(message, attr, None):
-            parts.append(f"[{label} — see attachment]")
-
-    return "\n".join(parts) if parts else "[No text content]"
-
-
-async def _download_attachments(bot, message: TgMessage, bot_name: str = "") -> list[str]:
-    """Download photos, documents, audio, voice, video from message."""
-    paths: list[str] = []
-    tg_prefix = f"tg_{bot_name}_" if bot_name else "tg_"
-    # Host-local path for actual file I/O
-    download_dir = files.get_abs_path(DOWNLOAD_FOLDER)
-    os.makedirs(download_dir, exist_ok=True)
-    # Docker-style path for agent references
-    download_dir_ref = files.get_abs_path_dockerized(DOWNLOAD_FOLDER)
-
-    async def _dl(file_id: str, filename: str) -> str | None:
-        safe_name = f"{tg_prefix}{uuid.uuid4().hex[:8]}_{filename}"
-        dest = os.path.join(download_dir, safe_name)
-        result = await tc.download_file(bot, file_id, dest)
-        if result:
-            return os.path.join(download_dir_ref, safe_name)
-        return None
-
-    # Photo: get largest resolution
-    if message.photo:
-        photo = message.photo[-1]
-        path = await _dl(photo.file_id, f"photo_{photo.file_unique_id}.jpg")
-        if path:
-            paths.append(path)
-
-    # Other attachment types: (attr, default_prefix, default_ext)
-    _types = [
-        ("document",   "file",      None),
-        ("audio",      "audio",     ".mp3"),
-        ("voice",      "voice",     ".ogg"),
-        ("video",      "video",     ".mp4"),
-        ("video_note", "videonote", ".mp4"),
-    ]
-    for attr, prefix, ext in _types:
-        obj = getattr(message, attr, None)
-        if not obj:
-            continue
-        fname = getattr(obj, "file_name", None) or f"{prefix}_{obj.file_unique_id}{ext or ''}"
-        path = await _dl(obj.file_id, fname)
-        if path:
-            paths.append(path)
-
-    return paths
 
 # Reply sending (called from process_chain_end extension)
+
 
 async def send_telegram_reply(
     context: AgentContext,
@@ -501,21 +470,35 @@ async def send_telegram_reply(
     reply_to = context.data.get(CTX_TG_REPLY_TO)
 
     try:
-        async with _temp_bot(instance.bot.token, default=DefaultBotProperties(parse_mode=ParseMode.HTML)) as reply_bot:
+        async with _temp_bot(
+            instance.bot.token, default=DefaultBotProperties(parse_mode=ParseMode.HTML)
+        ) as reply_bot:
             if attachments:
                 for path in attachments:
                     local_path = files.fix_dev_path(path)
                     if tc.is_image_file(local_path):
-                        await tc.send_photo(reply_bot, chat_id, local_path, reply_to_message_id=reply_to)
+                        await tc.send_photo(
+                            reply_bot, chat_id, local_path, reply_to_message_id=reply_to
+                        )
                     else:
-                        await tc.send_file(reply_bot, chat_id, local_path, reply_to_message_id=reply_to)
+                        await tc.send_file(
+                            reply_bot, chat_id, local_path, reply_to_message_id=reply_to
+                        )
 
             if response_text:
                 html_text = tc.md_to_telegram_html(response_text)
                 if keyboard:
-                    await tc.send_text_with_keyboard(reply_bot, chat_id, html_text, keyboard, reply_to_message_id=reply_to)
+                    await tc.send_text_with_keyboard(
+                        reply_bot,
+                        chat_id,
+                        html_text,
+                        keyboard,
+                        reply_to_message_id=reply_to,
+                    )
                 else:
-                    await tc.send_text(reply_bot, chat_id, html_text, reply_to_message_id=reply_to)
+                    await tc.send_text(
+                        reply_bot, chat_id, html_text, reply_to_message_id=reply_to
+                    )
 
         return None
 
@@ -524,7 +507,9 @@ async def send_telegram_reply(
         PrintStyle.error(f"Telegram reply failed: {error}")
         return error
 
+
 # Helpers
+
 
 @asynccontextmanager
 async def _temp_bot(token: str, **kwargs):
@@ -537,7 +522,9 @@ async def _temp_bot(token: str, **kwargs):
             await bot.session.close()
 
 
-async def _send_with_temp_bot(token: str, chat_id: int, text: str, parse_mode: str | None = None):
+async def _send_with_temp_bot(
+    token: str, chat_id: int, text: str, parse_mode: str | None = None
+):
     """Send text using a temporary Bot to avoid cross-event-loop session issues."""
     async with _temp_bot(token) as bot:
         await tc.send_text(bot, chat_id, text, parse_mode=parse_mode)
@@ -584,13 +571,19 @@ def _inherit_model_override(ctx: AgentContext):
         return
     try:
         from plugins._model_config.helpers.model_config import is_chat_override_allowed
+
         if not is_chat_override_allowed(ctx.agent0):
             return
     except Exception:
         return
     source = max(
-        (c for c in AgentContext.all()
-         if c.id != ctx.id and c.get_data("project") == project and c.get_data("chat_model_override")),
+        (
+            c
+            for c in AgentContext.all()
+            if c.id != ctx.id
+            and c.get_data("project") == project
+            and c.get_data("chat_model_override")
+        ),
         key=lambda c: c.last_message,
         default=None,
     )

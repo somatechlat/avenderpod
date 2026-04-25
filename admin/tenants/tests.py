@@ -23,11 +23,15 @@ class GodModeAuthTests(TestCase):
             owner=self.owner,
             status="active",
         )
-        GlobalConfig.objects.create(key="MASTER_CREATOR_PASSWORD", value="master-secret")
+        GlobalConfig.objects.create(
+            key="MASTER_CREATOR_PASSWORD", value="master-secret"
+        )
 
     def test_init_challenge_owner_allowed(self) -> None:
         self.client.force_login(self.owner)
-        response = self.client.post(f"/api/saas/auth/init-challenge?tenant_id={self.tenant.id}")
+        response = self.client.post(
+            f"/api/saas/auth/init-challenge?tenant_id={self.tenant.id}"
+        )
         self.assertEqual(response.status_code, 200)
 
         self.tenant.refresh_from_db()
@@ -36,7 +40,9 @@ class GodModeAuthTests(TestCase):
 
     def test_init_challenge_other_user_forbidden(self) -> None:
         self.client.force_login(self.other)
-        response = self.client.post(f"/api/saas/auth/init-challenge?tenant_id={self.tenant.id}")
+        response = self.client.post(
+            f"/api/saas/auth/init-challenge?tenant_id={self.tenant.id}"
+        )
         self.assertEqual(response.status_code, 403)
 
     def test_init_challenge_service_api_key_allowed(self) -> None:
@@ -44,7 +50,7 @@ class GodModeAuthTests(TestCase):
         try:
             response = self.client.post(
                 f"/api/saas/auth/init-challenge?tenant_id={self.tenant.id}",
-                **{"HTTP_X_API_KEY": "s" * 32},
+                headers={"X-API-KEY": "s" * 32},
             )
             self.assertEqual(response.status_code, 200)
         finally:
@@ -58,7 +64,11 @@ class GodModeAuthTests(TestCase):
         self.client.force_login(self.owner)
         response = self.client.post(
             "/api/saas/auth/verify-challenge",
-            data={"tenant_id": str(self.tenant.id), "password": "master-secret", "pin": "1234"},
+            data={
+                "tenant_id": str(self.tenant.id),
+                "password": "master-secret",
+                "pin": "1234",
+            },
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 403)
@@ -71,7 +81,11 @@ class GodModeAuthTests(TestCase):
         self.client.force_login(self.admin)
         response = self.client.post(
             "/api/saas/auth/verify-challenge",
-            data={"tenant_id": str(self.tenant.id), "password": "master-secret", "pin": "1234"},
+            data={
+                "tenant_id": str(self.tenant.id),
+                "password": "master-secret",
+                "pin": "1234",
+            },
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 200)
@@ -90,7 +104,9 @@ class GodModeAuthTests(TestCase):
 class VaultProvisioningTests(TestCase):
     def setUp(self) -> None:
         self.admin = User.objects.create_superuser("admin2", "admin2@example.com", "x")
-        self.plan = Plan.objects.create(name="Basic", price_monthly=10, max_conversations=100, max_numbers=1)
+        self.plan = Plan.objects.create(
+            name="Basic", price_monthly=10, max_conversations=100, max_numbers=1
+        )
         self.tenant = Tenant.objects.create(
             name="Tenant Vault",
             email="tenant-vault@example.com",
@@ -105,7 +121,9 @@ class VaultProvisioningTests(TestCase):
         os.environ["VAULT_KV_MOUNT"] = "secret"
         try:
             mock_response = MagicMock(status_code=200, text="ok")
-            with patch("tenants.vault_service.requests.post", return_value=mock_response) as post_mock:
+            with patch(
+                "tenants.vault_service.requests.post", return_value=mock_response
+            ) as post_mock:
                 bundle = provision_tenant_secrets(self.tenant)
 
             self.assertIn("AVENDER_SETUP_TOKEN", bundle)
@@ -132,6 +150,8 @@ class VaultProvisioningTests(TestCase):
                 build_tenant_bootstrap_env(
                     self.tenant,
                     {"AVENDER_SETUP_TOKEN": "a", "MCP_SERVER_TOKEN": "b"},
+                    assigned_port=45001,
+                    whisper_api_key="w" * 64,
                 )
         finally:
             os.environ.pop("SYSADMIN_API_URL", None)
@@ -146,11 +166,21 @@ class VaultProvisioningTests(TestCase):
                 "tenants.api.provision_tenant_secrets",
                 return_value={"AVENDER_SETUP_TOKEN": "a", "MCP_SERVER_TOKEN": "b"},
             ) as prov_mock:
-                with patch("tenants.api.build_tenant_bootstrap_env", return_value={"TENANT_ID": "id"}) as env_mock:
-                    with patch("tenants.api.deploy_tenant_pod", return_value={"instance": {"id": "abc"}}) as deploy_mock:
+                with patch(
+                    "tenants.api.build_tenant_bootstrap_env",
+                    return_value={"TENANT_ID": "id"},
+                ) as env_mock:
+                    with patch(
+                        "tenants.api.deploy_tenant_pod",
+                        return_value={"instance": {"id": "abc"}},
+                    ) as deploy_mock:
                         response = self.client.post(
                             "/api/saas/tenants",
-                            data={"name": "New Tenant", "email": "new-tenant@example.com", "plan_name": "Basic"},
+                            data={
+                                "name": "New Tenant",
+                                "email": "new-tenant@example.com",
+                                "plan_name": "Basic",
+                            },
                             content_type="application/json",
                         )
             self.assertEqual(response.status_code, 200)

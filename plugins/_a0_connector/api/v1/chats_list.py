@@ -1,4 +1,5 @@
 """POST /api/plugins/_a0_connector/v1/chats_list."""
+
 from __future__ import annotations
 
 from helpers.api import Request, Response
@@ -19,9 +20,11 @@ class ChatsList(connector_base.ProtectedConnectorApiHandler):
                     "created_at": data.get("created_at"),
                     "last_message": data.get("last_message"),
                     "running": data.get("running", False),
-                    "agent_profile": getattr(context.agent0.config, "profile", "default")
-                    if context.agent0
-                    else "default",
+                    "agent_profile": (
+                        getattr(context.agent0.config, "profile", "default")
+                        if context.agent0
+                        else "default"
+                    ),
                 }
             )
 

@@ -14,7 +14,9 @@ class LoadWebuiExtensions(ApiHandler):
 
         if not extension_point:
             return Response(status=400, response="Missing extension_point")
-        
-        exts = extension.get_webui_extensions(agent=None, extension_point=extension_point, filters=filters)
-        
+
+        exts = extension.get_webui_extensions(
+            agent=None, extension_point=extension_point, filters=filters
+        )
+
         return {"extensions": exts or []}

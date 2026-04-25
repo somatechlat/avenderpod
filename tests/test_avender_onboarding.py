@@ -46,7 +46,7 @@ def test_onboarding_wizard_and_catalog_ingestion():
         "idType": "RUC",
         "idNumber": "1790000000001",
         "tradeName": "Test ISO Business",
-        "archetype": "medical",
+        "archetype": "doctor",
         "policies": "Strictly no walk-ins.",
         "hours": "Mon-Fri 08:00-18:00",
         "payTransfer": "true",

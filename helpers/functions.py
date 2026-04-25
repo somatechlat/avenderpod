@@ -1,5 +1,6 @@
 import inspect
 
+
 def safe_call(func, *args, **kwargs):
     sig = inspect.signature(func)
 

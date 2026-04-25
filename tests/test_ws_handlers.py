@@ -23,16 +23,21 @@ def test_ws_result_ok_clones_payload():
     payload = {"value": 1}
     result = WsResult.ok(payload)
 
-    assert result.as_result(
-        handler_id="handler",
-        fallback_correlation_id="corr",
-    )["data"] == payload
+    assert (
+        result.as_result(
+            handler_id="handler",
+            fallback_correlation_id="corr",
+        )["data"]
+        == payload
+    )
 
     payload["value"] = 2
     assert result.as_result(
         handler_id="handler",
         fallback_correlation_id="corr",
-    )["data"] == {"value": 1}
+    )[
+        "data"
+    ] == {"value": 1}
 
 
 def test_ws_result_error_contains_metadata():

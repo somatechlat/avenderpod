@@ -61,8 +61,7 @@ class ProcessLocation(Tool):
         # delivery feasibility. The actual distance calculation uses a simple
         # heuristic — for Ecuador, 0.01 degree ≈ 1.11 km.
         location_summary = (
-            f"Ubicación del cliente:\n"
-            f"  Coordenadas: {lat:.6f}, {lon:.6f}\n"
+            f"Ubicación del cliente:\n" f"  Coordenadas: {lat:.6f}, {lon:.6f}\n"
         )
         if address_text:
             location_summary += f"  Dirección: {address_text}\n"

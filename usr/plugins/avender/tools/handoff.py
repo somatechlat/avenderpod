@@ -8,6 +8,7 @@ When triggered, this tool:
 4. The Tenant Admin Dashboard detects the flag and highlights the conversation
    for human intervention.
 """
+
 import json
 
 from helpers.tool import Tool, Response
@@ -30,7 +31,7 @@ class HandoffToHuman(Tool):
         "properties": {
             "reason": {
                 "type": "string",
-                "description": "Brief reason for requesting human intervention."
+                "description": "Brief reason for requesting human intervention.",
             }
         },
         "required": ["reason"],

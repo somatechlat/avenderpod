@@ -320,6 +320,66 @@ export function updateField(field, value) {
     this.formData[field] = value;
     this.requestUpdate();
 }
+
+export function getStepValidation(step = this.step) {
+    const requiredByStep = {
+        1: [
+            ["idType", "Tipo de Documento"],
+            ["idNumber", "Número de Identificación"],
+            ["tradeName", "Nombre Comercial"]
+        ],
+        2: [["headquarters", "Dirección Matriz"]],
+        3: [["archetype", "Giro de tu negocio"]],
+        5: [
+            ["whatsappNumber", "Número de WhatsApp del Negocio"],
+            ["adminPassword", "Contraseña de Administrador"]
+        ]
+    };
+
+    const missing = [];
+    const current = requiredByStep[step] || [];
+    for (const [field, label] of current) {
+        const value = this.formData[field];
+        if (typeof value === "string") {
+            if (!value.trim()) missing.push(label);
+            continue;
+        }
+        if (!value) missing.push(label);
+    }
+
+    if (step === 5 && this.formData.enableWhitelist) {
+        const hasAllowedNumbers = this.formData.allowedNumbers
+            .split(",")
+            .map(n => n.trim())
+            .filter(Boolean).length > 0;
+        if (!hasAllowedNumbers) {
+            missing.push("Lista Blanca (al menos un número)");
+        }
+    }
+
+    if (step === 5 && this.formData.adminPassword && this.formData.adminPassword.length < 8) {
+        missing.push("Contraseña de Administrador (mínimo 8 caracteres)");
+    }
+
+    return {
+        valid: missing.length === 0,
+        missing
+    };
+}
+
+export function goToNextStep() {
+    if (this.step >= 6) return;
+    const validation = this.getStepValidation(this.step);
+    if (!validation.valid) {
+        this.errorMessage = `Completa los campos requeridos: ${validation.missing.join(", ")}`;
+        this.requestUpdate();
+        return;
+    }
+    this.errorMessage = "";
+    this.step += 1;
+    this.requestUpdate();
+}
+
 export async function submitSetup() {
     if (!this.formData.whatsappNumber || !this.formData.tradeName) {
         this.errorMessage = "Por favor completa los campos obligatorios.";

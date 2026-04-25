@@ -41,11 +41,12 @@ ARCHETYPE_TOOLS = {
     "liquor": {"search_catalog", "calculate_total"},
     "cbd": {"search_catalog", "calculate_total"},
     "medical": {"search_catalog"},  # backward-compatible alias
-    "real_estate": {"search_catalog"}, # properties catalog
+    "real_estate": {"search_catalog"},  # properties catalog
     "subscriptions": {"search_catalog"},
 }
 
 AVENDER_AGENT_PROFILE = "avender_sales"
+
 
 class AvenderToolSandbox(Extension):
     """Reject tool calls not in the Avender allowlist."""
@@ -65,7 +66,7 @@ class AvenderToolSandbox(Extension):
             return
 
         archetype = get_setting("archetype", "retail")
-        
+
         # Build dynamic allowlist
         allowed_tools = set(BASE_TOOLS)
         allowed_tools.update(ARCHETYPE_TOOLS.get(archetype, set()))

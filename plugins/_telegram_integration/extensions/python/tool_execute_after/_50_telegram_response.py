@@ -11,7 +11,10 @@ from plugins._telegram_integration.helpers.dependencies import ensure_dependenci
 class TelegramResponseIntercept(Extension):
 
     async def execute(
-        self, tool_name: str = "", response: Response | None = None, **kwargs,
+        self,
+        tool_name: str = "",
+        response: Response | None = None,
+        **kwargs,
     ):
         if tool_name != "response":
             return

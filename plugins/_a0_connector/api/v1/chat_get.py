@@ -1,4 +1,5 @@
 """POST /api/plugins/_a0_connector/v1/chat_get."""
+
 from __future__ import annotations
 
 from helpers.api import Request, Response
@@ -38,9 +39,11 @@ class ChatGet(connector_base.ProtectedConnectorApiHandler):
             "created_at": context_data.get("created_at"),
             "last_message": context_data.get("last_message"),
             "running": context_data.get("running", False),
-            "agent_profile": getattr(context.agent0.config, "profile", "default")
-            if context.agent0
-            else "default",
+            "agent_profile": (
+                getattr(context.agent0.config, "profile", "default")
+                if context.agent0
+                else "default"
+            ),
             "log_entries": len(events),
             "last_sequence": last_sequence,
         }

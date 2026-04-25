@@ -1,4 +1,5 @@
 """Injects business rules dynamically from the tenant's onboarding config into the system prompt."""
+
 import json
 from typing import Any
 
@@ -10,7 +11,7 @@ class AvenderBusinessRules(Extension):
     async def execute(self, system_prompt: list[str], **kwargs):
         if not self.agent:
             return
-            
+
         agent_profile = getattr(self.agent.config, "agent_profile", "")
         if agent_profile != "avender_sales":
             return
@@ -22,7 +23,7 @@ class AvenderBusinessRules(Extension):
         delivery_rules = get_setting("delivery_rules", "No definido.")
         agent_name = get_setting("agent_name", "Asistente")
         tone = get_setting("agent_tone", "friendly")
-        
+
         # Build payment methods
         methods = []
         # JSON strings from Alpine might be literally 'true' or 'false'
@@ -32,14 +33,20 @@ class AvenderBusinessRules(Extension):
             methods.append("Efectivo")
         if str(get_setting("payments_link", False)).lower() == "true":
             methods.append(f"Link de Pago ({get_setting('payment_link_url', '')})")
-            
+
         methods_str = ", ".join(methods) if methods else "Acordar con el vendedor"
-        
+
         use_slang_val = str(get_setting("agent_slang", False)).lower() == "true"
-        slang_directive = "Puedes usar modismos locales moderadamente." if use_slang_val else "Mantén un lenguaje profesional sin modismos locales."
+        slang_directive = (
+            "Puedes usar modismos locales moderadamente."
+            if use_slang_val
+            else "Mantén un lenguaje profesional sin modismos locales."
+        )
 
         # Age Verification Constraint (LOPDP / Ecuadorian Law)
-        require_age_verification = str(get_setting("require_age_verification", False)).lower() == "true"
+        require_age_verification = (
+            str(get_setting("require_age_verification", False)).lower() == "true"
+        )
         age_verification_directive = ""
         if require_age_verification:
             age_verification_directive = (

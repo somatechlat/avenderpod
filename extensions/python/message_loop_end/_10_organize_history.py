@@ -11,7 +11,7 @@ class OrganizeHistory(Extension):
             return
 
         # is there a running task? if yes, skip this round, the wait extension will double check the context size
-        task: DeferredTask|None = self.agent.get_data(DATA_NAME_TASK)
+        task: DeferredTask | None = self.agent.get_data(DATA_NAME_TASK)
         if task and not task.is_ready():
             return
 

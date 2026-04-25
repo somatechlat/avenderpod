@@ -13,9 +13,9 @@ from helpers.print_style import PrintStyle
 
 class FileBrowser:
     ALLOWED_EXTENSIONS = {
-        'image': {'jpg', 'jpeg', 'png', 'bmp'},
-        'code': {'py', 'js', 'sh', 'html', 'css'},
-        'document': {'md', 'pdf', 'txt', 'csv', 'json'}
+        "image": {"jpg", "jpeg", "png", "bmp"},
+        "code": {"py", "js", "sh", "html", "css"},
+        "document": {"md", "pdf", "txt", "csv", "json"},
     }
 
     MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
@@ -50,7 +50,9 @@ class FileBrowser:
             PrintStyle.error(f"Error saving file {filename}: {e}")
             return False
 
-    def save_files(self, files: List, current_path: str = "") -> Tuple[List[str], List[str]]:
+    def save_files(
+        self, files: List, current_path: str = ""
+    ) -> Tuple[List[str], List[str]]:
         """Save uploaded files and return successful and failed filenames"""
         successful = []
         failed = []
@@ -191,9 +193,11 @@ class FileBrowser:
         return True  # Allow the file if it passes the checks
 
     def _get_file_extension(self, filename: str) -> str:
-        return filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
+        return filename.rsplit(".", 1)[1].lower() if "." in filename else ""
 
-    def _get_files_via_ls(self, full_path: Path) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    def _get_files_via_ls(
+        self, full_path: Path
+    ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
         """Get files and folders using ls command for better error handling"""
         files: List[Dict[str, Any]] = []
         folders: List[Dict[str, Any]] = []
@@ -201,10 +205,10 @@ class FileBrowser:
         try:
             # Use ls command to get directory listing
             result = subprocess.run(
-                ['ls', '-la', str(full_path)],
+                ["ls", "-la", str(full_path)],
                 capture_output=True,
                 text=True,
-                timeout=30
+                timeout=30,
             )
 
             if result.returncode != 0:
@@ -212,14 +216,14 @@ class FileBrowser:
                 return files, folders
 
             # Parse ls output (skip first line which is "total X")
-            lines = result.stdout.strip().split('\n')
+            lines = result.stdout.strip().split("\n")
             if len(lines) <= 1:
                 return files, folders
 
             for line in lines[1:]:  # Skip the "total" line
                 try:
                     # Skip current and parent directory entries
-                    if line.endswith(' .') or line.endswith(' ..'):
+                    if line.endswith(" .") or line.endswith(" .."):
                         continue
 
                     # Parse ls -la output format
@@ -229,19 +233,19 @@ class FileBrowser:
 
                     # Check if this is a symlink (permissions start with 'l')
                     permissions = parts[0]
-                    is_symlink = permissions.startswith('l')
+                    is_symlink = permissions.startswith("l")
 
                     if is_symlink:
                         # For symlinks, extract the name before the '->' arrow
-                        full_name_part = ' '.join(parts[8:])
-                        if ' -> ' in full_name_part:
-                            filename = full_name_part.split(' -> ')[0]
-                            symlink_target = full_name_part.split(' -> ')[1]
+                        full_name_part = " ".join(parts[8:])
+                        if " -> " in full_name_part:
+                            filename = full_name_part.split(" -> ")[0]
+                            symlink_target = full_name_part.split(" -> ")[1]
                         else:
                             filename = full_name_part
                             symlink_target = None
                     else:
-                        filename = ' '.join(parts[8:])  # Handle filenames with spaces
+                        filename = " ".join(parts[8:])  # Handle filenames with spaces
                         symlink_target = None
 
                     if not filename:
@@ -256,7 +260,9 @@ class FileBrowser:
                         entry_data: Dict[str, Any] = {
                             "name": filename,
                             "path": str(entry_path.relative_to(self.base_dir)),
-                            "modified": datetime.fromtimestamp(stat_info.st_mtime).isoformat()
+                            "modified": datetime.fromtimestamp(
+                                stat_info.st_mtime
+                            ).isoformat(),
                         }
 
                         # Add symlink information if this is a symlink
@@ -265,18 +271,22 @@ class FileBrowser:
                             entry_data["is_symlink"] = True
 
                         if entry_path.is_file():
-                            entry_data.update({
-                                "type": self._get_file_type(filename),
-                                "size": stat_info.st_size,
-                                "is_dir": False
-                            })
+                            entry_data.update(
+                                {
+                                    "type": self._get_file_type(filename),
+                                    "size": stat_info.st_size,
+                                    "is_dir": False,
+                                }
+                            )
                             files.append(entry_data)
                         elif entry_path.is_dir():
-                            entry_data.update({
-                                "type": "folder",
-                                "size": 0,  # Directories show as 0 bytes
-                                "is_dir": True
-                            })
+                            entry_data.update(
+                                {
+                                    "type": "folder",
+                                    "size": 0,  # Directories show as 0 bytes
+                                    "is_dir": True,
+                                }
+                            )
                             folders.append(entry_data)
 
                     except (OSError, PermissionError, FileNotFoundError) as e:
@@ -329,7 +339,7 @@ class FileBrowser:
             return {
                 "entries": all_entries,
                 "current_path": current_path,
-                "parent_path": parent_path
+                "parent_path": parent_path,
             }
 
         except Exception as e:
@@ -338,7 +348,9 @@ class FileBrowser:
 
     def get_full_path(self, file_path: str, allow_dir: bool = False) -> str:
         """Get full file path if it exists and is within base_dir"""
-        full_path = files.resolve_path_in_root(file_path, str(self.base_dir), must_exist=True)
+        full_path = files.resolve_path_in_root(
+            file_path, str(self.base_dir), must_exist=True
+        )
         if not files.exists(full_path):
             raise ValueError(f"File {file_path} not found")
         if not allow_dir and os.path.isdir(full_path):
@@ -350,4 +362,4 @@ class FileBrowser:
         for file_type, extensions in self.ALLOWED_EXTENSIONS.items():
             if ext in extensions:
                 return file_type
-        return 'unknown'
+        return "unknown"

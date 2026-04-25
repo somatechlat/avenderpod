@@ -1,14 +1,12 @@
 from abc import abstractmethod
 import asyncio
-from collections import OrderedDict
 from collections.abc import Mapping
 import json
 import math
 import uuid
-from typing import Coroutine, Literal, TypedDict, cast, Union, Dict, List, Any
-from helpers import messages, tokens, settings, call_llm
-from enum import Enum
-from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage, AIMessage
+from typing import TypedDict, cast, Union, Dict, List, Any
+from helpers import messages, tokens
+from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 from plugins._model_config.helpers.model_config import get_chat_model_config
 
 
@@ -17,8 +15,10 @@ TOPICS_MERGE_COUNT = 3
 CURRENT_TOPIC_RATIO = 0.5
 HISTORY_TOPIC_RATIO = 0.3
 HISTORY_BULK_RATIO = 0.2
-CURRENT_TOPIC_ATTENTION_COMPRESSION = 0.65 # compress current topic's attention window to 65% of size
-HISTORY_TOPIC_ATTENTION_COMPRESSION = 0 # compress history topic's attention window to 0% of size - only request and response remain intact
+CURRENT_TOPIC_ATTENTION_COMPRESSION = (
+    0.65  # compress current topic's attention window to 65% of size
+)
+HISTORY_TOPIC_ATTENTION_COMPRESSION = 0  # compress history topic's attention window to 0% of size - only request and response remain intact
 LARGE_MESSAGE_TO_CURRENT_TOPIC_RATIO = 0.5
 LARGE_MESSAGE_TO_HISTORY_TOPIC_RATIO = 0.2
 RAW_MESSAGE_OUTPUT_TEXT_TRIM = 100
@@ -82,7 +82,9 @@ class Record:
 
 
 class Message(Record):
-    def __init__(self, ai: bool, content: MessageContent, tokens: int = 0, id: str = ""):
+    def __init__(
+        self, ai: bool, content: MessageContent, tokens: int = 0, id: str = ""
+    ):
         self.id = id or str(uuid.uuid4())
         self.ai = ai
         self.content = content
@@ -163,16 +165,17 @@ class Topic(Record):
         self.summary = await self.summarize_messages(self.messages)
         return self.summary
 
-    def compress_large_messages(self, message_ratio: float = CURRENT_TOPIC_RATIO * LARGE_MESSAGE_TO_CURRENT_TOPIC_RATIO) -> bool:
+    def compress_large_messages(
+        self,
+        message_ratio: float = CURRENT_TOPIC_RATIO
+        * LARGE_MESSAGE_TO_CURRENT_TOPIC_RATIO,
+    ) -> bool:
         from plugins._model_config.helpers.model_config import get_chat_model_config
+
         chat_cfg = get_chat_model_config()
         ctx_length = int(chat_cfg.get("ctx_length", 128000))
         ctx_history = float(chat_cfg.get("ctx_history", 0.7))
-        msg_max_size = (
-            ctx_length
-            * ctx_history
-            * message_ratio
-        )
+        msg_max_size = ctx_length * ctx_history * message_ratio
         large_msgs = []
         for m in (m for m in self.messages if not m.summary):
             # TODO refactor this
@@ -210,7 +213,9 @@ class Topic(Record):
             compress = await self.compress_attention()
         return compress
 
-    async def compress_attention(self, ratio: float = CURRENT_TOPIC_ATTENTION_COMPRESSION) -> bool:
+    async def compress_attention(
+        self, ratio: float = CURRENT_TOPIC_ATTENTION_COMPRESSION
+    ) -> bool:
 
         middle = len(self.messages) - 2
         if middle < 2:
@@ -298,7 +303,6 @@ class Bulk(Record):
     def from_dict(data: dict, history: "History"):
         bulk = Bulk(history=history)
         bulk.summary = data["summary"]
-        cls = data["_cls"]
         bulk.records = [Record.from_dict(r, history=history) for r in data["records"]]
         return bulk
 
@@ -361,7 +365,9 @@ class History(Record):
         removed = 0
 
         for record in reversed(self.bulks + self.topics + [self.current]):
-            embeds_count, removed_now = self._trim_embeds_in_record(record, embeds_count, max_embeds)
+            embeds_count, removed_now = self._trim_embeds_in_record(
+                record, embeds_count, max_embeds
+            )
             removed += removed_now
 
         return removed
@@ -384,7 +390,9 @@ class History(Record):
             if not isinstance(raw_content, list):
                 return embeds_count, 0
 
-            embeds_in_message = sum(1 for item in raw_content if _is_embedded_data(item))
+            embeds_in_message = sum(
+                1 for item in raw_content if _is_embedded_data(item)
+            )
             if embeds_in_message <= 0:
                 return embeds_count, 0
 
@@ -397,14 +405,18 @@ class History(Record):
         if isinstance(record, Topic):
             removed = 0
             for message in reversed(record.messages):
-                embeds_count, removed_now = self._trim_embeds_in_record(message, embeds_count, max_embeds)
+                embeds_count, removed_now = self._trim_embeds_in_record(
+                    message, embeds_count, max_embeds
+                )
                 removed += removed_now
             return embeds_count, removed
 
         if isinstance(record, Bulk):
             removed = 0
             for nested in reversed(record.records):
-                embeds_count, removed_now = self._trim_embeds_in_record(nested, embeds_count, max_embeds)
+                embeds_count, removed_now = self._trim_embeds_in_record(
+                    nested, embeds_count, max_embeds
+                )
                 removed += removed_now
             return embeds_count, removed
 
@@ -486,7 +498,9 @@ class History(Record):
 
         # 1. first identify large messages and compress them cheaply
         for topic in self.topics:
-            if topic.compress_large_messages(HISTORY_TOPIC_RATIO*LARGE_MESSAGE_TO_HISTORY_TOPIC_RATIO):
+            if topic.compress_large_messages(
+                HISTORY_TOPIC_RATIO * LARGE_MESSAGE_TO_HISTORY_TOPIC_RATIO
+            ):
                 return True
 
         # 2. summarize topics attention window one by one
@@ -552,7 +566,6 @@ class History(Record):
         return max_embeds
 
 
-
 def deserialize_history(json_data: str, agent) -> History:
     history = History(agent=agent)
     if json_data:
@@ -569,7 +582,7 @@ def _stringify_content(content: MessageContent) -> str:
     # already a string
     if isinstance(content, str):
         return content
-    
+
     # raw messages return preview or trimmed json
     if _is_raw_message(content):
         raw_message = cast(dict[str, Any], content)
@@ -580,7 +593,7 @@ def _stringify_content(content: MessageContent) -> str:
         if len(text) > RAW_MESSAGE_OUTPUT_TEXT_TRIM:
             return text[:RAW_MESSAGE_OUTPUT_TEXT_TRIM] + "... TRIMMED"
         return text
-    
+
     # regular messages of non-string are dumped as json
     return _json_dumps(content)
 
@@ -626,7 +639,7 @@ def output_langchain(messages: list[OutputMessage]):
     for m in messages:
         content = _output_content_langchain(content=m["content"])
         if not content or (isinstance(content, str) and not content.strip()):
-            continue # skip empty messages, models 
+            continue  # skip empty messages, models
         if m["ai"]:
             result.append(AIMessage(content))  # type: ignore
         else:

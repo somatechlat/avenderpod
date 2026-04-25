@@ -29,9 +29,7 @@ class UnsafeUrlError(ValueError):
 
 def _build_request_headers() -> dict[str, str]:
     user_agent = (
-        os.getenv("USER_AGENT")
-        or os.getenv("user_agent")
-        or DEFAULT_HTTP_USER_AGENT
+        os.getenv("USER_AGENT") or os.getenv("user_agent") or DEFAULT_HTTP_USER_AGENT
     ).strip()
     return {"User-Agent": user_agent or DEFAULT_HTTP_USER_AGENT}
 
@@ -178,7 +176,8 @@ def is_loopback_address(address: str) -> bool:
     _checkers = {
         socket.AF_INET: lambda x: (
             struct.unpack("!I", socket.inet_aton(x))[0] >> (32 - 8)
-        ) == 127,
+        )
+        == 127,
         socket.AF_INET6: lambda x: x == "::1",
     }
     try:

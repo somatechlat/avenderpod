@@ -21,7 +21,8 @@ export class AvenderWizard extends LitElement {
         catalogFileName: { type: String },
         industries: { type: Array },
         showCatalogModal: { type: Boolean },
-        newItem: { type: Object }
+        newItem: { type: Object },
+        loadingMessage: { type: String }
     };
 
     constructor() {

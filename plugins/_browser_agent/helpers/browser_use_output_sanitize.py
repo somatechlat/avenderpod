@@ -20,11 +20,7 @@ def deep_strip_empty_string_keys(obj: Any) -> Any:
     action key; spurious "" keys break validation for every union variant.
     """
     if isinstance(obj, dict):
-        return {
-            k: deep_strip_empty_string_keys(v)
-            for k, v in obj.items()
-            if k != ""
-        }
+        return {k: deep_strip_empty_string_keys(v) for k, v in obj.items() if k != ""}
     if isinstance(obj, list):
         return [deep_strip_empty_string_keys(item) for item in obj]
     return obj

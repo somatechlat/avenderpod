@@ -1,16 +1,23 @@
+from __future__ import annotations
+
 import sys
 import threading
 from pathlib import Path
 
 import pytest
+
 import asyncio
 import time
+from typing import TYPE_CHECKING
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from helpers.ws_manager import WsManager
+
+if TYPE_CHECKING:
+    from api.ws_webui import WsWebui
 
 NAMESPACE = "/ws"
 
@@ -38,7 +45,9 @@ async def _create_manager() -> tuple[WsManager, "WsWebui"]:
     return manager, handler
 
 
-async def _create_manager_with_socketio() -> tuple[WsManager, "WsWebui", FakeSocketIOServer]:
+async def _create_manager_with_socketio() -> (
+    tuple[WsManager, "WsWebui", FakeSocketIOServer]
+):
     from api.ws_webui import WsWebui
     from helpers.state_monitor import _reset_state_monitor_for_testing
 

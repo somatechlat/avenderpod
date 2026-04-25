@@ -10,7 +10,9 @@ from helpers import runtime
 class WsDevTest(WsHandler):
     """Developer-only WebSocket test harness handler."""
 
-    async def process(self, event: str, data: dict, sid: str) -> dict[str, Any] | WsResult | None:
+    async def process(
+        self, event: str, data: dict, sid: str
+    ) -> dict[str, Any] | WsResult | None:
         if event == "ws_event_console_subscribe":
             if not runtime.is_development():
                 return WsResult.error(
@@ -31,7 +33,11 @@ class WsDevTest(WsHandler):
 
         if event == "ws_tester_emit":
             message = data.get("message", "emit")
-            payload = {"message": message, "echo": True, "timestamp": data.get("timestamp")}
+            payload = {
+                "message": message,
+                "echo": True,
+                "timestamp": data.get("timestamp"),
+            }
             await self.broadcast("ws_tester_broadcast", payload)
             PrintStyle.info(f"Harness emit broadcasted message='{message}'")
             return None
@@ -45,7 +51,11 @@ class WsDevTest(WsHandler):
             delay_ms = int(data.get("delay_ms", 0))
             await asyncio.sleep(delay_ms / 1000)
             PrintStyle.warning("Harness delayed request finished after %s ms", delay_ms)
-            return {"status": "delayed", "delay_ms": delay_ms, "handler": self.identifier}
+            return {
+                "status": "delayed",
+                "delay_ms": delay_ms,
+                "handler": self.identifier,
+            }
 
         if event == "ws_tester_trigger_persistence":
             phase = data.get("phase", "unknown")

@@ -39,7 +39,9 @@ def ensure_dependencies() -> None:
         importlib.invalidate_caches()
 
         if not has_aiogram():
-            raise RuntimeError("Telegram dependency 'aiogram' is still unavailable after installation")
+            raise RuntimeError(
+                "Telegram dependency 'aiogram' is still unavailable after installation"
+            )
 
         _CHECKED = True
 
@@ -47,9 +49,13 @@ def ensure_dependencies() -> None:
 def _install_aiogram() -> None:
     uv = shutil.which("uv")
     if not uv:
-        raise RuntimeError("Telegram plugin requires 'uv' to install aiogram automatically")
+        raise RuntimeError(
+            "Telegram plugin requires 'uv' to install aiogram automatically"
+        )
     if not _REQUIREMENTS_FILE.is_file():
-        raise RuntimeError(f"Telegram plugin requirements file not found: {_REQUIREMENTS_FILE}")
+        raise RuntimeError(
+            f"Telegram plugin requirements file not found: {_REQUIREMENTS_FILE}"
+        )
 
     cmd = [
         uv,
@@ -65,4 +71,6 @@ def _install_aiogram() -> None:
     try:
         subprocess.check_call(cmd, cwd=str(_PLUGIN_DIR))
     except Exception as e:
-        raise RuntimeError(f"Failed to install Telegram dependency 'aiogram': {format_error(e)}") from e
+        raise RuntimeError(
+            f"Failed to install Telegram dependency 'aiogram': {format_error(e)}"
+        ) from e

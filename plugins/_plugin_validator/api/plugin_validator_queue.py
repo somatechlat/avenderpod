@@ -21,6 +21,10 @@ class PluginValidatorQueue(ApiHandler):
         mq.log_user_message(context, text, [])
 
         if queued:
-            context.log.set_progress("icon://hourglass_empty Queued - waiting for another validation to finish", 0, True)
+            context.log.set_progress(
+                "icon://hourglass_empty Queued - waiting for another validation to finish",
+                0,
+                True,
+            )
 
         return {"ok": True, "context": ctxid}

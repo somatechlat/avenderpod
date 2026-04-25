@@ -1,4 +1,5 @@
 """code_execution_remote tool — run shell-backed frontend operations on the CLI machine via `/ws`."""
+
 from __future__ import annotations
 
 import asyncio

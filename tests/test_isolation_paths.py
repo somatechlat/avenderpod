@@ -43,5 +43,7 @@ def test_resolve_path_in_root_maps_a0_dev_paths(monkeypatch, tmp_path: Path) -> 
     monkeypatch.setattr(files, "get_base_dir", lambda: str(root))
     monkeypatch.setattr("helpers.runtime.is_dockerized", lambda: False)
 
-    resolved = files.resolve_path_in_root("/a0/usr/uploads/file.txt", str(root), must_exist=True)
+    resolved = files.resolve_path_in_root(
+        "/a0/usr/uploads/file.txt", str(root), must_exist=True
+    )
     assert resolved == str(upload.resolve())

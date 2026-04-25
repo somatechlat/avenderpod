@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import asyncio, os
+import asyncio
 import re
 import time
-import threading
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -15,7 +14,13 @@ import uuid
 from helpers.defer import DeferredTask
 from helpers.print_style import PrintStyle
 from helpers import runtime
-from helpers.ws import ConnectionIdentity, ConnectionNotFoundError, WsHandler, _ws_debug_enabled, ws_debug
+from helpers.ws import (
+    ConnectionIdentity,
+    ConnectionNotFoundError,
+    WsHandler,
+    _ws_debug_enabled,
+    ws_debug,
+)
 
 
 # Event validation
@@ -36,6 +41,7 @@ _RESERVED_EVENT_NAMES: set[str] = {
 
 
 # WsResult – standardized handler return value
+
 
 class WsResult:
     """Helper wrapper for standardized handler results.
@@ -146,10 +152,14 @@ class WsResult:
         if self._ok:
             result["data"] = dict(self._data) if self._data is not None else {}
         else:
-            result["error"] = dict(self._error) if self._error is not None else {
-                "code": "INTERNAL_ERROR",
-                "error": "Internal server error",
-            }
+            result["error"] = (
+                dict(self._error)
+                if self._error is not None
+                else {
+                    "code": "INTERNAL_ERROR",
+                    "error": "Internal server error",
+                }
+            )
         return result
 
 
@@ -589,7 +599,10 @@ class WsManager:
         )
 
         results = self._collect_results(
-            executions, event_type, correlation_id, skip_none=True,
+            executions,
+            event_type,
+            correlation_id,
+            skip_none=True,
         )
 
         await self._publish_diagnostic_event(
@@ -602,9 +615,7 @@ class WsManager:
                 "correlationId": correlation_id,
                 "timestamp": self._timestamp(),
                 "handlerCount": len(handlers),
-                "durationMs": sum(
-                    (exec.duration_ms or 0.0) for exec in executions
-                ),
+                "durationMs": sum((exec.duration_ms or 0.0) for exec in executions),
                 "resultSummary": self._summarize_results(results),
                 "payloadSummary": self._summarize_payload(handler_payload),
             }
@@ -952,7 +963,10 @@ class WsManager:
         # This is intentional: route_event is server-initiated and callers
         # expect a result entry for every handler.
         results = self._collect_results(
-            executions, event_type, correlation_id, skip_none=False,
+            executions,
+            event_type,
+            correlation_id,
+            skip_none=False,
         )
 
         await self._publish_diagnostic_event(
@@ -1320,7 +1334,9 @@ class WsManager:
             )
             coros = [
                 self._run_on_dispatcher_loop(
-                    self.socketio.emit(event_type, envelope, to=sid, namespace=namespace)
+                    self.socketio.emit(
+                        event_type, envelope, to=sid, namespace=namespace
+                    )
                 )
                 for sid in targets
             ]

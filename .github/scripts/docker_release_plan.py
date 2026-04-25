@@ -15,7 +15,9 @@ from urllib.request import Request, urlopen
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 OPENROUTER_CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions"
-OPENROUTER_SYSTEM_PROMPT_PATH = REPO_ROOT / "scripts" / "openrouter_release_notes_system_prompt.md"
+OPENROUTER_SYSTEM_PROMPT_PATH = (
+    REPO_ROOT / "scripts" / "openrouter_release_notes_system_prompt.md"
+)
 
 
 def fail(message: str) -> None:
@@ -164,7 +166,12 @@ def parse_release_tag(config: Config, tag: str) -> tuple[int, int] | None:
 
 
 def tag_exists(tag: str) -> bool:
-    return run_command("git", "rev-parse", "--verify", "--quiet", f"refs/tags/{tag}", check=False).returncode == 0
+    return (
+        run_command(
+            "git", "rev-parse", "--verify", "--quiet", f"refs/tags/{tag}", check=False
+        ).returncode
+        == 0
+    )
 
 
 def tag_commit(tag: str) -> str:
@@ -202,7 +209,12 @@ def branch_contains_commit(branch: str, commit: str) -> bool:
 def ref_exists(ref: str) -> bool:
     if not ref or re.fullmatch(r"0{40}", ref):
         return False
-    return run_command("git", "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}", check=False).returncode == 0
+    return (
+        run_command(
+            "git", "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}", check=False
+        ).returncode
+        == 0
+    )
 
 
 def releasable_tags_for_ref(config: Config, ref: str) -> list[str]:
@@ -226,10 +238,22 @@ def latest_releasable_tag_for_ref(config: Config, ref: str) -> str | None:
     return valid_tags[-1] if valid_tags else None
 
 
-def collect_branch_states(config: Config, branches: list[str] | None = None) -> dict[str, BranchState]:
+def collect_branch_states(
+    config: Config, branches: list[str] | None = None
+) -> dict[str, BranchState]:
     states: dict[str, BranchState] = {}
     for branch in branches or config.allowed_branches:
-        if run_command("git", "show-ref", "--verify", "--quiet", f"refs/remotes/origin/{branch}", check=False).returncode != 0:
+        if (
+            run_command(
+                "git",
+                "show-ref",
+                "--verify",
+                "--quiet",
+                f"refs/remotes/origin/{branch}",
+                check=False,
+            ).returncode
+            != 0
+        ):
             fail(f"Allowed branch origin/{branch} was not fetched.")
 
         valid_tags = releasable_tags_for_ref(config, f"origin/{branch}")
@@ -241,26 +265,36 @@ def collect_branch_states(config: Config, branches: list[str] | None = None) -> 
     return states
 
 
-def add_or_merge_candidate(candidates: dict[tuple[str, str, str], Candidate], candidate: Candidate) -> None:
+def add_or_merge_candidate(
+    candidates: dict[tuple[str, str, str], Candidate], candidate: Candidate
+) -> None:
     key = (candidate.branch, candidate.source_tag, candidate.mode)
     existing = candidates.get(key)
     if existing is None:
         candidates[key] = candidate
         return
     existing.publish_version = existing.publish_version or candidate.publish_version
-    existing.publish_branch_tag = existing.publish_branch_tag or candidate.publish_branch_tag
+    existing.publish_branch_tag = (
+        existing.publish_branch_tag or candidate.publish_branch_tag
+    )
     if candidate.reason not in existing.reason:
         existing.reason = f"{existing.reason}; {candidate.reason}"
 
 
-def plan_tag_push(config: Config, branch_states: dict[str, BranchState]) -> tuple[list[Candidate], list[str]]:
+def plan_tag_push(
+    config: Config, branch_states: dict[str, BranchState]
+) -> tuple[list[Candidate], list[str]]:
     source_tag = config.source_ref_name
     notes: list[str] = []
     version = parse_release_tag(config, source_tag)
     if version is None:
-        return [], [f"Skipped `{source_tag}` because it does not match `v{{X}}.{{Y}}` or is below v{config.min_version[0]}.{config.min_version[1]}."]
+        return [], [
+            f"Skipped `{source_tag}` because it does not match `v{{X}}.{{Y}}` or is below v{config.min_version[0]}.{config.min_version[1]}."
+        ]
     if not tag_exists(source_tag):
-        return [], [f"Skipped `{source_tag}` because the tag is not present after checkout."]
+        return [], [
+            f"Skipped `{source_tag}` because the tag is not present after checkout."
+        ]
 
     commit = tag_commit(source_tag)
     candidates: list[Candidate] = []
@@ -286,11 +320,15 @@ def plan_tag_push(config: Config, branch_states: dict[str, BranchState]) -> tupl
         )
 
     if not found_branch:
-        notes.append(f"Skipped `{source_tag}` because it is not reachable from any allowed branch.")
+        notes.append(
+            f"Skipped `{source_tag}` because it is not reachable from any allowed branch."
+        )
     return candidates, notes
 
 
-def plan_branch_push(config: Config, branch_states: dict[str, BranchState]) -> tuple[list[Candidate], list[str]]:
+def plan_branch_push(
+    config: Config, branch_states: dict[str, BranchState]
+) -> tuple[list[Candidate], list[str]]:
     branch = config.source_ref_name
     if branch not in branch_states:
         return [], [f"Skipped `{branch}` because it is not an allowed release branch."]
@@ -300,7 +338,9 @@ def plan_branch_push(config: Config, branch_states: dict[str, BranchState]) -> t
     if after_tag is None:
         return [], [f"Skipped `{branch}` because it has no releasable tags."]
     if before_tag == after_tag:
-        return [], [f"Skipped `{branch}` because its highest release tag is still `{after_tag}`."]
+        return [], [
+            f"Skipped `{branch}` because its highest release tag is still `{after_tag}`."
+        ]
 
     return [
         Candidate(
@@ -314,7 +354,9 @@ def plan_branch_push(config: Config, branch_states: dict[str, BranchState]) -> t
     ], []
 
 
-def plan_manual_exact(config: Config, branch_states: dict[str, BranchState]) -> tuple[list[Candidate], list[str]]:
+def plan_manual_exact(
+    config: Config, branch_states: dict[str, BranchState]
+) -> tuple[list[Candidate], list[str]]:
     manual_tag = config.manual_tag
     if parse_release_tag(config, manual_tag) is None:
         fail(
@@ -362,7 +404,9 @@ def plan_manual_exact(config: Config, branch_states: dict[str, BranchState]) -> 
     return candidates, notes
 
 
-def plan_manual_backfill(config: Config, branch_states: dict[str, BranchState]) -> tuple[list[Candidate], list[str]]:
+def plan_manual_backfill(
+    config: Config, branch_states: dict[str, BranchState]
+) -> tuple[list[Candidate], list[str]]:
     notes: list[str] = []
     candidates: dict[tuple[str, str, str], Candidate] = {}
 
@@ -559,11 +603,15 @@ def parse_commit_entries(raw_log: str) -> list[CommitEntry]:
     return entries
 
 
-def collect_release_commits(previous_release_tag: str | None, source_tag: str) -> list[CommitEntry]:
+def collect_release_commits(
+    previous_release_tag: str | None, source_tag: str
+) -> list[CommitEntry]:
     range_ref = source_tag
     if previous_release_tag:
         if not tag_exists(previous_release_tag):
-            fail(f"Previous published release tag `{previous_release_tag}` is not available in the repository.")
+            fail(
+                f"Previous published release tag `{previous_release_tag}` is not available in the repository."
+            )
         if not commit_is_ancestor(
             f"refs/tags/{previous_release_tag}^{{commit}}",
             f"refs/tags/{source_tag}^{{commit}}",
@@ -657,7 +705,9 @@ def generate_release_body_with_openrouter(commits: list[CommitEntry]) -> str:
 
     choices = response_payload.get("choices")
     if not isinstance(choices, list) or not choices:
-        fail(f"OpenRouter response did not include choices: {json.dumps(response_payload)}")
+        fail(
+            f"OpenRouter response did not include choices: {json.dumps(response_payload)}"
+        )
 
     first_choice = choices[0]
     if not isinstance(first_choice, dict):
@@ -675,7 +725,9 @@ def resolve_release_command() -> None:
 
     if branch != config.main_branch:
         write_output("should_release", "false")
-        write_output("skip_reason", f"Branch `{branch}` does not publish GitHub releases.")
+        write_output(
+            "skip_reason", f"Branch `{branch}` does not publish GitHub releases."
+        )
         return
 
     branch_state = collect_branch_states(config, [branch])[branch]
@@ -692,7 +744,9 @@ def resolve_release_command() -> None:
     commit = tag_commit(source_tag)
     if not branch_contains_commit(branch, commit):
         write_output("should_release", "false")
-        write_output("skip_reason", f"Tag `{source_tag}` is no longer reachable from `{branch}`.")
+        write_output(
+            "skip_reason", f"Tag `{source_tag}` is no longer reachable from `{branch}`."
+        )
         return
 
     if branch_state.latest_tag != source_tag:
@@ -736,7 +790,9 @@ def resolve_build_command() -> None:
     source_tag = os.environ["TARGET_TAG"].strip()
     mode = os.environ["TARGET_MODE"].strip()
     publish_version = os.environ["TARGET_PUBLISH_VERSION"].strip().lower() == "true"
-    publish_branch_tag = os.environ["TARGET_PUBLISH_BRANCH_TAG"].strip().lower() == "true"
+    publish_branch_tag = (
+        os.environ["TARGET_PUBLISH_BRANCH_TAG"].strip().lower() == "true"
+    )
 
     branch_state = collect_branch_states(config, [branch])[branch]
     if branch_state.latest_tag is None:
@@ -752,7 +808,9 @@ def resolve_build_command() -> None:
     commit = tag_commit(source_tag)
     if not branch_contains_commit(branch, commit):
         write_output("should_build", "false")
-        write_output("skip_reason", f"Tag `{source_tag}` is no longer reachable from `{branch}`.")
+        write_output(
+            "skip_reason", f"Tag `{source_tag}` is no longer reachable from `{branch}`."
+        )
         return
 
     mutable_tag = "latest" if branch == config.main_branch else branch
@@ -803,7 +861,9 @@ def resolve_build_command() -> None:
                 return
             if branch == config.main_branch and branch_state.latest_tag != source_tag:
                 publish_branch_tag = False
-            if publish_branch_tag and not docker_tag_exists(config.image_repo, mutable_tag):
+            if publish_branch_tag and not docker_tag_exists(
+                config.image_repo, mutable_tag
+            ):
                 tags_to_push.append(f"{config.image_repo}:{mutable_tag}")
     else:
         fail(f"Unsupported resolve-build mode: {mode}")
@@ -811,12 +871,17 @@ def resolve_build_command() -> None:
     tags_to_push = unique(tags_to_push)
     if not tags_to_push:
         write_output("should_build", "false")
-        write_output("skip_reason", "All requested Docker tags already exist or are no longer eligible.")
+        write_output(
+            "skip_reason",
+            "All requested Docker tags already exist or are no longer eligible.",
+        )
         return
 
     write_output("should_build", "true")
     write_output("tags", "\n".join(tags_to_push))
-    write_output("display_tags", ", ".join(tag.rsplit(":", 1)[1] for tag in tags_to_push))
+    write_output(
+        "display_tags", ", ".join(tag.rsplit(":", 1)[1] for tag in tags_to_push)
+    )
     print("\n".join(tags_to_push))
 
 

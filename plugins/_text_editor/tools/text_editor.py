@@ -15,7 +15,6 @@ from plugins._text_editor.helpers.file_ops import (
 _MTIME_KEY = "_text_editor_mtimes"
 
 
-
 class TextEditor(Tool):
 
     async def execute(self, **kwargs):
@@ -100,7 +99,8 @@ class TextEditor(Tool):
 
         # Extension point
         await call_extensions_async(
-            "text_editor_write_after", agent=self.agent,
+            "text_editor_write_after",
+            agent=self.agent,
             data={"path": path, "total_lines": result["total_lines"]},
         )
 
@@ -161,17 +161,14 @@ class TextEditor(Tool):
 
         # Extension point
         await call_extensions_async(
-            "text_editor_patch_after", agent=self.agent,
+            "text_editor_patch_after",
+            agent=self.agent,
             data={"path": expanded, "total_lines": total_lines},
         )
 
         # Refresh file info after patch for updated mtime
-        post_info = await runtime.call_development_function(
-            file_info, expanded
-        )
-        _apply_patch_post(
-            self.agent, post_info, total_lines, ext_data["edits"]
-        )
+        post_info = await runtime.call_development_function(file_info, expanded)
+        _apply_patch_post(self.agent, post_info, total_lines, ext_data["edits"])
 
         patch_content = await _read_patch_region(
             expanded, ext_data["edits"], total_lines, _get_config(self.agent)
@@ -200,6 +197,7 @@ class TextEditor(Tool):
 # Standalone helpers
 # ------------------------------------------------------------------
 
+
 async def _read_patch_region(
     path: str, edits: list[dict], total_lines: int, cfg: dict
 ) -> str:
@@ -210,12 +208,10 @@ async def _read_patch_region(
     added = sum(
         e["content"].count("\n")
         + (1 if e["content"] and not e["content"].endswith("\n") else 0)
-        for e in edits if e.get("content")
+        for e in edits
+        if e.get("content")
     )
-    removed = sum(
-        max(e["to"] - e["from"] + 1, 0)
-        for e in edits if not e.get("insert")
-    )
+    removed = sum(max(e["to"] - e["from"] + 1, 0) for e in edits if not e.get("insert"))
     max_to = max(e["to"] for e in edits)
     end_line = max_to + added - removed + 3
 
@@ -240,9 +236,7 @@ def _record_mtime(agent, info: FileInfo, total_lines: int):
 
 
 def _count_content_lines(content: str) -> int:
-    return content.count("\n") + (
-        1 if content and not content.endswith("\n") else 0
-    )
+    return content.count("\n") + (1 if content and not content.endswith("\n") else 0)
 
 
 def _all_edits_in_place(edits: list[dict]) -> bool:
@@ -256,9 +250,7 @@ def _all_edits_in_place(edits: list[dict]) -> bool:
     return True
 
 
-def _apply_patch_post(
-    agent, info: FileInfo, new_total: int, edits: list[dict]
-):
+def _apply_patch_post(agent, info: FileInfo, new_total: int, edits: list[dict]):
     mtimes = agent.data.setdefault(_MTIME_KEY, {})
     real = info["realpath"]
 
@@ -307,9 +299,11 @@ def _check_mtime(agent, info: FileInfo) -> str:
         )
     return ""
 
+
 # ------------------------------------------------------------------
 # Config
 # ------------------------------------------------------------------
+
 
 def _get_config(agent) -> dict:
     config = plugins.get_plugin_config("_text_editor", agent=agent) or {}

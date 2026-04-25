@@ -19,19 +19,21 @@ class MissingApiKeyCheck(Extension):
         missing_providers = model_config.get_missing_api_key_providers()
 
         if missing_providers:
-            banners.append({
-                "id": "missing-api-key",
-                "type": "error",
-                "priority": 100,
-                "title": "Welcome to Agent Zero!",
-                "html": f"""You're almost ready to chat. Please configure your models to continue.<br>
+            banners.append(
+                {
+                    "id": "missing-api-key",
+                    "type": "error",
+                    "priority": 100,
+                    "title": "Welcome to Agent Zero!",
+                    "html": f"""You're almost ready to chat. Please configure your models to continue.<br>
                          Insert your API key in the onboarding wizard.
                          {self.CONFIGURE_MODEL_SETTINGS_LINK}""",
-                "dismissible": False,
-                "source": "backend",
-                # For programmatic clients (e.g. chat composer) reusing this banner pipeline
-                "missing_providers": missing_providers,
-            })
+                    "dismissible": False,
+                    "source": "backend",
+                    # For programmatic clients (e.g. chat composer) reusing this banner pipeline
+                    "missing_providers": missing_providers,
+                }
+            )
 
         # Check preset providers for missing API keys (warning level)
         if cfg.get("allow_chat_override"):
@@ -55,18 +57,22 @@ class MissingApiKeyCheck(Extension):
                         continue
                     if not model_config.has_provider_api_key(provider_lower):
                         seen.add(provider_lower)
-                        preset_missing.append(f"{preset_name}/{slot_label} ({provider})")
+                        preset_missing.append(
+                            f"{preset_name}/{slot_label} ({provider})"
+                        )
 
             if preset_missing:
                 preset_list = ", ".join(preset_missing)
-                banners.append({
-                    "id": "missing-preset-api-key",
-                    "type": "warning",
-                    "priority": 90,
-                    "title": "Missing API Key for model presets",
-                    "html": f"""No API key configured for preset models: {preset_list}.<br>
+                banners.append(
+                    {
+                        "id": "missing-preset-api-key",
+                        "type": "warning",
+                        "priority": 90,
+                        "title": "Missing API Key for model presets",
+                        "html": f"""No API key configured for preset models: {preset_list}.<br>
                              These presets will not work until you provide the required API keys.<br>
                              {self.CONFIGURE_MODEL_SETTINGS_LINK}""",
-                    "dismissible": True,
-                    "source": "backend"
-                })
+                        "dismissible": True,
+                        "source": "backend",
+                    }
+                )

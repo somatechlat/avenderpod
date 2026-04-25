@@ -1,0 +1,78 @@
+# ============================================================================
+# ¡A VENDER! — Minimal Tenant Agent Zero Image
+# ============================================================================
+# Stripped-down image for per-tenant Vultr VM deployment.
+# 
+# Differences from the full agent0ai/agent-zero-base image:
+#   • python:3.12-slim instead of kalilinux/kali-rolling
+#   • NO SearXNG, NO SSH daemon, NO tunnel API, NO cron
+#   • NO Playwright browsers (not needed for Avender WhatsApp sales)
+#   • Runs run_ui.py directly (no supervisord)
+#   • Expected size: ~1.5-2GB vs ~4-6GB for the full image
+#
+# Build:
+#   docker build -f deployments/avender/Dockerfile.tenant -t agent0ai/agent-zero-tenant:latest .
+# ============================================================================
+
+FROM python:3.12-slim
+
+# Prevent interactive prompts during apt
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+
+# ---------------------------------------------------------------------------
+# 1. System dependencies (runtime only)
+# ---------------------------------------------------------------------------
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    # Node.js 20.x for Baileys WhatsApp bridge
+    curl ca-certificates gnupg \
+    # SQLite, image processing, general utilities
+    libsqlite3-0 libgl1-mesa-glx libglib2.0-0 libsm6 libxext6 libxrender-dev \
+    # Tesseract OCR (for catalog image processing)
+    tesseract-ocr tesseract-ocr-spa \
+    # Runtime networking
+    netbase \
+    # Cleanup
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# Install Node.js 20.x (required by Baileys WA bridge)
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# ---------------------------------------------------------------------------
+# 2. Python dependencies
+# ---------------------------------------------------------------------------
+WORKDIR /a0
+
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+# ---------------------------------------------------------------------------
+# 3. Application source
+# ---------------------------------------------------------------------------
+COPY . .
+
+# Ensure plugin directories exist (tenant data mounts here at runtime)
+RUN mkdir -p /a0/usr/workdir /a0/usr/plugins /a0/logs /a0/tmp
+
+# ---------------------------------------------------------------------------
+# 4. Preload heavy models (optional — speeds up first request)
+# ---------------------------------------------------------------------------
+RUN python preload.py || true
+
+# ---------------------------------------------------------------------------
+# 5. Runtime configuration
+# ---------------------------------------------------------------------------
+ENV WEB_UI_HOST=0.0.0.0
+ENV WEB_UI_PORT=80
+
+EXPOSE 80
+
+# Health check
+HEALTHCHECK --interval=15s --timeout=10s --start-period=90s --retries=12 \
+    CMD curl -sf http://localhost:80 || exit 1
+
+# Run Agent Zero WebUI directly — no supervisord, no SSH, no SearXNG
+CMD ["python", "run_ui.py"]

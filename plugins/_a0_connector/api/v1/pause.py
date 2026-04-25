@@ -1,4 +1,5 @@
 """POST /api/plugins/_a0_connector/v1/pause."""
+
 from __future__ import annotations
 
 from helpers.api import Request, Response

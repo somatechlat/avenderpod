@@ -20,15 +20,18 @@ def test_normalize_number_handles_jids_and_phone_formatting():
 
 
 def test_normalize_allowed_numbers_accepts_lists_and_csv_strings():
-    assert normalize_allowed_numbers([
-        "+1 (415) 555-1234",
-        "00420 777 123 456",
-        "",
-    ]) == {"14155551234", "420777123456"}
-
     assert normalize_allowed_numbers(
-        "+1 (415) 555-1234, 00420 777 123 456"
+        [
+            "+1 (415) 555-1234",
+            "00420 777 123 456",
+            "",
+        ]
     ) == {"14155551234", "420777123456"}
+
+    assert normalize_allowed_numbers("+1 (415) 555-1234, 00420 777 123 456") == {
+        "14155551234",
+        "420777123456",
+    }
 
 
 def test_normalize_allowed_numbers_ignores_unsupported_values():

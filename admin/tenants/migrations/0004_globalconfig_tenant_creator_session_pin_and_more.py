@@ -6,28 +6,44 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('tenants', '0003_tenant_owner'),
+        ("tenants", "0003_tenant_owner"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='GlobalConfig',
+            name="GlobalConfig",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('key', models.CharField(max_length=100, unique=True)),
-                ('value', models.TextField()),
-                ('description', models.CharField(blank=True, max_length=255, null=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("key", models.CharField(max_length=100, unique=True)),
+                ("value", models.TextField()),
+                (
+                    "description",
+                    models.CharField(blank=True, max_length=255, null=True),
+                ),
+                ("updated_at", models.DateTimeField(auto_now=True)),
             ],
         ),
         migrations.AddField(
-            model_name='tenant',
-            name='creator_session_pin',
-            field=models.CharField(blank=True, help_text='Temporary session PIN for God Mode challenge', max_length=10, null=True),
+            model_name="tenant",
+            name="creator_session_pin",
+            field=models.CharField(
+                blank=True,
+                help_text="Temporary session PIN for God Mode challenge",
+                max_length=10,
+                null=True,
+            ),
         ),
         migrations.AddField(
-            model_name='tenant',
-            name='pin_expires_at',
+            model_name="tenant",
+            name="pin_expires_at",
             field=models.DateTimeField(blank=True, null=True),
         ),
     ]

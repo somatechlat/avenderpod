@@ -12,6 +12,7 @@ from typing import TypedDict
 # Data models
 # ------------------------------------------------------------------
 
+
 class WriteResult(TypedDict):
     path: str
     error: str
@@ -21,9 +22,11 @@ class WriteResult(TypedDict):
 # File writer
 # ------------------------------------------------------------------
 
+
 def write_attachment(rel_path: str, content_b64: str) -> WriteResult:
     try:
         from helpers import files
+
         abs_path = files.get_abs_path(rel_path)
         files.make_dirs(abs_path)
 

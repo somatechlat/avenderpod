@@ -34,7 +34,9 @@ def get_max_active_skills() -> int:
 
 def coerce_config(config: dict[str, Any] | None) -> dict[str, Any]:
     normalized = dict(config or {})
-    normalized["active_skills"] = normalize_active_skills(normalized.get("active_skills"))
+    normalized["active_skills"] = normalize_active_skills(
+        normalized.get("active_skills")
+    )
     return normalized
 
 
@@ -216,7 +218,9 @@ def _get_catalog_roots(project_name: str = "") -> list[str]:
     return roots
 
 
-def _resolve_skill_entry(entry: ActiveSkillEntry, visible_roots: list[str]) -> skills.Skill | None:
+def _resolve_skill_entry(
+    entry: ActiveSkillEntry, visible_roots: list[str]
+) -> skills.Skill | None:
     skill_path = str(entry.get("path") or "").strip()
     if skill_path:
         skill = _load_skill_from_path(skill_path, visible_roots)
@@ -243,7 +247,9 @@ def _resolve_skill_entry(entry: ActiveSkillEntry, visible_roots: list[str]) -> s
     return None
 
 
-def _load_skill_from_path(skill_path: str, visible_roots: list[str]) -> skills.Skill | None:
+def _load_skill_from_path(
+    skill_path: str, visible_roots: list[str]
+) -> skills.Skill | None:
     abs_path = files.fix_dev_path(skill_path)
     if not any(files.is_in_dir(abs_path, root) for root in visible_roots):
         return None

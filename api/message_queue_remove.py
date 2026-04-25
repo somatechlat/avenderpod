@@ -3,6 +3,7 @@ from helpers import message_queue as mq
 from agent import AgentContext
 from helpers.state_monitor_integration import mark_dirty_for_context
 
+
 class MessageQueueRemove(ApiHandler):
     """Remove message(s) from queue."""
 

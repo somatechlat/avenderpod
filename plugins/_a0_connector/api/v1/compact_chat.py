@@ -1,4 +1,5 @@
 """POST /api/plugins/_a0_connector/v1/compact_chat."""
+
 from __future__ import annotations
 
 from helpers.api import Request, Response
@@ -18,7 +19,9 @@ def _coerce_bool(value: object, default: bool = False) -> bool:
     return bool(value)
 
 
-async def _run_compaction_task(context, use_chat_model: bool, preset_name: str | None) -> None:
+async def _run_compaction_task(
+    context, use_chat_model: bool, preset_name: str | None
+) -> None:
     from helpers.state_monitor_integration import mark_dirty_all
     from plugins._chat_compaction.helpers.compactor import run_compaction
 
@@ -67,7 +70,9 @@ class CompactChat(connector_base.ProtectedConnectorApiHandler):
             return {"ok": True, "stats": stats}
 
         if action == "compact":
-            use_chat_model = _coerce_bool(input.get("use_chat_model", True), default=True)
+            use_chat_model = _coerce_bool(
+                input.get("use_chat_model", True), default=True
+            )
             preset_name = str(input.get("preset_name", "")).strip() or None
             context.run_task(_run_compaction_task, context, use_chat_model, preset_name)
             return {"ok": True, "message": "Compaction started"}

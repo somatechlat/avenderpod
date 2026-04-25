@@ -10,7 +10,9 @@ from helpers.persist_chat import (
 from agent import AgentContext
 
 
-def _trim_history_json(history_json: str, kept_ids: set[str], after_cut_ids: set[str]) -> str:
+def _trim_history_json(
+    history_json: str, kept_ids: set[str], after_cut_ids: set[str]
+) -> str:
     """Trim a serialized history JSON to keep only messages that appear
     before the branch cut point.
 
@@ -138,6 +140,7 @@ class BranchChat(ApiHandler):
 
         # Notify all tabs
         from helpers.state_monitor_integration import mark_dirty_all
+
         mark_dirty_all(reason="plugins.chat_branching.BranchChat")
 
         return {

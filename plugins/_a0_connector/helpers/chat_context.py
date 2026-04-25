@@ -36,7 +36,10 @@ def get_existing_context(
             code="CONTEXT_NOT_FOUND",
         )
 
-    if agent_profile and getattr(context.agent0.config, "profile", None) != agent_profile:
+    if (
+        agent_profile
+        and getattr(context.agent0.config, "profile", None) != agent_profile
+    ):
         raise ConnectorContextError(
             "Cannot change agent_profile on existing context",
             status_code=400,
@@ -72,7 +75,9 @@ def create_context(
         override_settings["agent_profile"] = agent_profile
 
     with lock if lock is not None else nullcontext():
-        current_context = AgentContext.get(current_context_id or "") if current_context_id else None
+        current_context = (
+            AgentContext.get(current_context_id or "") if current_context_id else None
+        )
 
         context = AgentContext(
             config=initialize_agent(override_settings=override_settings),
@@ -80,8 +85,12 @@ def create_context(
             set_current=True,
         )
 
-        if current_context and settings.get_settings().get("chat_inherit_project", True):
-            current_project = current_context.get_data(projects.CONTEXT_DATA_KEY_PROJECT)
+        if current_context and settings.get_settings().get(
+            "chat_inherit_project", True
+        ):
+            current_project = current_context.get_data(
+                projects.CONTEXT_DATA_KEY_PROJECT
+            )
             if current_project:
                 context.set_data(projects.CONTEXT_DATA_KEY_PROJECT, current_project)
 
@@ -102,7 +111,9 @@ def create_context(
         if project_name:
             try:
                 try:
-                    projects.activate_project(context.id, project_name, mark_dirty=False)
+                    projects.activate_project(
+                        context.id, project_name, mark_dirty=False
+                    )
                 except TypeError as exc:
                     if "mark_dirty" not in str(exc):
                         raise

@@ -153,7 +153,10 @@ def _handle_config(context: "AgentContext", args: str) -> str:
         return f"Config '{desired}' was not found. Available configs: {available}"
 
     preset_name = match["name"]
-    if isinstance(current_override, dict) and current_override.get("preset_name") == preset_name:
+    if (
+        isinstance(current_override, dict)
+        and current_override.get("preset_name") == preset_name
+    ):
         return f"Already using config {preset_name}."
 
     context.set_data("chat_model_override", {"preset_name": preset_name})

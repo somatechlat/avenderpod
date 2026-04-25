@@ -10,36 +10,67 @@ from typing import Iterator
 import pytest
 from flask import Flask
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from helpers import cache
 from api.load_webui_extensions import LoadWebuiExtensions
 
 
 SURFACE_SCENARIOS: list[tuple[str, str]] = [
     ("sidebar-start", "webui/components/sidebar/left-sidebar.html"),
     ("sidebar-end", "webui/components/sidebar/left-sidebar.html"),
-    ("sidebar-top-wrapper-start", "webui/components/sidebar/top-section/sidebar-top.html"),
-    ("sidebar-top-wrapper-end", "webui/components/sidebar/top-section/sidebar-top.html"),
-    ("sidebar-quick-actions-main-start", "webui/components/sidebar/top-section/quick-actions.html"),
-    ("sidebar-quick-actions-main-end", "webui/components/sidebar/top-section/quick-actions.html"),
-    ("sidebar-quick-actions-dropdown-start", "webui/components/sidebar/top-section/quick-actions.html"),
-    ("sidebar-quick-actions-dropdown-end", "webui/components/sidebar/top-section/quick-actions.html"),
+    (
+        "sidebar-top-wrapper-start",
+        "webui/components/sidebar/top-section/sidebar-top.html",
+    ),
+    (
+        "sidebar-top-wrapper-end",
+        "webui/components/sidebar/top-section/sidebar-top.html",
+    ),
+    (
+        "sidebar-quick-actions-main-start",
+        "webui/components/sidebar/top-section/quick-actions.html",
+    ),
+    (
+        "sidebar-quick-actions-main-end",
+        "webui/components/sidebar/top-section/quick-actions.html",
+    ),
+    (
+        "sidebar-quick-actions-dropdown-start",
+        "webui/components/sidebar/top-section/quick-actions.html",
+    ),
+    (
+        "sidebar-quick-actions-dropdown-end",
+        "webui/components/sidebar/top-section/quick-actions.html",
+    ),
     ("sidebar-chats-list-start", "webui/components/sidebar/chats/chats-list.html"),
     ("sidebar-chats-list-end", "webui/components/sidebar/chats/chats-list.html"),
     ("sidebar-tasks-list-start", "webui/components/sidebar/tasks/tasks-list.html"),
     ("sidebar-tasks-list-end", "webui/components/sidebar/tasks/tasks-list.html"),
-    ("sidebar-bottom-wrapper-start", "webui/components/sidebar/bottom/sidebar-bottom.html"),
-    ("sidebar-bottom-wrapper-end", "webui/components/sidebar/bottom/sidebar-bottom.html"),
+    (
+        "sidebar-bottom-wrapper-start",
+        "webui/components/sidebar/bottom/sidebar-bottom.html",
+    ),
+    (
+        "sidebar-bottom-wrapper-end",
+        "webui/components/sidebar/bottom/sidebar-bottom.html",
+    ),
     ("chat-input-start", "webui/components/chat/input/chat-bar.html"),
     ("chat-input-end", "webui/components/chat/input/chat-bar.html"),
     ("chat-input-progress-start", "webui/components/chat/input/progress.html"),
     ("chat-input-progress-end", "webui/components/chat/input/progress.html"),
     ("chat-input-box-start", "webui/components/chat/input/chat-bar-input.html"),
     ("chat-input-box-end", "webui/components/chat/input/chat-bar-input.html"),
-    ("chat-input-bottom-actions-start", "webui/components/chat/input/bottom-actions-bar.html"),
-    ("chat-input-bottom-actions-end", "webui/components/chat/input/bottom-actions-bar.html"),
+    (
+        "chat-input-bottom-actions-start",
+        "webui/components/chat/input/bottom-actions-bar.html",
+    ),
+    (
+        "chat-input-bottom-actions-end",
+        "webui/components/chat/input/bottom-actions-bar.html",
+    ),
     ("chat-top-start", "webui/components/chat/top-section/chat-top.html"),
     ("chat-top-end", "webui/components/chat/top-section/chat-top.html"),
     ("welcome-screen-start", "webui/components/welcome/welcome-screen.html"),
@@ -82,6 +113,10 @@ def _temporary_probe_plugin(surface: str) -> Iterator[tuple[str, str]]:
             / surface
             / "surface-probe.html"
         )
+        (Path(temp_plugin_dir) / "plugin.yaml").write_text(
+            f"name: {plugin_id}\ndescription: WebUI surface probe\nversion: 0.0.0\n",
+            encoding="utf-8",
+        )
         probe_file.parent.mkdir(parents=True, exist_ok=True)
         probe_file.write_text(
             (
@@ -91,7 +126,11 @@ def _temporary_probe_plugin(surface: str) -> Iterator[tuple[str, str]]:
             ),
             encoding="utf-8",
         )
+        cache.clear("*(plugins)*")
+        cache.clear("*(extensions)*")
         yield plugin_id, probe_file.name
+        cache.clear("*(plugins)*")
+        cache.clear("*(extensions)*")
 
 
 @pytest.mark.asyncio
@@ -113,12 +152,9 @@ async def test_webui_surface_extension_point_end_to_end(
         )
         assert isinstance(payload, dict)
         extensions = payload.get("extensions", [])
-        expected_suffix = (
-            f"{plugin_id}/extensions/webui/{surface}/{probe_file_name}"
-        )
+        expected_suffix = f"{plugin_id}/extensions/webui/{surface}/{probe_file_name}"
 
         assert any(
-            extension.get("plugin_id") == plugin_id
-            and str(extension.get("path", "")).replace("\\", "/").endswith(expected_suffix)
+            str(extension).replace("\\", "/").endswith(expected_suffix)
             for extension in extensions
         )

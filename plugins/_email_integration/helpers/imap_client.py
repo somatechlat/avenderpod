@@ -28,6 +28,7 @@ from helpers.print_style import PrintStyle
 # Data models
 # ------------------------------------------------------------------
 
+
 @dataclass
 class InboundMessage:
     sender: str
@@ -42,6 +43,7 @@ class InboundMessage:
 # ------------------------------------------------------------------
 # IMAP connection
 # ------------------------------------------------------------------
+
 
 async def connect_imap(
     server: str,
@@ -73,6 +75,7 @@ async def disconnect_imap(client: IMAPClient) -> None:
 # ------------------------------------------------------------------
 # Fetch messages
 # ------------------------------------------------------------------
+
 
 async def fetch_new(
     client: IMAPClient,
@@ -122,7 +125,9 @@ async def fetch_new(
             if msg:
                 results.append(msg)
         except Exception as e:
-            PrintStyle.error(f"Email: error processing message {msg_id}: {format_error(e)}")
+            PrintStyle.error(
+                f"Email: error processing message {msg_id}: {format_error(e)}"
+            )
     return results, new_last_uid
 
 
@@ -237,6 +242,7 @@ async def _fetch_single(
 # Exchange connection
 # ------------------------------------------------------------------
 
+
 async def connect_exchange(
     server: str,
     username: str,
@@ -272,7 +278,9 @@ async def fetch_unread_exchange(
     def _sync():
         q = Q(is_read=False)
         if since_days > 0:
-            since = datetime.now(tz=account.default_timezone) - timedelta(days=since_days)
+            since = datetime.now(tz=account.default_timezone) - timedelta(
+                days=since_days
+            )
             q &= Q(datetime_received__gte=since)
         return list(account.inbox.filter(q))
 
@@ -294,18 +302,22 @@ async def fetch_unread_exchange(
         if item.attachments:
             for att in item.attachments:
                 if hasattr(att, "content") and att.name:
-                    path = await _save_attachment(att.name, att.content, download_folder)
+                    path = await _save_attachment(
+                        att.name, att.content, download_folder
+                    )
                     attachment_paths.append(path)
 
-        results.append(InboundMessage(
-            sender=sender,
-            subject=str(item.subject or ""),
-            body=body,
-            attachments=attachment_paths,
-            message_id=str(getattr(item, "message_id", "") or ""),
-            in_reply_to=str(getattr(item, "in_reply_to", "") or ""),
-            references="",
-        ))
+        results.append(
+            InboundMessage(
+                sender=sender,
+                subject=str(item.subject or ""),
+                body=body,
+                attachments=attachment_paths,
+                message_id=str(getattr(item, "message_id", "") or ""),
+                in_reply_to=str(getattr(item, "in_reply_to", "") or ""),
+                references="",
+            )
+        )
 
     return results
 
@@ -313,6 +325,7 @@ async def fetch_unread_exchange(
 # ------------------------------------------------------------------
 # Parsing helpers
 # ------------------------------------------------------------------
+
 
 async def _parse_body(
     email_msg: EmailMessage,
@@ -337,12 +350,14 @@ async def _parse_body(
                     filename = _decode_header(filename)
                     content = part.get_payload(decode=True)
                     if isinstance(content, bytes):
-                        path = await _save_attachment(filename, content, download_folder)
+                        path = await _save_attachment(
+                            filename, content, download_folder
+                        )
                         attachments.append(path)
                         cid = part.get("Content-ID")
                         if cid:
                             cid_map[cid.strip("<>")] = path
-                        
+
                         if not cid:
                             body_parts.append(f"\n[attachment://{path}]\n")
 
@@ -350,14 +365,22 @@ async def _parse_body(
                 if not body:
                     charset = part.get_content_charset() or "utf-8"
                     payload = part.get_payload(decode=True)
-                    body = payload.decode(charset, errors="ignore") if isinstance(payload, bytes) else ""
+                    body = (
+                        payload.decode(charset, errors="ignore")
+                        if isinstance(payload, bytes)
+                        else ""
+                    )
                     body_parts.append(body)
 
             elif content_type == "text/html":
                 if not body:
                     charset = part.get_content_charset() or "utf-8"
                     payload = part.get_payload(decode=True)
-                    html = payload.decode(charset, errors="ignore") if isinstance(payload, bytes) else ""
+                    html = (
+                        payload.decode(charset, errors="ignore")
+                        if isinstance(payload, bytes)
+                        else ""
+                    )
                     body = _html_to_text(html, cid_map)
                     body_parts.append(body)
 
@@ -387,7 +410,7 @@ def _strip_quoted_reply(text: str) -> str:
         # Match "On <date> <someone> wrote:" pattern
         if re.match(r"^On .+ wrote:\s*$", line.strip()):
             # Verify next non-empty lines are quoted
-            rest = [l for l in lines[i + 1:] if l.strip()]
+            rest = [next_line for next_line in lines[i + 1 :] if next_line.strip()]
             if not rest or rest[0].strip().startswith(">"):
                 cut = i
                 break
@@ -401,7 +424,7 @@ def _html_to_text(html_content: str, cid_map: dict[str, str] | None = None) -> s
     if cid_map:
         soup = BeautifulSoup(html_content, "html.parser")
         for img in soup.find_all("img"):
-            src = str(img.get("src", "")) # type: ignore
+            src = str(img.get("src", ""))  # type: ignore
             if src.startswith("cid:"):
                 cid = src[4:]
                 if cid in cid_map:
@@ -425,17 +448,19 @@ async def _save_attachment(filename: str, content: bytes, download_folder: str) 
     rel_path = os.path.join(download_folder, unique)
     from helpers import runtime
     from plugins._email_integration.helpers.attachment_writer import write_attachment
-    
+
     import base64
+
     content_b64 = base64.b64encode(content).decode()
-    
+
     result = await runtime.call_development_function(
         write_attachment, rel_path, content_b64
     )
     if result.get("error"):
         from helpers.print_style import PrintStyle
+
         PrintStyle.error(f"Failed to save attachment {filename}: {result['error']}")
-        
+
     return result.get("path", files.get_abs_path(rel_path))
 
 
@@ -458,9 +483,14 @@ def _is_noreply(sender: str) -> bool:
         addr = match.group(1)
     local = addr.split("@")[0] if "@" in addr else addr
     return local in (
-        "noreply", "no-reply", "no_reply",
-        "donotreply", "do-not-reply", "do_not_reply",
-        "mailer-daemon", "postmaster",
+        "noreply",
+        "no-reply",
+        "no_reply",
+        "donotreply",
+        "do-not-reply",
+        "do_not_reply",
+        "mailer-daemon",
+        "postmaster",
     )
 
 
@@ -474,16 +504,17 @@ def _matches_whitelist(sender: str, whitelist: list[str]) -> bool:
 
 def _extract_email_from_sender(sender: str) -> str:
     """Extract email address from sender string.
-    
+
     Handles formats like:
     - "email@example.com"
     - "Name <email@example.com>"
     - "\"Display Name\" <email@example.com>"
-    
+
     Uses content inside angle brackets as authoritative to prevent spoofing
     by fake emails in the display name (e.g., "John ceo@company.com <real@email.com>").
     """
     import re
+
     # Look for email inside angle brackets - this is the authoritative source
     match = re.search(r"<([^>]+)>", sender)
     if match:
@@ -491,12 +522,12 @@ def _extract_email_from_sender(sender: str) -> str:
         # Validate it looks like an email
         if re.match(r"^[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+$", email):
             return email
-    
+
     # No angle brackets - extract email from the whole string
     # This handles plain "email@example.com" or malformed input
     email_match = re.search(r"[^\s<>]+@[^\s<>]+\.[^\s<>]+", sender)
     if email_match:
         return email_match.group(0)
-    
+
     # Fallback: return the whole string (will likely fail pattern match)
     return sender

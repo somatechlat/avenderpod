@@ -30,7 +30,9 @@ def _load_template() -> str:
         _TMPL = path.read_text()
         return _TMPL
     except Exception as e:
-        raise RuntimeError(f"Unable to load plugin validator prompt template: {e}") from e
+        raise RuntimeError(
+            f"Unable to load plugin validator prompt template: {e}"
+        ) from e
 
 
 def _load_guidance() -> str:
@@ -65,7 +67,9 @@ def _source_label(source_type: str) -> str:
     }.get(source_type, "Plugin Source")
 
 
-def _source_instructions(source_type: str, target: str, cleanup_target: str | None = None) -> str:
+def _source_instructions(
+    source_type: str, target: str, cleanup_target: str | None = None
+) -> str:
     target_ref = _target_reference(source_type, target)
     cleanup_ref = _sanitize_target(cleanup_target or target_ref)
 
@@ -80,7 +84,7 @@ def _source_instructions(source_type: str, target: str, cleanup_target: str | No
         return (
             f"The ZIP has already been extracted to `{target_ref}`. Validate the plugin from that extracted "
             "directory only. Do not install or move it. After the review, delete that extracted directory "
-            f"with `rm -rf \"{cleanup_ref}\"` and verify cleanup with `ls \"{cleanup_ref}\" 2>&1`."
+            f'with `rm -rf "{cleanup_ref}"` and verify cleanup with `ls "{cleanup_ref}" 2>&1`.'
         )
 
     return (
@@ -97,13 +101,19 @@ def build_prompt(
 ) -> str:
     cfg = _load_config()
     ratings, all_checks = cfg["ratings"], cfg["checks"]
-    keys = list(all_checks.keys()) if checks is None else [k for k in checks if k in all_checks]
+    keys = (
+        list(all_checks.keys())
+        if checks is None
+        else [k for k in checks if k in all_checks]
+    )
     prompt_template = _load_template()
 
     subs = {
         "SOURCE_LABEL": _source_label(source_type),
         "TARGET_REFERENCE": _target_reference(source_type, target),
-        "SOURCE_INSTRUCTIONS": _source_instructions(source_type, target, cleanup_target),
+        "SOURCE_INSTRUCTIONS": _source_instructions(
+            source_type, target, cleanup_target
+        ),
         "SELECTED_CHECKS": (
             "\n".join(f"- **{all_checks[k]['label']}**" for k in keys)
             if keys
@@ -112,14 +122,19 @@ def build_prompt(
         "CHECK_DETAILS": (
             "\n\n".join(
                 f"#### {c['label']}\n{c['detail']}\n\nCriteria:\n"
-                + "\n".join(f"  - {ratings[level]['icon']} {desc}" for level, desc in c["criteria"].items())
+                + "\n".join(
+                    f"  - {ratings[level]['icon']} {desc}"
+                    for level, desc in c["criteria"].items()
+                )
                 for c in (all_checks[k] for k in keys)
             )
             if keys
             else "(no validation phases selected)"
         ),
         "CHECKLIST_GUIDANCE": _load_guidance(),
-        "STATUS_LEGEND": "\n".join(f"- {r['icon']} **{r['label']}**" for r in ratings.values()),
+        "STATUS_LEGEND": "\n".join(
+            f"- {r['icon']} **{r['label']}**" for r in ratings.values()
+        ),
         "RATING_ICONS": "/".join(r["icon"] for r in ratings.values()),
         "RATING_PASS": ratings["pass"]["icon"],
         "RATING_WARNING": ratings["warning"]["icon"],

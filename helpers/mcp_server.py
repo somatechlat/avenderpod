@@ -1,5 +1,4 @@
 import os
-import asyncio
 from typing import Annotated, Literal, Union
 from urllib.parse import urlparse
 from openai import BaseModel
@@ -17,7 +16,7 @@ from starlette.middleware import Middleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.types import ASGIApp, Receive, Scope, Send
-from fastmcp.server.http import create_sse_app, create_base_app, build_resource_metadata_url # type: ignore
+from fastmcp.server.http import create_sse_app, create_base_app, build_resource_metadata_url  # type: ignore
 from starlette.routing import Mount  # type: ignore
 from starlette.requests import Request
 import threading
@@ -25,7 +24,9 @@ import threading
 _PRINTER = PrintStyle(italic=True, font_color="green", padding=False)
 
 # Context variable to store project name from URL (per-request)
-_mcp_project_name: contextvars.ContextVar[str | None] = contextvars.ContextVar('mcp_project_name', default=None)
+_mcp_project_name: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "mcp_project_name", default=None
+)
 
 mcp_server: FastMCP = FastMCP(
     name="Agent Zero integrated MCP Server",
@@ -153,7 +154,7 @@ async def send_message(
                 if existing_project and existing_project != project_name:
                     return ToolError(
                         error=f"Chat belongs to project '{existing_project}' but URL specifies '{project_name}'",
-                        chat_id=chat_id
+                        chat_id=chat_id,
                     )
     else:
         config = initialize_agent()
@@ -164,7 +165,9 @@ async def send_message(
             try:
                 projects.activate_project(context.id, project_name)
             except Exception as e:
-                return ToolError(error=f"Failed to activate project: {str(e)}", chat_id="")
+                return ToolError(
+                    error=f"Failed to activate project: {str(e)}", chat_id=""
+                )
 
     if not message:
         return ToolError(
@@ -382,7 +385,9 @@ class DynamicMcpProxy:
         auth_provider = mcp_server.auth
 
         if auth_provider:
-            server_routes.extend(auth_provider.get_routes(mcp_path=streamable_http_path))
+            server_routes.extend(
+                auth_provider.get_routes(mcp_path=streamable_http_path)
+            )
             server_middleware.extend(auth_provider.get_middleware())
 
             resource_url = auth_provider._get_resource_url(streamable_http_path)
@@ -445,7 +450,9 @@ class DynamicMcpProxy:
                     project_part = parts[1].split("/")[0]
                     if project_part:
                         project_name = project_part
-                        _PRINTER.print(f"[MCP] Proxy extracted project from URL: {project_name}")
+                        _PRINTER.print(
+                            f"[MCP] Proxy extracted project from URL: {project_name}"
+                        )
             except Exception as e:
                 _PRINTER.print(f"[MCP] Failed to extract project in proxy: {e}")
 
@@ -458,11 +465,12 @@ class DynamicMcpProxy:
         if "/p-" in path:
             # Remove /p-{project}/ segment: /t-TOKEN/p-PROJECT/sse -> /t-TOKEN/sse
             import re
-            cleaned_path = re.sub(r'/p-[^/]+/', '/', path)
+
+            cleaned_path = re.sub(r"/p-[^/]+/", "/", path)
 
         # Update scope with cleaned path for the underlying app
         modified_scope = dict(scope)
-        modified_scope['path'] = cleaned_path
+        modified_scope["path"] = cleaned_path
 
         if has_token and ("/sse" in path or "/messages" in path):
             # Route to SSE app with cleaned path
@@ -471,9 +479,7 @@ class DynamicMcpProxy:
             # Route to HTTP app with cleaned path
             await http_app(modified_scope, receive, send)
         else:
-            raise StarletteHTTPException(
-                status_code=403, detail="MCP forbidden"
-            )
+            raise StarletteHTTPException(status_code=403, detail="MCP forbidden")
 
 
 async def mcp_middleware(request: Request, call_next):

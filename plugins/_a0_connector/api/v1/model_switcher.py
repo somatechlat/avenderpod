@@ -1,4 +1,5 @@
 """POST /api/plugins/_a0_connector/v1/model_switcher."""
+
 from __future__ import annotations
 
 from typing import Callable
@@ -7,14 +8,18 @@ from helpers.api import Request, Response
 import plugins._a0_connector.api.v1.base as connector_base
 
 
-def _model_payload(config: dict | None, *, has_api_key: bool = False) -> dict[str, object]:
+def _model_payload(
+    config: dict | None, *, has_api_key: bool = False
+) -> dict[str, object]:
     config = config or {}
     provider = str(config.get("provider") or "").strip()
     name = str(config.get("name") or "").strip()
     return {
         "provider": provider,
         "name": name,
-        "label": f"{provider}/{name}" if provider and name else (name or provider or "—"),
+        "label": (
+            f"{provider}/{name}" if provider and name else (name or provider or "—")
+        ),
         "has_api_key": bool(has_api_key),
     }
 
@@ -71,7 +76,9 @@ def _provider_payload(
         elif isinstance(item, dict):
             has_api_key = bool(item.get("has_api_key"))
 
-        options.append({"value": provider, "label": label or provider, "has_api_key": has_api_key})
+        options.append(
+            {"value": provider, "label": label or provider, "has_api_key": has_api_key}
+        )
 
     return options
 
@@ -88,11 +95,15 @@ class ModelSwitcher(connector_base.ProtectedConnectorApiHandler):
         agent = getattr(context, "agent0", None) if context is not None else None
 
         def build_state() -> dict[str, object]:
-            override = context.get_data("chat_model_override") if context is not None else None
+            override = (
+                context.get_data("chat_model_override") if context is not None else None
+            )
             try:
                 chat_providers = _provider_payload(
                     model_config.get_chat_providers(),
-                    has_api_key_lookup=lambda provider: model_config.has_provider_api_key(provider, ""),
+                    has_api_key_lookup=lambda provider: model_config.has_provider_api_key(
+                        provider, ""
+                    ),
                 )
             except Exception:
                 chat_providers = []
@@ -117,8 +128,12 @@ class ModelSwitcher(connector_base.ProtectedConnectorApiHandler):
                 "override": override,
                 "presets": model_config.get_presets(),
                 "chat_providers": chat_providers,
-                "main_model": _model_payload(chat_model, has_api_key=_has_api_key(chat_model)),
-                "utility_model": _model_payload(utility_model, has_api_key=_has_api_key(utility_model)),
+                "main_model": _model_payload(
+                    chat_model, has_api_key=_has_api_key(chat_model)
+                ),
+                "utility_model": _model_payload(
+                    utility_model, has_api_key=_has_api_key(utility_model)
+                ),
             }
 
         if action == "get":
@@ -139,7 +154,9 @@ class ModelSwitcher(connector_base.ProtectedConnectorApiHandler):
                 return Response(status=400, response="Missing preset_name")
             preset = model_config.get_preset_by_name(preset_name)
             if not preset:
-                return Response(status=404, response=f"Preset '{preset_name}' not found")
+                return Response(
+                    status=404, response=f"Preset '{preset_name}' not found"
+                )
             context.set_data("chat_model_override", {"preset_name": preset_name})
             save_tmp_chat(context)
             return build_state()

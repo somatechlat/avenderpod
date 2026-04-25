@@ -84,7 +84,9 @@ def trim_cache(area: str, seconds: float = 300) -> None:
             if not area_cache:
                 continue
 
-            keys_to_remove = [key for key, entry in area_cache.items() if entry.timestamp < cutoff]
+            keys_to_remove = [
+                key for key, entry in area_cache.items() if entry.timestamp < cutoff
+            ]
             for key in keys_to_remove:
                 area_cache.pop(key, None)
 

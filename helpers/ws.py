@@ -270,7 +270,10 @@ class WsHandler:
         correlation_id: str | None = None,
     ) -> None:
         await self.manager.emit_to(
-            self._namespace, sid, event, data,
+            self._namespace,
+            sid,
+            event,
+            data,
             handler_id=self.identifier,
             correlation_id=correlation_id,
         )
@@ -284,7 +287,9 @@ class WsHandler:
         correlation_id: str | None = None,
     ) -> None:
         await self.manager.broadcast(
-            self._namespace, event, data,
+            self._namespace,
+            event,
+            data,
             exclude_sids=exclude_sids,
             handler_id=self.identifier,
             correlation_id=correlation_id,
@@ -311,8 +316,7 @@ class WsHandler:
 
         with _contexts_lock:
             snapshot = {
-                sid: dict(handlers)
-                for sid, handlers in _active_handlers.items()
+                sid: dict(handlers) for sid, handlers in _active_handlers.items()
             }
             contexts_snapshot = dict(_ws_contexts)
 
@@ -328,19 +332,23 @@ class WsHandler:
             for _path, instance in handlers.items():
                 error = _check_security(type(instance), ctx)
                 if error is not None:
-                    security_errors.append({
-                        "handlerId": instance.identifier,
-                        "ok": False,
-                        "correlationId": cid,
-                        "error": error,
-                    })
+                    security_errors.append(
+                        {
+                            "handlerId": instance.identifier,
+                            "ok": False,
+                            "correlationId": cid,
+                            "error": error,
+                        }
+                    )
                     continue
                 passing.append(instance)
 
             if mgr is not None and passing:
                 result = await mgr.process_client_event(
-                    self._namespace, event,
-                    dict(data, correlationId=cid), sid,
+                    self._namespace,
+                    event,
+                    dict(data, correlationId=cid),
+                    sid,
                     handlers=passing,
                 )
                 sid_results = security_errors + result.get("results", [])
@@ -352,39 +360,51 @@ class WsHandler:
                         continue
                     try:
                         result = await instance.process(
-                            event, dict(data, correlationId=cid), sid,
+                            event,
+                            dict(data, correlationId=cid),
+                            sid,
                         )
                         if result is not None:
-                            sid_results.append({
-                                "handlerId": instance.identifier,
-                                "ok": True,
-                                "correlationId": cid,
-                                "data": result,
-                            })
+                            sid_results.append(
+                                {
+                                    "handlerId": instance.identifier,
+                                    "ok": True,
+                                    "correlationId": cid,
+                                    "data": result,
+                                }
+                            )
                     except Exception as e:
-                        sid_results.append({
-                            "handlerId": instance.identifier,
-                            "ok": False,
-                            "correlationId": cid,
-                            "error": {"code": "HANDLER_ERROR", "error": str(e)},
-                        })
-            aggregated.append({
-                "sid": sid,
-                "correlationId": cid,
-                "results": sid_results,
-            })
+                        sid_results.append(
+                            {
+                                "handlerId": instance.identifier,
+                                "ok": False,
+                                "correlationId": cid,
+                                "error": {"code": "HANDLER_ERROR", "error": str(e)},
+                            }
+                        )
+            aggregated.append(
+                {
+                    "sid": sid,
+                    "correlationId": cid,
+                    "results": sid_results,
+                }
+            )
         return aggregated
 
     # Context helper (shared with ApiHandler)
 
     def use_context(self, ctxid: str, create_if_not_exists: bool = True):
         from helpers.context_utils import use_context as _use_context
+
         return _use_context(self.lock, ctxid, create_if_not_exists)
 
 
 # Security check (aligned with api.py decorators)
 
-def _check_security(handler_cls: type[WsHandler], ctx: _SecurityContext) -> dict[str, Any] | None:
+
+def _check_security(
+    handler_cls: type[WsHandler], ctx: _SecurityContext
+) -> dict[str, Any] | None:
     """Return an error payload dict if the check fails, or ``None`` on success."""
 
     if handler_cls.requires_loopback():
@@ -393,6 +413,7 @@ def _check_security(handler_cls: type[WsHandler], ctx: _SecurityContext) -> dict
 
     if handler_cls.requires_auth():
         from helpers import login
+
         user_pass_hash = login.get_credentials_hash()
         if user_pass_hash and ctx.auth_hash != user_pass_hash:
             return {"code": "AUTH_REQUIRED", "error": "Authentication required"}
@@ -407,6 +428,7 @@ def _check_security(handler_cls: type[WsHandler], ctx: _SecurityContext) -> dict
 
     if handler_cls.requires_api_key():
         from helpers.settings import get_settings
+
         valid_key = get_settings().get("mcp_server_token")
         if not ctx.api_key or ctx.api_key != valid_key:
             return {"code": "API_KEY_REQUIRED", "error": "API key required"}
@@ -415,6 +437,7 @@ def _check_security(handler_cls: type[WsHandler], ctx: _SecurityContext) -> dict
 
 
 # Namespace registration
+
 
 def register_ws_namespace(
     socketio_server: socketio.AsyncServer,
@@ -430,7 +453,9 @@ def register_ws_namespace(
 
         # Check built-in api/<path>.py
         builtin_file = files.get_abs_path(f"api/{path}.py")
-        if files.is_in_dir(builtin_file, files.get_abs_path("api")) and files.exists(builtin_file):
+        if files.is_in_dir(builtin_file, files.get_abs_path("api")) and files.exists(
+            builtin_file
+        ):
             classes = load_classes_from_file(builtin_file, WsHandler)
             if classes:
                 handler_cls = classes[0]
@@ -482,7 +507,8 @@ def register_ws_namespace(
                 csrf_token=session.get("csrf_token"),
                 client_csrf_token=(
                     (auth.get("csrf_token") or auth.get("csrfToken"))
-                    if isinstance(auth, dict) else None
+                    if isinstance(auth, dict)
+                    else None
                 ),
                 csrf_cookie=request.cookies.get(
                     f"csrf_token_{runtime.get_runtime_id()}"
@@ -490,7 +516,8 @@ def register_ws_namespace(
                 remote_addr=str(request.remote_addr) if request.remote_addr else None,
                 api_key=(
                     (auth.get("api_key") or auth.get("apiKey"))
-                    if isinstance(auth, dict) else None
+                    if isinstance(auth, dict)
+                    else None
                 ),
             )
             user_id = session.get("user_id") or "single_user"
@@ -521,8 +548,10 @@ def register_ws_namespace(
                 if error is not None:
                     continue
                 instance = handler_cls(
-                    socketio_server, lock,
-                    manager=manager, namespace=NAMESPACE,
+                    socketio_server,
+                    lock,
+                    manager=manager,
+                    namespace=NAMESPACE,
                 )
                 await instance.on_connect(sid)
                 activated[path] = instance
@@ -561,11 +590,13 @@ def register_ws_namespace(
             correlation_id = incoming.get("correlationId") or uuid.uuid4().hex
 
             if ctx is None:
-                return _error_response("AUTH_REQUIRED",
-                                       "No security context", correlation_id)
+                return _error_response(
+                    "AUTH_REQUIRED", "No security context", correlation_id
+                )
             if not activated:
-                return _error_response("NO_HANDLERS",
-                                       "No handlers activated", correlation_id)
+                return _error_response(
+                    "NO_HANDLERS", "No handlers activated", correlation_id
+                )
 
             # Pre-filter handlers through security checks
             passing_handlers: list[WsHandler] = []
@@ -573,12 +604,14 @@ def register_ws_namespace(
             for path, instance in activated.items():
                 error = _check_security(type(instance), ctx)
                 if error is not None:
-                    security_errors.append({
-                        "handlerId": instance.identifier,
-                        "ok": False,
-                        "correlationId": correlation_id,
-                        "error": error,
-                    })
+                    security_errors.append(
+                        {
+                            "handlerId": instance.identifier,
+                            "ok": False,
+                            "correlationId": correlation_id,
+                            "error": error,
+                        }
+                    )
                 else:
                     passing_handlers.append(instance)
 
@@ -586,7 +619,10 @@ def register_ws_namespace(
             # (worker thread isolation, diagnostic events, WsResult support)
             if manager is not None and passing_handlers:
                 result = await manager.process_client_event(
-                    NAMESPACE, event, incoming, sid,
+                    NAMESPACE,
+                    event,
+                    incoming,
+                    sid,
                     handlers=passing_handlers,
                 )
                 if security_errors:
@@ -612,21 +648,28 @@ def register_ws_namespace(
                 try:
                     result = await instance.process(event, handler_payload, sid)
                     if result is not None:
-                        results.append({
-                            "handlerId": instance.identifier,
-                            "ok": True,
-                            "correlationId": correlation_id,
-                            "data": result,
-                        })
+                        results.append(
+                            {
+                                "handlerId": instance.identifier,
+                                "ok": True,
+                                "correlationId": correlation_id,
+                                "data": result,
+                            }
+                        )
                 except Exception as e:
                     error_text = format_error(e)
                     PrintStyle.error(f"WS handler error ({path}/{event}): {error_text}")
-                    results.append({
-                        "handlerId": instance.identifier,
-                        "ok": False,
-                        "correlationId": correlation_id,
-                        "error": {"code": "HANDLER_ERROR", "error": "Internal server error"},
-                    })
+                    results.append(
+                        {
+                            "handlerId": instance.identifier,
+                            "ok": False,
+                            "correlationId": correlation_id,
+                            "error": {
+                                "code": "HANDLER_ERROR",
+                                "error": "Internal server error",
+                            },
+                        }
+                    )
 
             return {"correlationId": correlation_id, "results": results}
 
@@ -634,18 +677,20 @@ def register_ws_namespace(
             error_text = format_error(e)
             PrintStyle.error(f"WS dispatch error ({event}): {error_text}")
             return _error_response(
-                "INTERNAL_ERROR", "Internal server error",
+                "INTERNAL_ERROR",
+                "Internal server error",
                 incoming.get("correlationId", ""),
             )
 
 
-def _error_response(code: str, message: str,
-                    correlation_id: str) -> dict[str, Any]:
+def _error_response(code: str, message: str, correlation_id: str) -> dict[str, Any]:
     return {
         "correlationId": correlation_id,
-        "results": [{
-            "handlerId": "ws.dispatch",
-            "ok": False,
-            "error": {"code": code, "error": message},
-        }],
+        "results": [
+            {
+                "handlerId": "ws.dispatch",
+                "ok": False,
+                "error": {"code": code, "error": message},
+            }
+        ],
     }

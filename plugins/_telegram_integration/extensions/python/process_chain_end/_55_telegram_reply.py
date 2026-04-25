@@ -54,7 +54,10 @@ class TelegramAutoReply(Extension):
         from plugins._telegram_integration.helpers.handler import send_telegram_reply
 
         error = await send_telegram_reply(
-            context, response_text, attachments or None, keyboard,
+            context,
+            response_text,
+            attachments or None,
+            keyboard,
         )
         if not error:
             context.data[CTX_SEND_FAILURES] = 0
@@ -74,7 +77,9 @@ class TelegramAutoReply(Extension):
                 content=error,
             )
 
+
 # Helpers
+
 
 def _extract_last_response(context: AgentContext) -> str:
     with context.log._lock:
@@ -88,7 +93,9 @@ def _extract_last_response(context: AgentContext) -> str:
 
 
 def _notify_agent_of_failure(
-    context: AgentContext, error: str, attempt: int,
+    context: AgentContext,
+    error: str,
+    attempt: int,
 ):
     msg = context.agent0.read_prompt(
         "fw.telegram.send_failed.md",

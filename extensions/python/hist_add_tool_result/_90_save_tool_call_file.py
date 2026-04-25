@@ -1,15 +1,16 @@
 from typing import Any
 from helpers.extension import Extension
 from helpers import files, persist_chat
-import os, re
+import os
 
 LEN_MIN = 500
+
 
 class SaveToolCallFile(Extension):
     def execute(self, data: dict[str, Any] | None = None, **kwargs):
         if not self.agent:
             return
-            
+
         if not data:
             return
 

@@ -2,7 +2,6 @@ from helpers.tool import Tool, Response
 from plugins._memory.helpers.memory import Memory
 
 
-
 class MemorySave(Tool):
 
     async def execute(self, text="", area="", **kwargs):

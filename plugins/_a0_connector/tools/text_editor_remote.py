@@ -1,4 +1,5 @@
 """text_editor_remote tool — edit files on the CLI machine via `/ws`."""
+
 from __future__ import annotations
 
 import asyncio

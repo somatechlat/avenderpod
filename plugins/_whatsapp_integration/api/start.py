@@ -32,7 +32,10 @@ class Start(ApiHandler):
 
         try:
             ok = await ensure_bridge_http_up(
-                port, session_dir, cache_dir, mode=mode,
+                port,
+                session_dir,
+                cache_dir,
+                mode=mode,
             )
             if ok:
                 return {"success": True, "message": "Bridge started"}

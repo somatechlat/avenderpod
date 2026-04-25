@@ -12,7 +12,9 @@ LOCAL_EMBEDDING = {"huggingface"}
 
 def _get_presets_path() -> str:
     """Return the path to the user's global presets file (usr/plugins/_model_config/presets.yaml)."""
-    return files.get_abs_path(files.USER_DIR, files.PLUGINS_DIR, "_model_config", PRESETS_FILE)
+    return files.get_abs_path(
+        files.USER_DIR, files.PLUGINS_DIR, "_model_config", PRESETS_FILE
+    )
 
 
 def _get_default_presets_path() -> str:
@@ -23,12 +25,15 @@ def _get_default_presets_path() -> str:
 
 def get_config(agent=None, project_name=None, agent_profile=None):
     """Get the full model config dict for the given agent/scope."""
-    return plugins.get_plugin_config(
-        "_model_config",
-        agent=agent,
-        project_name=project_name,
-        agent_profile=agent_profile,
-    ) or {}
+    return (
+        plugins.get_plugin_config(
+            "_model_config",
+            agent=agent,
+            project_name=project_name,
+            agent_profile=agent_profile,
+        )
+        or {}
+    )
 
 
 def get_presets() -> list:
@@ -118,6 +123,7 @@ def get_embedding_model_config(agent=None) -> dict:
     """Get embedding model config."""
     cfg = get_config(agent)
     return cfg.get("embedding_model", {})
+
 
 def is_chat_override_allowed(agent=None) -> bool:
     """Check if per-chat model override is enabled."""

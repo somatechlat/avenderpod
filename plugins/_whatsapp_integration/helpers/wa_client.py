@@ -10,7 +10,8 @@ import aiohttp
 async def get_messages(base_url: str) -> list[dict]:
     async with aiohttp.ClientSession() as session:
         async with session.get(
-            f"{base_url}/messages", timeout=aiohttp.ClientTimeout(total=10),
+            f"{base_url}/messages",
+            timeout=aiohttp.ClientTimeout(total=10),
         ) as resp:
             if resp.status == 200:
                 return await resp.json()
@@ -18,7 +19,10 @@ async def get_messages(base_url: str) -> list[dict]:
 
 
 async def send_message(
-    base_url: str, chat_id: str, message: str, reply_to: str = "",
+    base_url: str,
+    chat_id: str,
+    message: str,
+    reply_to: str = "",
 ) -> dict:
     payload: dict = {"chatId": chat_id, "message": message}
     if reply_to:
@@ -75,7 +79,8 @@ async def send_typing(base_url: str, chat_id: str, paused: bool = False) -> None
 async def get_health(base_url: str) -> dict:
     async with aiohttp.ClientSession() as session:
         async with session.get(
-            f"{base_url}/health", timeout=aiohttp.ClientTimeout(total=5),
+            f"{base_url}/health",
+            timeout=aiohttp.ClientTimeout(total=5),
         ) as resp:
             if resp.status == 200:
                 return await resp.json()
@@ -85,7 +90,8 @@ async def get_health(base_url: str) -> dict:
 async def get_qr(base_url: str) -> dict:
     async with aiohttp.ClientSession() as session:
         async with session.get(
-            f"{base_url}/qr", timeout=aiohttp.ClientTimeout(total=5),
+            f"{base_url}/qr",
+            timeout=aiohttp.ClientTimeout(total=5),
         ) as resp:
             if resp.status == 200:
                 return await resp.json()

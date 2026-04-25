@@ -21,6 +21,7 @@ MIN_INTERVAL: int = 5
 # Extension entry point
 # ------------------------------------------------------------------
 
+
 class EmailAutoPoll(Extension):
 
     async def execute(self, **kwargs: Any) -> None:
@@ -47,6 +48,7 @@ class EmailAutoPoll(Extension):
 # ------------------------------------------------------------------
 # Per-handler poll loop
 # ------------------------------------------------------------------
+
 
 async def _handler_poll_loop(handler_name: str) -> None:
     from plugins._email_integration.helpers.handler import (
@@ -89,6 +91,7 @@ async def _handler_poll_loop(handler_name: str) -> None:
 # ------------------------------------------------------------------
 # Poll interval
 # ------------------------------------------------------------------
+
 
 def _get_sleep_seconds(handler_cfg: dict) -> float:
     mode = handler_cfg.get("poll_mode", "seconds")

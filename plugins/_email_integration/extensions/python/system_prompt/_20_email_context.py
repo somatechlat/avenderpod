@@ -24,9 +24,7 @@ class EmailContextPrompt(Extension):
         if not handler_name:
             return
 
-        system_prompt.append(
-            self.agent.read_prompt("fw.email.system_context_reply.md")
-        )
+        system_prompt.append(self.agent.read_prompt("fw.email.system_context_reply.md"))
 
         config = plugins.get_plugin_config(PLUGIN_NAME) or {}
         for h in config.get("handlers", []):

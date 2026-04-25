@@ -1,6 +1,6 @@
 from helpers.tool import Tool, Response
 from extensions.python.system_prompt._11_tools_prompt import (
-    build_prompt as build_tools_prompt
+    build_prompt as build_tools_prompt,
 )
 
 

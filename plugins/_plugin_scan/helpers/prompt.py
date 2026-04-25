@@ -35,7 +35,11 @@ def _load_template() -> str:
 def build_prompt(git_url: str, checks: list | None = None) -> str:
     cfg = _load_config()
     ratings, all_checks = cfg["ratings"], cfg["checks"]
-    keys = list(all_checks.keys()) if checks is None else [k for k in checks if k in all_checks]
+    keys = (
+        list(all_checks.keys())
+        if checks is None
+        else [k for k in checks if k in all_checks]
+    )
     prompt_template = _load_template()
 
     subs = {
@@ -48,17 +52,22 @@ def build_prompt(git_url: str, checks: list | None = None) -> str:
         "CHECK_DETAILS": (
             "\n\n".join(
                 f"#### {c['label']}\n{c['detail']}\n\nCriteria:\n"
-                + "\n".join(f"  - {ratings[l]['icon']} {d}" for l, d in c["criteria"].items())
+                + "\n".join(
+                    f"  - {ratings[level]['icon']} {d}"
+                    for level, d in c["criteria"].items()
+                )
                 for c in (all_checks[k] for k in keys)
             )
             if keys
             else "(no checks selected)"
         ),
-        "STATUS_LEGEND": "\n".join(f"- {r['icon']} **{r['label']}**" for r in ratings.values()),
-        "RATING_ICONS":   "/".join(r["icon"] for r in ratings.values()),
-        "RATING_PASS":    ratings["pass"]["icon"],
+        "STATUS_LEGEND": "\n".join(
+            f"- {r['icon']} **{r['label']}**" for r in ratings.values()
+        ),
+        "RATING_ICONS": "/".join(r["icon"] for r in ratings.values()),
+        "RATING_PASS": ratings["pass"]["icon"],
         "RATING_WARNING": ratings["warning"]["icon"],
-        "RATING_FAIL":    ratings["fail"]["icon"],
+        "RATING_FAIL": ratings["fail"]["icon"],
     }
     prompt = prompt_template
     for key, val in subs.items():

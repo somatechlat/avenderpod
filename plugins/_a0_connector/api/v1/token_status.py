@@ -1,4 +1,5 @@
 """POST /api/plugins/_a0_connector/v1/token_status."""
+
 from __future__ import annotations
 
 from helpers.api import Request, Response
@@ -28,7 +29,9 @@ class TokenStatus(connector_base.ProtectedConnectorApiHandler):
             )
 
         agent = context.streaming_agent or context.agent0
-        window = agent.get_data(Agent.DATA_NAME_CTX_WINDOW) if agent is not None else None
+        window = (
+            agent.get_data(Agent.DATA_NAME_CTX_WINDOW) if agent is not None else None
+        )
         token_count: int | None = None
         if isinstance(window, dict):
             raw_tokens = window.get("tokens")

@@ -19,7 +19,9 @@ class SelfUpdateSchedule(ApiHandler):
                 backup_usr=bool(input.get("backup_usr", True)),
                 backup_path=str(input.get("backup_path", "")),
                 backup_name=str(input.get("backup_name", "")),
-                backup_conflict_policy=str(input.get("backup_conflict_policy", "rename")),
+                backup_conflict_policy=str(
+                    input.get("backup_conflict_policy", "rename")
+                ),
             )
             return {
                 "success": True,

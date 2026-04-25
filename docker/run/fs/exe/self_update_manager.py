@@ -191,7 +191,9 @@ def normalize_requested_tag(tag: str) -> str:
 def normalize_backup_conflict_policy(conflict_policy: str) -> str:
     normalized = (conflict_policy or DEFAULT_BACKUP_CONFLICT_POLICY).strip().lower()
     if normalized not in BACKUP_CONFLICT_POLICIES:
-        raise ValueError("Backup conflict policy must be one of: rename, overwrite, fail.")
+        raise ValueError(
+            "Backup conflict policy must be one of: rename, overwrite, fail."
+        )
     return normalized
 
 
@@ -348,7 +350,9 @@ def create_usr_backup(
     else:
         destination_dir = destination_dir.resolve()
     destination_name = sanitize_filename(backup_name, "agent-zero-usr-backup.zip")
-    destination = resolve_backup_destination(destination_dir, destination_name, conflict_policy)
+    destination = resolve_backup_destination(
+        destination_dir, destination_name, conflict_policy
+    )
 
     temp_fd, temp_path = tempfile.mkstemp(suffix=".zip")
     os.close(temp_fd)
@@ -415,7 +419,9 @@ def get_top_stash_ref(repo_dir: Path) -> str:
 
 def create_rollback_stash(repo_dir: Path, logger: AttemptLogger) -> str | None:
     if not has_local_rollback_changes(repo_dir):
-        logger.log("No tracked or non-ignored untracked changes need rollback protection.")
+        logger.log(
+            "No tracked or non-ignored untracked changes need rollback protection."
+        )
         return None
 
     previous_top = get_top_stash_ref(repo_dir)
@@ -495,7 +501,9 @@ def clean_repo_worktree(
     )
 
 
-def fetch_release_refs(repo_dir: Path, branch: str, tag: str, logger: AttemptLogger) -> None:
+def fetch_release_refs(
+    repo_dir: Path, branch: str, tag: str, logger: AttemptLogger
+) -> None:
     remote_branch_ref = f"refs/remotes/a0-self-update/{branch}"
     tag_commit_ref = get_tag_commit_ref(tag)
     logger.log(f"Fetching branch {branch} and tag {tag} from {OFFICIAL_REPO_URL}")
@@ -590,7 +598,9 @@ def resolve_requested_target(
             "target_description": f"latest tag {effective_tag}",
         }
 
-    head_describe = git_output(repo_dir, "describe", "--tags", "--always", remote_branch_ref)
+    head_describe = git_output(
+        repo_dir, "describe", "--tags", "--always", remote_branch_ref
+    )
     head_short_tag = normalize_describe_to_version(head_describe)
     head_commit = git_output(repo_dir, "rev-parse", remote_branch_ref)
     ensure_latest_target_matches_current_major(
@@ -683,7 +693,11 @@ def launch_ui_process(repo_dir: Path, logger: AttemptLogger) -> subprocess.Popen
     prepare_script = repo_dir / "prepare.py"
     if prepare_script.exists():
         logger.log("Running prepare.py before UI start")
-        run_command([sys.executable, str(prepare_script), "--dockerized=true"], cwd=repo_dir, logger=logger)
+        run_command(
+            [sys.executable, str(prepare_script), "--dockerized=true"],
+            cwd=repo_dir,
+            logger=logger,
+        )
     else:
         logger.log("prepare.py not found, skipping prepare step")
 
@@ -731,12 +745,20 @@ def wait_for_health(
                 git_info = payload.get("gitinfo") or {}
                 current_version = (git_info.get("short_tag") or "").strip()
                 current_commit = (git_info.get("commit_hash") or "").strip()
-                if expected_commit and current_commit and current_commit != expected_commit:
+                if (
+                    expected_commit
+                    and current_commit
+                    and current_commit != expected_commit
+                ):
                     last_error = (
                         f"Health check responded, but commit {current_commit} does not match "
                         f"expected {expected_commit}."
                     )
-                elif expected_version and current_version and current_version != expected_version:
+                elif (
+                    expected_version
+                    and current_version
+                    and current_version != expected_version
+                ):
                     last_error = (
                         f"Health check responded, but version {current_version} does not match "
                         f"expected {expected_version}."
@@ -744,7 +766,12 @@ def wait_for_health(
                 elif response.status == 200:
                     logger.log(f"Health check passed at {health_url}")
                     return True, payload
-        except (urllib.error.URLError, TimeoutError, ValueError, json.JSONDecodeError) as exc:
+        except (
+            urllib.error.URLError,
+            TimeoutError,
+            ValueError,
+            json.JSONDecodeError,
+        ) as exc:
             last_error = str(exc)
 
         time.sleep(poll_interval_seconds)
@@ -752,7 +779,9 @@ def wait_for_health(
     return False, last_error
 
 
-def terminate_process(process: subprocess.Popen[bytes], timeout_seconds: int = 20) -> None:
+def terminate_process(
+    process: subprocess.Popen[bytes], timeout_seconds: int = 20
+) -> None:
     if process.poll() is not None:
         return
     process.terminate()
@@ -837,9 +866,15 @@ def execute_pending_update(
         if bool(request_data.get("backup_usr", True)):
             backup_destination = create_usr_backup(
                 repo_dir=REPO_DIR,
-                backup_path=str(request_data.get("backup_path", "/root/update-backups")),
-                backup_name=str(request_data.get("backup_name", "agent-zero-usr-backup.zip")),
-                conflict_policy=str(request_data.get("backup_conflict_policy", "rename")),
+                backup_path=str(
+                    request_data.get("backup_path", "/root/update-backups")
+                ),
+                backup_name=str(
+                    request_data.get("backup_name", "agent-zero-usr-backup.zip")
+                ),
+                conflict_policy=str(
+                    request_data.get("backup_conflict_policy", "rename")
+                ),
                 logger=logger,
             )
             backup_zip_path = str(backup_destination)
@@ -868,12 +903,18 @@ def execute_pending_update(
         )
 
         current_info = get_repo_version_info(REPO_DIR)
-        if resolved_target.get("expected_commit") and current_info["commit"] != resolved_target["expected_commit"]:
+        if (
+            resolved_target.get("expected_commit")
+            and current_info["commit"] != resolved_target["expected_commit"]
+        ):
             raise RuntimeError(
                 "Git checkout completed but the repository commit does not match the requested target. "
                 f"Expected {resolved_target['expected_commit']}, got {current_info['commit']}."
             )
-        if resolved_target.get("expected_short_tag") and current_info["short_tag"] != resolved_target["expected_short_tag"]:
+        if (
+            resolved_target.get("expected_short_tag")
+            and current_info["short_tag"] != resolved_target["expected_short_tag"]
+        ):
             raise RuntimeError(
                 "Git checkout completed but the repository version does not match the requested tag. "
                 f"Expected {resolved_target['expected_short_tag']}, got {current_info['short_tag']}."

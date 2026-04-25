@@ -5,7 +5,10 @@ from helpers.extension import Extension
 from helpers.errors import format_error
 from helpers.print_style import PrintStyle
 from helpers import plugins
-from plugins._telegram_integration.helpers.dependencies import ensure_dependencies, has_aiogram
+from plugins._telegram_integration.helpers.dependencies import (
+    ensure_dependencies,
+    has_aiogram,
+)
 
 
 PLUGIN_NAME: str = "_telegram_integration"
@@ -17,7 +20,9 @@ class TelegramBotManager(Extension):
         config = plugins.get_plugin_config(PLUGIN_NAME) or {}
         bots_cfg = config.get("bots", [])
         enabled_names = {
-            b["name"] for b in bots_cfg if b.get("enabled") and b.get("name") and b.get("token")
+            b["name"]
+            for b in bots_cfg
+            if b.get("enabled") and b.get("name") and b.get("token")
         }
 
         # Avoid installing aiogram on idle ticks when Telegram is not configured.
@@ -63,7 +68,10 @@ class TelegramBotManager(Extension):
                 current_mode = bot_cfg.get("mode", "polling")
                 running_mode = "webhook" if inst.webhook_active else "polling"
                 current_group_mode = bot_cfg.get("group_mode", "mention")
-                if current_mode == running_mode and current_group_mode == inst.group_mode:
+                if (
+                    current_mode == running_mode
+                    and current_group_mode == inst.group_mode
+                ):
                     # Same mode and still alive → skip
                     if (inst.task and not inst.task.done()) or inst.webhook_active:
                         continue
@@ -72,11 +80,21 @@ class TelegramBotManager(Extension):
 
             try:
                 # Create handler closures that capture bot_name and config
-                _on_start = partial(_make_handler(handle_start), bot_name=name, bot_cfg=bot_cfg)
-                _on_clear = partial(_make_handler(handle_clear), bot_name=name, bot_cfg=bot_cfg)
-                _on_message = partial(_make_handler(handle_message), bot_name=name, bot_cfg=bot_cfg)
-                _on_callback = partial(_make_handler(handle_callback_query), bot_name=name, bot_cfg=bot_cfg)
-                _on_new_members = partial(_make_handler(handle_new_members), bot_name=name, bot_cfg=bot_cfg)
+                _on_start = partial(
+                    _make_handler(handle_start), bot_name=name, bot_cfg=bot_cfg
+                )
+                _on_clear = partial(
+                    _make_handler(handle_clear), bot_name=name, bot_cfg=bot_cfg
+                )
+                _on_message = partial(
+                    _make_handler(handle_message), bot_name=name, bot_cfg=bot_cfg
+                )
+                _on_callback = partial(
+                    _make_handler(handle_callback_query), bot_name=name, bot_cfg=bot_cfg
+                )
+                _on_new_members = partial(
+                    _make_handler(handle_new_members), bot_name=name, bot_cfg=bot_cfg
+                )
 
                 instance = create_bot(
                     name=name,
@@ -113,7 +131,9 @@ class TelegramBotManager(Extension):
                     f"Telegram ({name}): failed to start: {format_error(e)}"
                 )
 
+
 # Wrapper functions for aiogram handlers
+
 
 def _get_current_bot_cfg(bot_name: str) -> dict:
     """Fetch the latest bot config by name, so handlers always use fresh settings."""
@@ -126,6 +146,8 @@ def _get_current_bot_cfg(bot_name: str) -> dict:
 
 def _make_handler(handler_fn):
     """Create a wrapper that resolves fresh bot config on every call."""
+
     async def _wrapped(event, bot_name: str, bot_cfg: dict):
         await handler_fn(event, bot_name, _get_current_bot_cfg(bot_name) or bot_cfg)
+
     return _wrapped

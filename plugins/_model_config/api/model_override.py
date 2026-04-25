@@ -26,7 +26,9 @@ class ModelOverride(ApiHandler):
                 return Response(status=403, response="Per-chat override is disabled")
             override_config = input.get("override")
             if not override_config or not isinstance(override_config, dict):
-                return Response(status=400, response="Missing or invalid override config")
+                return Response(
+                    status=400, response="Missing or invalid override config"
+                )
             ctx.set_data("chat_model_override", override_config)
             save_tmp_chat(ctx)
             return {"ok": True, "override": override_config}
@@ -40,7 +42,9 @@ class ModelOverride(ApiHandler):
             # Verify preset exists
             preset = model_config.get_preset_by_name(preset_name)
             if not preset:
-                return Response(status=404, response=f"Preset '{preset_name}' not found")
+                return Response(
+                    status=404, response=f"Preset '{preset_name}' not found"
+                )
             # Store as a preset reference
             override_value = {"preset_name": preset_name}
             ctx.set_data("chat_model_override", override_value)

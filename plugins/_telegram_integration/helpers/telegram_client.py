@@ -61,7 +61,9 @@ async def send_text(
         PrintStyle.error(f"Telegram send_text failed: {format_error(e)}")
         return None
 
+
 # Files and images
+
 
 async def send_file(
     bot: Bot,
@@ -115,6 +117,7 @@ async def send_photo(
 
 # Inline keyboards
 
+
 def build_inline_keyboard(
     buttons: list[list[dict]],
 ) -> InlineKeyboardMarkup:
@@ -126,14 +129,19 @@ def build_inline_keyboard(
         row_buttons = []
         for btn in row:
             if "url" in btn:
-                row_buttons.append(InlineKeyboardButton(
-                    text=btn["text"], url=btn["url"],
-                ))
+                row_buttons.append(
+                    InlineKeyboardButton(
+                        text=btn["text"],
+                        url=btn["url"],
+                    )
+                )
             else:
-                row_buttons.append(InlineKeyboardButton(
-                    text=btn["text"],
-                    callback_data=btn.get("callback_data", btn["text"]),
-                ))
+                row_buttons.append(
+                    InlineKeyboardButton(
+                        text=btn["text"],
+                        callback_data=btn.get("callback_data", btn["text"]),
+                    )
+                )
         rows.append(row_buttons)
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -162,7 +170,9 @@ async def send_text_with_keyboard(
         PrintStyle.error(f"Telegram send_text_with_keyboard failed: {format_error(e)}")
         return None
 
+
 # Typing indicator
+
 
 async def send_typing(bot: Bot, chat_id: int):
     """Send 'typing...' action to chat."""
@@ -171,7 +181,9 @@ async def send_typing(bot: Bot, chat_id: int):
     except Exception:
         pass
 
+
 # File download
+
 
 async def download_file(
     bot: Bot,
@@ -190,7 +202,9 @@ async def download_file(
         PrintStyle.error(f"Telegram download failed: {format_error(e)}")
         return None
 
+
 # Helpers
+
 
 def _split_text(text: str, max_len: int) -> list[str]:
     if len(text) <= max_len:
@@ -235,8 +249,12 @@ def md_to_telegram_html(text: str) -> str:
             return _put(f'<pre><code class="language-{lang}">{_esc(body)}</code></pre>')
         return _put(f"<pre>{_esc(body)}</pre>")
 
-    text = re.sub(r"(?:```|~~~)(\w*)\n?(.*?)(?:```|~~~)", _code_block, text, flags=re.DOTALL)
-    text = re.sub(r"`([^`]+)`", lambda m: _put(f"<code>{_esc(m.group(1))}</code>"), text)
+    text = re.sub(
+        r"(?:```|~~~)(\w*)\n?(.*?)(?:```|~~~)", _code_block, text, flags=re.DOTALL
+    )
+    text = re.sub(
+        r"`([^`]+)`", lambda m: _put(f"<code>{_esc(m.group(1))}</code>"), text
+    )
 
     # Strip unsupported syntax
     text = _strip_tables(text)
@@ -270,7 +288,6 @@ def md_to_telegram_html(text: str) -> str:
     for i, block in enumerate(stash):
         text = text.replace(f"\x00B{i}\x00", block)
     return text
-
 
 
 _TABLE_RE = re.compile(r"^\|(.+)\|$")

@@ -109,7 +109,9 @@ class InfectionChecker:
 
     # -- gate (called before every tool execution) ---------------------------
 
-    async def gate(self, agent: "Agent", tool_name: str = "", tool_args: dict | None = None):
+    async def gate(
+        self, agent: "Agent", tool_name: str = "", tool_args: dict | None = None
+    ):
         """Block until the safety check passes or terminate the agent."""
         try:
             await self._gate_inner(agent, tool_name, tool_args)
@@ -117,6 +119,7 @@ class InfectionChecker:
             raise
         except Exception as e:
             from helpers.print_style import PrintStyle
+
             PrintStyle(font_color="red", padding=True).print(
                 f"Infection check error (non-fatal): {e}"
             )
@@ -208,10 +211,14 @@ class InfectionChecker:
             parts.append(f"## Agent Response\n{self.response_log}")
         if getattr(self, "_tool_name", ""):
             try:
-                args_str = json.dumps(self._tool_args, ensure_ascii=False, default=str, indent=2)
+                args_str = json.dumps(
+                    self._tool_args, ensure_ascii=False, default=str, indent=2
+                )
             except Exception:
                 args_str = str(getattr(self, "_tool_args", {}))
-            parts.append(f"## Tool About to Execute\nTool: {self._tool_name}\nArguments:\n{args_str}")
+            parts.append(
+                f"## Tool About to Execute\nTool: {self._tool_name}\nArguments:\n{args_str}"
+            )
         return "\n\n".join(parts)
 
     def _get_model(self, agent: "Agent"):
@@ -235,7 +242,9 @@ class InfectionChecker:
                 continue
             filtered.append(entry)
 
-        hist_text = history_helpers.output_text(filtered, ai_label="assistant", human_label="user")
+        hist_text = history_helpers.output_text(
+            filtered, ai_label="assistant", human_label="user"
+        )
         user_msg = (
             f"## Recent Conversation History\n{hist_text}\n\n"
             f"## Current Agent Output to Analyze\n{log_text}"
@@ -329,6 +338,7 @@ class InfectionChecker:
 
     def _do_terminate(self, agent: "Agent", detail: str, cot: str):
         import uuid as _uuid
+
         content = cot or detail or "Malicious behavior detected."
         msg_id = str(_uuid.uuid4())
         agent.context.log.log(
@@ -344,7 +354,8 @@ class InfectionChecker:
             if msgs and msgs[-1].ai:
                 msgs.pop()
             agent.history.add_message(
-                ai=True, content="[BLOCKED] Response terminated by security policy.",
+                ai=True,
+                content="[BLOCKED] Response terminated by security policy.",
                 id=msg_id,
             )
         except Exception:

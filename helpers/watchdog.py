@@ -89,7 +89,11 @@ class _WatchRegistry:
         )
         normalized_events = _normalize_events(events)
         normalized_debounce = _normalize_debounce(debounce)
-        watch_ids = [id] if len(normalized_roots) == 1 else [f"{id}:{index}" for index in range(len(normalized_roots))]
+        watch_ids = (
+            [id]
+            if len(normalized_roots) == 1
+            else [f"{id}:{index}" for index in range(len(normalized_roots))]
+        )
         watches = {
             watch_id: _Watch(
                 id=watch_id,
@@ -200,7 +204,9 @@ class _WatchRegistry:
             timer = pending.timer
             if timer:
                 timer.cancel()
-            pending.timer = threading.Timer(watch.debounce, self._flush_watch_batch, args=(watch.id,))
+            pending.timer = threading.Timer(
+                watch.debounce, self._flush_watch_batch, args=(watch.id,)
+            )
             pending.timer.daemon = True
             pending.timer.start()
 
@@ -276,7 +282,11 @@ def _normalize_patterns(
     default = default or _DEFAULT_PATTERNS
     if not patterns:
         return list(default)
-    normalized = [pattern.strip().replace("\\", "/") for pattern in patterns if pattern and pattern.strip()]
+    normalized = [
+        pattern.strip().replace("\\", "/")
+        for pattern in patterns
+        if pattern and pattern.strip()
+    ]
     return normalized or default
 
 
@@ -343,7 +353,9 @@ def _compile_single_matcher(root: str, patterns: list[str]) -> PatternMatcher:
 
     relative_patterns = [pattern for pattern in patterns if "/" in pattern]
     name_patterns = [
-        pattern for pattern in patterns if "/" not in pattern and pattern not in {"**", "**/*", "*"}
+        pattern
+        for pattern in patterns
+        if "/" not in pattern and pattern not in {"**", "**/*", "*"}
     ]
 
     def matches(path: str) -> bool:
@@ -419,4 +431,3 @@ __all__ = [
     "start_watchdog_daemon",
     "stop_watchdog_daemon",
 ]
-

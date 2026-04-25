@@ -1,4 +1,5 @@
 """POST /api/plugins/_a0_connector/v1/projects."""
+
 from __future__ import annotations
 
 from typing import Any, Mapping
@@ -35,7 +36,10 @@ class Projects(connector_base.ProtectedConnectorApiHandler):
     async def process(self, input: dict, request: Request) -> dict | Response:
         action = _string(input.get("action")).lower() or "list"
         if action not in {"list", "load", "update", "activate", "deactivate"}:
-            return {"ok": False, "error": f"Unsupported action: {action or '<missing>'}"}
+            return {
+                "ok": False,
+                "error": f"Unsupported action: {action or '<missing>'}",
+            }
 
         core_response = await self._call_core(
             {
@@ -51,10 +55,16 @@ class Projects(connector_base.ProtectedConnectorApiHandler):
         if not isinstance(core_response, Mapping):
             return {"ok": False, "error": "Invalid response from core projects handler"}
         if not core_response.get("ok"):
-            return {"ok": False, "error": _string(core_response.get("error")) or "Project request failed"}
+            return {
+                "ok": False,
+                "error": _string(core_response.get("error"))
+                or "Project request failed",
+            }
 
         if action in {"activate", "deactivate", "list"}:
-            return await self._normalized_list_state(_string(input.get("context_id")), request)
+            return await self._normalized_list_state(
+                _string(input.get("context_id")), request
+            )
 
         project = core_response.get("data")
         return {
@@ -62,7 +72,9 @@ class Projects(connector_base.ProtectedConnectorApiHandler):
             "project": dict(project) if isinstance(project, Mapping) else {},
         }
 
-    async def _normalized_list_state(self, context_id: str, request: Request) -> dict[str, Any] | Response:
+    async def _normalized_list_state(
+        self, context_id: str, request: Request
+    ) -> dict[str, Any] | Response:
         core_response = await self._call_core(
             {
                 "action": "list",
@@ -75,7 +87,11 @@ class Projects(connector_base.ProtectedConnectorApiHandler):
         if not isinstance(core_response, Mapping):
             return {"ok": False, "error": "Invalid response from core projects handler"}
         if not core_response.get("ok"):
-            return {"ok": False, "error": _string(core_response.get("error")) or "Project request failed"}
+            return {
+                "ok": False,
+                "error": _string(core_response.get("error"))
+                or "Project request failed",
+            }
 
         projects: list[dict[str, str]] = []
         for item in core_response.get("data") or []:
@@ -89,7 +105,9 @@ class Projects(connector_base.ProtectedConnectorApiHandler):
             "current_project": self._load_current_project(context_id),
         }
 
-    async def _call_core(self, payload: dict[str, Any], request: Request) -> dict | Response:
+    async def _call_core(
+        self, payload: dict[str, Any], request: Request
+    ) -> dict | Response:
         from api.projects import Projects as CoreProjects
 
         handler = CoreProjects(self.app, self.thread_lock)

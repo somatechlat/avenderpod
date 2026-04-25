@@ -26,7 +26,9 @@ class IncludeActiveSkills(Extension):
         if not active_skills:
             return
 
-        content = "\n\n".join(item["content"] for item in active_skills if item.get("content")).strip()
+        content = "\n\n".join(
+            item["content"] for item in active_skills if item.get("content")
+        ).strip()
         if not content:
             return
 

@@ -26,7 +26,9 @@ class ModelPreset(ApiHandler):
             if not preset_name:
                 return Response(status=400, response="Missing preset_name")
             if not model_config.get_preset_by_name(preset_name):
-                return Response(status=404, response=f"Preset '{preset_name}' not found")
+                return Response(
+                    status=404, response=f"Preset '{preset_name}' not found"
+                )
 
         save_browser_model_preset_name(preset_name)
         return {

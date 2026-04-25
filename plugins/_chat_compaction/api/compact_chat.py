@@ -1,4 +1,5 @@
 """API handler for chat compaction."""
+
 from helpers.api import ApiHandler, Input, Output, Request, Response
 from agent import AgentContext
 from plugins._chat_compaction.helpers.compactor import (
@@ -44,9 +45,7 @@ class CompactChat(ApiHandler):
             use_chat_model = input.get("use_chat_model", True)
             preset_name = input.get("preset_name") or None
 
-            context.run_task(
-                _run_compaction_task, context, use_chat_model, preset_name
-            )
+            context.run_task(_run_compaction_task, context, use_chat_model, preset_name)
 
             return {"ok": True, "message": "Compaction started"}
 
@@ -65,4 +64,5 @@ async def _run_compaction_task(context, use_chat_model: bool, preset_name: str |
             content=str(e),
         )
         from helpers.state_monitor_integration import mark_dirty_all
+
         mark_dirty_all(reason="plugins._chat_compaction.compact_chat_error")

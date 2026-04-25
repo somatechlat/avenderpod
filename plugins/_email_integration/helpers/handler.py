@@ -50,6 +50,7 @@ _state_lock = asyncio.Lock()
 # which would reset module-level state and orphan running tasks.
 _poll_tasks: dict[str, asyncio.Task] = {}  # type: ignore[type-arg]
 
+
 def _load_state() -> dict:
     path = files.get_abs_path(STATE_FILE)
     if os.path.isfile(path):
@@ -69,6 +70,7 @@ def _save_state(state: dict):
 # ------------------------------------------------------------------
 # Single handler poll (called from per-handler poll loop)
 # ------------------------------------------------------------------
+
 
 async def _poll_single_handler(handler_cfg: dict, state: dict):
     name = handler_cfg.get("name", "default")
@@ -94,7 +96,10 @@ async def _poll_single_handler(handler_cfg: dict, state: dict):
         if last_uid == 0:
             if process_unread_days > 0:
                 messages, highest = await fetch_unread_since(
-                    client, DOWNLOAD_FOLDER, process_unread_days, whitelist or None,
+                    client,
+                    DOWNLOAD_FOLDER,
+                    process_unread_days,
+                    whitelist or None,
                 )
                 highest = highest or await get_highest_uid(client)
                 state[name] = {"last_uid": highest}
@@ -111,11 +116,16 @@ async def _poll_single_handler(handler_cfg: dict, state: dict):
             else:
                 highest = await get_highest_uid(client)
                 state[name] = {"last_uid": highest}
-                PrintStyle.info(f"Email ({name}): initialized, tracking from UID {highest}")
+                PrintStyle.info(
+                    f"Email ({name}): initialized, tracking from UID {highest}"
+                )
             return
 
         messages, new_uid = await fetch_new(
-            client, DOWNLOAD_FOLDER, last_uid, whitelist or None,
+            client,
+            DOWNLOAD_FOLDER,
+            last_uid,
+            whitelist or None,
         )
 
         if new_uid > last_uid:
@@ -130,7 +140,9 @@ async def _poll_single_handler(handler_cfg: dict, state: dict):
 
 
 async def _fetch_exchange(
-    cfg: dict, whitelist: list[str], since_days: int = 0,
+    cfg: dict,
+    whitelist: list[str],
+    since_days: int = 0,
 ) -> list[InboundMessage]:
     account = await connect_exchange(
         server=cfg.get("imap_server", ""),
@@ -138,14 +150,17 @@ async def _fetch_exchange(
         password=cfg.get("password", ""),
     )
     return await fetch_unread_exchange(
-        account, DOWNLOAD_FOLDER, whitelist or None, since_days=since_days,
+        account,
+        DOWNLOAD_FOLDER,
+        whitelist or None,
+        since_days=since_days,
     )
 
 
 async def _dispatch_all(handler_cfg: dict, messages: list[InboundMessage]):
     own_address = (handler_cfg.get("username") or "").lower()
 
-    # Need an agent for dispatcher AI calls 
+    # Need an agent for dispatcher AI calls
     # find existing dispatcher or create new background context
     ctx = None
     for c in AgentContext._contexts.values():
@@ -155,8 +170,9 @@ async def _dispatch_all(handler_cfg: dict, messages: list[InboundMessage]):
 
     if not ctx:
         agent_config = initialize_agent()
-        ctx = AgentContext(agent_config, name="Email Dispatcher",
-                           type=AgentContextType.BACKGROUND)
+        ctx = AgentContext(
+            agent_config, name="Email Dispatcher", type=AgentContextType.BACKGROUND
+        )
     agent = ctx.agent0
 
     for msg in messages:
@@ -173,6 +189,7 @@ async def _dispatch_all(handler_cfg: dict, messages: list[InboundMessage]):
 # Dispatch a single inbound message
 # ------------------------------------------------------------------
 
+
 async def _dispatch_message(agent: Agent, handler_cfg: dict, msg: InboundMessage):
     handler_name = handler_cfg.get("name", "default")
     thread_id = disp.extract_thread_id(msg.subject)
@@ -187,13 +204,15 @@ async def _dispatch_message(agent: Agent, handler_cfg: dict, msg: InboundMessage
         for chat in existing:
             if chat["thread_id"] == thread_id:
                 await _route_to_chat(
-                    agent, handler_cfg, msg, chat["context_id"],
+                    agent,
+                    handler_cfg,
+                    msg,
+                    chat["context_id"],
                 )
                 return
 
     # Dispatcher AI decides
     decision = await _call_dispatcher(agent, handler_cfg, msg, existing)
-    reason = decision.reason or ""
 
     if decision.action == "continue_chat" and decision.context_id:
         ctx = AgentContext.get(decision.context_id)
@@ -208,10 +227,14 @@ async def _dispatch_message(agent: Agent, handler_cfg: dict, msg: InboundMessage
 
 
 async def _call_model(
-    agent: Agent, handler_cfg: dict, system: str, prompt: str,
+    agent: Agent,
+    handler_cfg: dict,
+    system: str,
+    prompt: str,
 ):
     if handler_cfg.get("dispatcher_model", "utility") == "chat":
         from langchain_core.messages import SystemMessage, HumanMessage
+
         messages = [SystemMessage(content=system), HumanMessage(content=prompt)]
         response, _ = await agent.call_chat_model(messages)
         return response
@@ -238,7 +261,8 @@ async def _call_dispatcher(
     extra = handler_cfg.get("dispatcher_instructions", "")
     if extra:
         prompt += agent.read_prompt(
-            "fw.email.dispatcher_extra.md", instructions=extra,
+            "fw.email.dispatcher_extra.md",
+            instructions=extra,
         )
 
     system = agent.read_prompt("fw.email.dispatcher_system.md")
@@ -246,7 +270,7 @@ async def _call_dispatcher(
     try:
         response = await _call_model(agent, handler_cfg, system, prompt)
         return disp.parse_dispatcher_response(str(response))
-        
+
     except Exception as e:
         PrintStyle.error(f"Dispatcher error: {format_error(e)}")
         return disp.DispatchDecision(action="new_chat", reason="dispatcher error")
@@ -255,6 +279,7 @@ async def _call_dispatcher(
 # ------------------------------------------------------------------
 # Chat creation and routing
 # ------------------------------------------------------------------
+
 
 async def _start_new_chat(agent: Agent, handler_cfg: dict, msg: InboundMessage):
     from helpers import projects
@@ -271,7 +296,7 @@ async def _start_new_chat(agent: Agent, handler_cfg: dict, msg: InboundMessage):
     context.data[disp.CTX_EMAIL_SUBJECT] = msg.subject
     context.data[disp.CTX_EMAIL_LAST_BODY] = msg.body
     context.data[disp.CTX_EMAIL_MESSAGE_ID] = msg.message_id
-    
+
     refs_list = []
     if msg.references:
         for r in msg.references.split():
@@ -279,7 +304,7 @@ async def _start_new_chat(agent: Agent, handler_cfg: dict, msg: InboundMessage):
                 refs_list.append(r)
     if msg.message_id and msg.message_id not in refs_list:
         refs_list.append(msg.message_id)
-        
+
     context.data[disp.CTX_EMAIL_REFERENCES] = " ".join(refs_list)
 
     project = handler_cfg.get("project", "")
@@ -293,15 +318,21 @@ async def _start_new_chat(agent: Agent, handler_cfg: dict, msg: InboundMessage):
     system_ctx = agent.read_prompt("fw.email.system_context.md")
 
     msg_id = str(uuid.uuid4())
-    mq.log_user_message(context, user_msg, msg.attachments or [], message_id=msg_id, source=" (email)")
-    context.communicate(UserMessage(
-        message=user_msg,
-        system_message=[system_ctx],
-        attachments=msg.attachments,
-        id=msg_id,
-    ))
+    mq.log_user_message(
+        context, user_msg, msg.attachments or [], message_id=msg_id, source=" (email)"
+    )
+    context.communicate(
+        UserMessage(
+            message=user_msg,
+            system_message=[system_ctx],
+            attachments=msg.attachments,
+            id=msg_id,
+        )
+    )
 
-    PrintStyle.success(f"Email: new chat {context.id} for '{msg.subject}' from {msg.sender}")
+    PrintStyle.success(
+        f"Email: new chat {context.id} for '{msg.subject}' from {msg.sender}"
+    )
 
 
 async def _route_to_chat(
@@ -318,28 +349,32 @@ async def _route_to_chat(
     context.data[disp.CTX_EMAIL_LAST_BODY] = msg.body
     if not context.get_data("chat_model_override"):
         _apply_handler_model_preset(context, handler_cfg)
-    
+
     refs = context.data.get(disp.CTX_EMAIL_REFERENCES, "")
     refs_list = refs.split() if refs else []
-    
+
     if msg.references:
         for r in msg.references.split():
             if r not in refs_list:
                 refs_list.append(r)
-                
+
     if msg.message_id and msg.message_id not in refs_list:
         refs_list.append(msg.message_id)
-        
+
     context.data[disp.CTX_EMAIL_REFERENCES] = " ".join(refs_list)
 
     user_msg = _build_user_message(agent, msg, handler_cfg)
     msg_id = str(uuid.uuid4())
-    mq.log_user_message(context, user_msg, msg.attachments or [], message_id=msg_id, source=" (email)")
-    context.communicate(UserMessage(
-        message=user_msg,
-        attachments=msg.attachments,
-        id=msg_id,
-    ))
+    mq.log_user_message(
+        context, user_msg, msg.attachments or [], message_id=msg_id, source=" (email)"
+    )
+    context.communicate(
+        UserMessage(
+            message=user_msg,
+            attachments=msg.attachments,
+            id=msg_id,
+        )
+    )
 
     save_tmp_chat(context)
     PrintStyle.info(f"Email: continuing chat {context_id}")
@@ -512,6 +547,7 @@ def _get_history_preview(ctx: AgentContext) -> str:
 # Sender helpers
 # ------------------------------------------------------------------
 
+
 def _is_own_email(sender: str, own_address: str) -> bool:
     sender_lower = sender.lower()
     if "<" in sender_lower:
@@ -524,6 +560,7 @@ def _is_own_email(sender: str, own_address: str) -> bool:
 # ------------------------------------------------------------------
 # Message builders
 # ------------------------------------------------------------------
+
 
 def _build_user_message(agent: Agent, msg: InboundMessage, handler_cfg: dict) -> str:
     recipient = handler_cfg.get("username", "")
@@ -539,6 +576,7 @@ def _build_user_message(agent: Agent, msg: InboundMessage, handler_cfg: dict) ->
 # ------------------------------------------------------------------
 # Reply sending (called from process_chain_end extension)
 # ------------------------------------------------------------------
+
 
 async def send_email_reply(
     context: AgentContext,
@@ -591,6 +629,7 @@ async def send_email_reply(
 # Attachment reading (via RFC into execution runtime)
 # ------------------------------------------------------------------
 
+
 async def _read_attachments_via_rfc(
     paths: list[str] | None,
 ) -> list[tuple[str, bytes]]:
@@ -612,6 +651,7 @@ async def _read_attachments_via_rfc(
 # ------------------------------------------------------------------
 # Config lookup
 # ------------------------------------------------------------------
+
 
 def _get_handler_config(handler_name: str) -> dict | None:
     config = plugins.get_plugin_config(PLUGIN_NAME) or {}

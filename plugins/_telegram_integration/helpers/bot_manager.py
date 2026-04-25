@@ -6,12 +6,13 @@ from aiogram import Bot, Dispatcher, Router, F
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode, ChatType, ContentType
 from aiogram.filters import Command, CommandStart
-from aiogram.types import Message
+from aiogram.types import Message, User
 
 from helpers.errors import format_error
 from helpers.print_style import PrintStyle
 
 # Data models
+
 
 @dataclass
 class BotInstance:
@@ -23,7 +24,8 @@ class BotInstance:
     webhook_active: bool = False  # True when webhook mode is registered
     webhook_secret: str = ""  # secret for webhook verification
     group_mode: str = "mention"  # current group_mode setting
-    bot_info: object | None = None  # cached result of bot.get_me()
+    bot_info: User | None = None  # cached result of bot.get_me()
+
 
 # Bot registry (singleton, persists across module reloads)
 
@@ -37,7 +39,9 @@ def get_bot(name: str) -> BotInstance | None:
 def get_all_bots() -> dict[str, BotInstance]:
     return _bots
 
+
 # Bot creation
+
 
 def create_bot(
     name: str,
@@ -67,18 +71,22 @@ def create_bot(
         router.callback_query.register(on_callback_query)
 
     if on_new_members:
-        router.message.register(on_new_members, F.content_type == ContentType.NEW_CHAT_MEMBERS)
+        router.message.register(
+            on_new_members, F.content_type == ContentType.NEW_CHAT_MEMBERS
+        )
 
     # Register message handler with group filtering
     if group_mode == "off":
         # Private chats only
         router.message.register(
-            on_message, F.chat.type == ChatType.PRIVATE,
+            on_message,
+            F.chat.type == ChatType.PRIVATE,
         )
     elif group_mode == "mention":
         # Private chats: all messages; Groups: only when mentioned/replied
         router.message.register(
-            on_message, F.chat.type == ChatType.PRIVATE,
+            on_message,
+            F.chat.type == ChatType.PRIVATE,
         )
         router.message.register(
             _make_group_mention_filter(on_message, bot),
@@ -88,7 +96,9 @@ def create_bot(
         router.message.register(on_message)
 
     dp.include_router(router)
-    instance = BotInstance(name=name, bot=bot, dispatcher=dp, router=router, group_mode=group_mode)
+    instance = BotInstance(
+        name=name, bot=bot, dispatcher=dp, router=router, group_mode=group_mode
+    )
     _bots[name] = instance
     return instance
 
@@ -102,6 +112,7 @@ async def cache_bot_info(instance: BotInstance):
 
 def _make_group_mention_filter(handler: Callable, bot: Bot):
     """Create a group message handler that only responds to mentions and replies."""
+
     async def _group_handler(message: Message):
         if message.chat.type == ChatType.PRIVATE:
             return
@@ -132,7 +143,7 @@ def _make_group_mention_filter(handler: Callable, bot: Bot):
         # Check entities for mention
         for entity in entities:
             if entity.type == "mention":
-                mention_text = text[entity.offset:entity.offset + entity.length]
+                mention_text = text[entity.offset : entity.offset + entity.length]
                 if mention_text.lower() == f"@{bot_username.lower()}":
                     await handler(message)
                     return
@@ -140,7 +151,9 @@ def _make_group_mention_filter(handler: Callable, bot: Bot):
     _group_handler.__name__ = f"_group_handler_{id(handler)}"
     return _group_handler
 
+
 # Polling
+
 
 async def start_polling(instance: BotInstance) -> asyncio.Task:
     # Ensure any leftover webhook is removed before polling
@@ -159,7 +172,9 @@ async def start_polling(instance: BotInstance) -> asyncio.Task:
         except asyncio.CancelledError:
             PrintStyle.info(f"Telegram ({instance.name}): polling cancelled")
         except Exception as e:
-            PrintStyle.error(f"Telegram ({instance.name}): polling error: {format_error(e)}")
+            PrintStyle.error(
+                f"Telegram ({instance.name}): polling error: {format_error(e)}"
+            )
 
     task = asyncio.create_task(_poll())
     instance.task = task
@@ -176,7 +191,9 @@ async def stop_polling(instance: BotInstance):
             pass
     instance.task = None
 
+
 # Webhook
+
 
 async def setup_webhook(instance: BotInstance, webhook_url: str, secret: str = ""):
     """Register webhook with Telegram. Updates are received via the API handler."""
@@ -189,18 +206,24 @@ async def setup_webhook(instance: BotInstance, webhook_url: str, secret: str = "
 
     instance.webhook_active = True
     instance.webhook_secret = secret
-    PrintStyle.info(f"Telegram ({instance.name}): webhook active via {webhook_url.rstrip('/')}")
+    PrintStyle.info(
+        f"Telegram ({instance.name}): webhook active via {webhook_url.rstrip('/')}"
+    )
 
 
 async def remove_webhook(instance: BotInstance):
     try:
         await instance.bot.delete_webhook()
     except Exception as e:
-        PrintStyle.error(f"Telegram ({instance.name}): remove webhook error: {format_error(e)}")
+        PrintStyle.error(
+            f"Telegram ({instance.name}): remove webhook error: {format_error(e)}"
+        )
     instance.webhook_active = False
     instance.webhook_secret = ""
 
+
 # Cleanup
+
 
 async def stop_bot(name: str):
     instance = _bots.pop(name, None)
@@ -218,6 +241,7 @@ async def stop_bot(name: str):
 
 
 # Test connection
+
 
 async def test_token(token: str) -> tuple[bool, str]:
     try:

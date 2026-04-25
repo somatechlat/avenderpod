@@ -1,8 +1,8 @@
-
 from .dirty_json import DirtyJson
-import regex, re
-from helpers.modules import load_classes_from_file, load_classes_from_folder # keep here for backwards compatibility
+import regex
+import re
 from typing import Any
+
 
 def json_parse_dirty(json: str) -> dict[str, Any] | None:
     if not json or not isinstance(json, str):
@@ -18,6 +18,7 @@ def json_parse_dirty(json: str) -> dict[str, Any] | None:
             # If parsing fails, return None instead of crashing
             return None
     return None
+
 
 def extract_json_root_string(content: str) -> str | None:
     if not content or not isinstance(content, str):
@@ -81,5 +82,3 @@ def fix_json_string(json_string):
         r'(?<=: ")(.*?)(?=")', replace_unescaped_newlines, json_string, flags=re.DOTALL
     )
     return fixed_string
-
-

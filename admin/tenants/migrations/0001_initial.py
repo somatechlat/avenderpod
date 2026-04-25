@@ -9,43 +9,98 @@ class Migration(migrations.Migration):
 
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='Plan',
+            name="Plan",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('name', models.CharField(max_length=100)),
-                ('price_monthly', models.DecimalField(decimal_places=2, max_digits=10)),
-                ('max_conversations', models.IntegerField(default=500)),
-                ('max_numbers', models.IntegerField(default=1)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("name", models.CharField(max_length=100)),
+                ("price_monthly", models.DecimalField(decimal_places=2, max_digits=10)),
+                ("max_conversations", models.IntegerField(default=500)),
+                ("max_numbers", models.IntegerField(default=1)),
             ],
         ),
         migrations.CreateModel(
-            name='Tenant',
+            name="Tenant",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('name', models.CharField(max_length=255)),
-                ('email', models.EmailField(max_length=254, unique=True)),
-                ('status', models.CharField(choices=[('pending', 'Pending Deployment'), ('active', 'Active'), ('suspended', 'Suspended'), ('deleted', 'Deleted')], default='pending', max_length=20)),
-                ('vultr_instance_id', models.CharField(blank=True, max_length=100, null=True)),
-                ('assigned_port', models.IntegerField(blank=True, null=True)),
-                ('custom_domain', models.CharField(blank=True, max_length=255, null=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('plan', models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, to='tenants.plan')),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("name", models.CharField(max_length=255)),
+                ("email", models.EmailField(max_length=254, unique=True)),
+                (
+                    "status",
+                    models.CharField(
+                        choices=[
+                            ("pending", "Pending Deployment"),
+                            ("active", "Active"),
+                            ("suspended", "Suspended"),
+                            ("deleted", "Deleted"),
+                        ],
+                        default="pending",
+                        max_length=20,
+                    ),
+                ),
+                (
+                    "vultr_instance_id",
+                    models.CharField(blank=True, max_length=100, null=True),
+                ),
+                ("assigned_port", models.IntegerField(blank=True, null=True)),
+                (
+                    "custom_domain",
+                    models.CharField(blank=True, max_length=255, null=True),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "plan",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        to="tenants.plan",
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='VaultRecord',
+            name="VaultRecord",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('vault_path', models.CharField(max_length=255)),
-                ('description', models.CharField(max_length=255)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('tenant', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='vault_records', to='tenants.tenant')),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4,
+                        editable=False,
+                        primary_key=True,
+                        serialize=False,
+                    ),
+                ),
+                ("vault_path", models.CharField(max_length=255)),
+                ("description", models.CharField(max_length=255)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                (
+                    "tenant",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="vault_records",
+                        to="tenants.tenant",
+                    ),
+                ),
             ],
         ),
     ]

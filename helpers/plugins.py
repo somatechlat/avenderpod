@@ -1,21 +1,20 @@
 from __future__ import annotations
 
 import asyncio
-import re, json, glob
+import re
+import json
+import glob
 import time
 from pathlib import Path
 from typing import (
     Any,
-    Dict,
     Iterator,
     List,
     Literal,
-    Optional,
     TYPE_CHECKING,
     TypedDict,
 )
 
-from regex import W
 
 from helpers import (
     files,
@@ -130,7 +129,7 @@ def register_watchdogs():
             if plugin_name and plugin_name not in plugin_names:
                 plugin_names.append(plugin_name)
         print_style.PrintStyle.debug("Plugins watchdog triggered", plugin_names)
-        python_change = any(path.endswith('.py') for path, _event in events)
+        python_change = any(path.endswith(".py") for path, _event in events)
         after_plugin_change(plugin_names or None, python_change=python_change)
 
     relevant_patterns = ["**/extensions/**/*", TOGGLE_FILE_PATTERN, HOOKS_SCRIPT]
@@ -171,13 +170,15 @@ def register_watchdogs():
             files.get_abs_path(subagents.DEFAULT_AGENTS_DIR),
             files.get_abs_path(subagents.USER_AGENTS_DIR),
         ],
-        patterns=[*expand_patterns(f"*/plugins/*/")],
+        patterns=[*expand_patterns("*/plugins/*/")],
         handler=on_plugin_change,
     )
 
 
 @extension.extensible
-def after_plugin_change(plugin_names: list[str] | None = None, python_change:bool=False):
+def after_plugin_change(
+    plugin_names: list[str] | None = None, python_change: bool = False
+):
     clear_plugin_cache(plugin_names)
     if python_change:
         refresh_plugin_modules(plugin_names)
@@ -396,7 +397,11 @@ def delete_plugin(plugin_name: str):
         raise ValueError("Only custom plugins can be deleted")
 
     # delete additional plugin folders
-    assets = [asset for asset in find_plugin_assets("", plugin_name=plugin_name) if not asset["path"].startswith(plugin_dir)]
+    assets = [
+        asset
+        for asset in find_plugin_assets("", plugin_name=plugin_name)
+        if not asset["path"].startswith(plugin_dir)
+    ]
     for asset in assets:
         files.delete_dir(asset["path"])
 
@@ -405,7 +410,7 @@ def delete_plugin(plugin_name: str):
     )  # send before deletion to properly check the extensions, second notification will be skipped automatically
 
     # does it have python files?
-    python_change = bool(files.find_existing_paths_by_pattern(plugin_dir+"/**/*.py"))
+    python_change = bool(files.find_existing_paths_by_pattern(plugin_dir + "/**/*.py"))
 
     # delete main plugin folder
     files.delete_dir(plugin_dir)

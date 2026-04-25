@@ -4,6 +4,7 @@ import copy
 import json
 from typing import Any
 
+
 def is_openrouter_request(provider: str | None, model_name: str | None) -> bool:
     provider_name = (provider or "").lower()
     model = (model_name or "").lower()
@@ -25,7 +26,9 @@ def should_use_openrouter_prompt_schema_fallback(
     that reject large compiled grammars. Avoid the hard error entirely by
     downgrading to `json_object` before the first request.
     """
-    return is_openrouter_request(provider, model_name) and has_json_schema_response_format(kwargs)
+    return is_openrouter_request(
+        provider, model_name
+    ) and has_json_schema_response_format(kwargs)
 
 
 def relax_strict_tool_schemas(tools: Any) -> Any:

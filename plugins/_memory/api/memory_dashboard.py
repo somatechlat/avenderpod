@@ -1,10 +1,12 @@
 from helpers.api import ApiHandler, Request, Response
-from helpers import files
-from models import ModelConfig, ModelType
 from langchain_core.documents import Document
 from agent import AgentContext
 
-from plugins._memory.helpers.memory import Memory, get_existing_memory_subdirs, get_context_memory_subdir
+from plugins._memory.helpers.memory import (
+    Memory,
+    get_existing_memory_subdirs,
+    get_context_memory_subdir,
+)
 
 
 class MemoryDashboard(ApiHandler):
@@ -97,7 +99,7 @@ class MemoryDashboard(ApiHandler):
             else:
                 return {
                     "success": False,
-                    "error": f"Failed to delete any memories.",
+                    "error": "Failed to delete any memories.",
                 }
 
         except Exception as e:
@@ -184,7 +186,9 @@ class MemoryDashboard(ApiHandler):
                     memories = memories[:limit]
 
             # Format memories for the dashboard
-            formatted_memories = [self._format_memory_for_dashboard(m) for m in memories]
+            formatted_memories = [
+                self._format_memory_for_dashboard(m) for m in memories
+            ]
 
             # Get summary statistics
             total_memories = len(formatted_memories)

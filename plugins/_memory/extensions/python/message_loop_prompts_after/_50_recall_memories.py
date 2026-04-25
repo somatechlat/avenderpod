@@ -5,7 +5,6 @@ from helpers import dirty_json, errors, log, plugins
 
 # Direct import - this extension lives inside the memory plugin
 from plugins._memory.helpers.memory import Memory
-from plugins._memory.tools.memory_load import DEFAULT_THRESHOLD as DEFAULT_MEMORY_THRESHOLD
 
 
 DATA_NAME_TASK = "_recall_memories_task"
@@ -46,7 +45,9 @@ class RecallMemories(Extension):
 
             task = asyncio.create_task(
                 asyncio.wait_for(
-                    self.search_memories(loop_data=loop_data, log_item=log_item, **kwargs),
+                    self.search_memories(
+                        loop_data=loop_data, log_item=log_item, **kwargs
+                    ),
                     timeout=SEARCH_TIMEOUT,
                 )
             )
@@ -57,7 +58,9 @@ class RecallMemories(Extension):
         self.agent.set_data(DATA_NAME_TASK, task)
         self.agent.set_data(DATA_NAME_ITER, loop_data.iteration)
 
-    async def search_memories(self, log_item: log.LogItem, loop_data: LoopData, **kwargs):
+    async def search_memories(
+        self, log_item: log.LogItem, loop_data: LoopData, **kwargs
+    ):
         if not self.agent:
             return
 
@@ -67,7 +70,6 @@ class RecallMemories(Extension):
             del extras["memories"]
         if "solutions" in extras:
             del extras["solutions"]
-
 
         set = plugins.get_plugin_config("_memory", self.agent)
         if not set:
@@ -85,7 +87,7 @@ class RecallMemories(Extension):
         user_instruction = (
             loop_data.user_message.output_text() if loop_data.user_message else "None"
         )
-        history = self.agent.history.output_text()[-set["memory_recall_history_len"]:]
+        history = self.agent.history.output_text()[-set["memory_recall_history_len"] :]
         message = self.agent.read_prompt(
             "memory.memories_query.msg.md", history=history, message=user_instruction
         )
@@ -100,11 +102,13 @@ class RecallMemories(Extension):
                     # callback=log_callback,
                 )
                 query = query.strip()
-                log_item.update(query=query) # no need for streaming here
+                log_item.update(query=query)  # no need for streaming here
             except Exception as e:
                 err = errors.format_error(e)
                 self.agent.context.log.log(
-                    type="warning", heading="Recall memories extension error:", content=err
+                    type="warning",
+                    heading="Recall memories extension error:",
+                    content=err,
                 )
                 query = ""
 
@@ -114,7 +118,7 @@ class RecallMemories(Extension):
                     heading="Failed to generate memory query",
                 )
                 return
-        
+
         # otherwise use the message and history as query
         else:
             query = user_instruction + "\n\n" + history
@@ -154,7 +158,9 @@ class RecallMemories(Extension):
         # if post filtering is enabled
         if set["memory_recall_post_filter"]:
             # assemble an enumerated dict of memories and solutions for AI validation
-            mems_list = {i: memory.page_content for i, memory in enumerate(memories + solutions)}
+            mems_list = {
+                i: memory.page_content for i, memory in enumerate(memories + solutions)
+            }
 
             # call AI to validate the memories
             try:
@@ -195,10 +201,11 @@ class RecallMemories(Extension):
             except Exception as e:
                 err = errors.format_error(e)
                 self.agent.context.log.log(
-                    type="warning", heading="Failed to filter relevant memories", content=err
+                    type="warning",
+                    heading="Failed to filter relevant memories",
+                    content=err,
                 )
                 filter_inds = []
-
 
         # limit the number of memories and solutions
         memories = memories[: set["memory_recall_memories_max_result"]]
@@ -209,8 +216,12 @@ class RecallMemories(Extension):
             heading=f"{len(memories)} memories and {len(solutions)} relevant solutions found",
         )
 
-        memories_txt = "\n\n".join([mem.page_content for mem in memories]) if memories else ""
-        solutions_txt = "\n\n".join([sol.page_content for sol in solutions]) if solutions else ""
+        memories_txt = (
+            "\n\n".join([mem.page_content for mem in memories]) if memories else ""
+        )
+        solutions_txt = (
+            "\n\n".join([sol.page_content for sol in solutions]) if solutions else ""
+        )
 
         # log the full results
         if memories_txt:

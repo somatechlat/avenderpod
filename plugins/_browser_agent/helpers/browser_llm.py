@@ -83,17 +83,26 @@ class BrowserCompatibleChatWrapper(ChatOpenRouter):
             request_messages = messages
 
             # hack from browser-use to fix json schema for gemini (additionalProperties, $defs, $ref)
-            if "response_format" in kwrgs and "json_schema" in kwrgs["response_format"] and effective_model and effective_model.startswith("gemini/"):
-                kwrgs["response_format"]["json_schema"] = ChatGoogle("")._fix_gemini_schema(kwrgs["response_format"]["json_schema"])
+            if (
+                "response_format" in kwrgs
+                and "json_schema" in kwrgs["response_format"]
+                and effective_model
+                and effective_model.startswith("gemini/")
+            ):
+                kwrgs["response_format"]["json_schema"] = ChatGoogle(
+                    ""
+                )._fix_gemini_schema(kwrgs["response_format"]["json_schema"])
 
             if browser_use_openrouter_compat.should_use_openrouter_prompt_schema_fallback(
-                    provider=self.provider,
-                    model_name=effective_model,
-                    kwargs=kwrgs,
-                ):
-                fallback_request = browser_use_openrouter_compat.build_json_object_fallback_request(
-                    messages=messages,
-                    kwargs=kwrgs,
+                provider=self.provider,
+                model_name=effective_model,
+                kwargs=kwrgs,
+            ):
+                fallback_request = (
+                    browser_use_openrouter_compat.build_json_object_fallback_request(
+                        messages=messages,
+                        kwargs=kwrgs,
+                    )
                 )
                 if fallback_request is not None:
                     request_messages, kwrgs = fallback_request
@@ -104,12 +113,15 @@ class BrowserCompatibleChatWrapper(ChatOpenRouter):
                 stop=stop,
                 **kwrgs,
             )
+            response: Any = resp
 
             # Gemini: strip triple backticks and conform schema
             try:
-                msg = resp.choices[0].message # type: ignore
-                if self.provider == "gemini" and isinstance(getattr(msg, "content", None), str):
-                    cleaned = browser_use_monkeypatch.gemini_clean_and_conform(msg.content) # type: ignore
+                msg = response.choices[0].message
+                if self.provider == "gemini" and isinstance(
+                    getattr(msg, "content", None), str
+                ):
+                    cleaned = browser_use_monkeypatch.gemini_clean_and_conform(msg.content)  # type: ignore
                     if cleaned:
                         msg.content = cleaned
             except Exception:
@@ -122,7 +134,7 @@ class BrowserCompatibleChatWrapper(ChatOpenRouter):
         try:
             rf = kwrgs.get("response_format") or {}
             if "json_schema" in rf or "json_object" in rf:
-                msg_obj = resp.choices[0].message
+                msg_obj = response.choices[0].message
                 raw_content = getattr(msg_obj, "content", None)
                 fixed = browser_use_output_sanitize.sanitize_llm_message_content_for_browser_use(raw_content)  # type: ignore[arg-type]
                 if fixed is not None:
@@ -148,6 +160,7 @@ def build_browser_model_from_config(
         model_config,
         **kwargs,
     )
+
 
 def build_browser_model_for_agent(agent=None) -> BrowserCompatibleChatWrapper:
     """Build and return the browser-use adapter using chat model config."""

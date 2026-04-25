@@ -1,4 +1,5 @@
 """Connector WebSocket handler for the shared `/ws` namespace."""
+
 from __future__ import annotations
 
 import asyncio
@@ -25,7 +26,7 @@ from plugins._a0_connector.helpers.ws_runtime import (
 )
 
 if TYPE_CHECKING:
-    from agent import AgentContext, AgentContextType, UserMessage
+    from agent import AgentContext
 
 
 PROTOCOL_VERSION = "a0-connector.v1"
@@ -186,7 +187,7 @@ class WsConnector(WsHandler):
                 code="MISSING_MESSAGE",
                 message="message is required",
                 correlation_id=data.get("correlationId"),
-        )
+            )
 
         context_id = str(data.get("context_id", "")).strip() or None
         current_context_id = (
@@ -194,7 +195,11 @@ class WsConnector(WsHandler):
             or None
         )
         client_message_id = str(data.get("client_message_id", "")).strip()
-        attachments = list(data.get("attachments", [])) if isinstance(data.get("attachments"), list) else []
+        attachments = (
+            list(data.get("attachments", []))
+            if isinstance(data.get("attachments"), list)
+            else []
+        )
         project_name = str(data.get("project_name", "")).strip() or None
         agent_profile = str(data.get("agent_profile", "")).strip() or None
 
@@ -448,7 +453,9 @@ class WsConnector(WsHandler):
                     f"[a0-connector] failed to emit connector_context_complete to {target_sid}: {exc}"
                 )
 
-    def _start_streaming(self, sid: str, context_id: str, *, from_sequence: int) -> None:
+    def _start_streaming(
+        self, sid: str, context_id: str, *, from_sequence: int
+    ) -> None:
         key = (sid, context_id)
         task = self._streaming_tasks.get(key)
         if task is not None and not task.done():

@@ -7,10 +7,12 @@ ModelType = Literal["chat", "embedding"]
 PROVIDER_MANAGER_CACHE_AREA = "model_providers(plugins)"
 PROVIDER_MANAGER_CACHE_KEY = "manager"
 
+
 # Type alias for UI option items
 class FieldOption(TypedDict):
     value: str
     label: str
+
 
 class ProviderManager:
     _raw: Optional[Dict[str, List[Dict[str, str]]]] = None  # full provider data
@@ -53,10 +55,12 @@ class ProviderManager:
                 for pid, cfg in providers.items():
                     entries[pid] = cfg or {}
             elif isinstance(providers, list):
-                for p in (providers or []):
+                for p in providers or []:
                     pid = (p.get("id") or p.get("value") or "").lower()
                     if pid:
-                        entries[pid] = {k: v for k, v in p.items() if k not in ("id", "value")}
+                        entries[pid] = {
+                            k: v for k, v in p.items() if k not in ("id", "value")
+                        }
             result[p_type] = entries
         return result
 
@@ -68,6 +72,7 @@ class ProviderManager:
 
         # Merge plugin provider configs (enabled plugins only)
         from helpers.plugins import get_enabled_plugin_paths
+
         plugin_yamls = get_enabled_plugin_paths(None, "conf", "model_providers.yaml")
         for plugin_yaml_path in plugin_yamls:
             plugin_data = self._normalise_yaml(self._load_yaml(plugin_yaml_path))
@@ -85,10 +90,12 @@ class ProviderManager:
             for pid, cfg in providers.items():
                 entry = {"id": pid, **cfg}
                 items.append(entry)
-            items.sort(key=lambda p: (
-                p.get("id") == "other",  # False (0) first, True (1) last
-                (p.get("name") or p.get("id") or "").lower(),
-            ))
+            items.sort(
+                key=lambda p: (
+                    p.get("id") == "other",  # False (0) first, True (1) last
+                    (p.get("name") or p.get("id") or "").lower(),
+                )
+            )
             normalised[p_type] = items
 
         # Save raw
@@ -113,7 +120,9 @@ class ProviderManager:
         """Return raw provider dictionaries for advanced use-cases."""
         return self._raw.get(provider_type, []) if self._raw else []
 
-    def get_provider_config(self, provider_type: ModelType, provider_id: str) -> Optional[Dict[str, str]]:
+    def get_provider_config(
+        self, provider_type: ModelType, provider_id: str
+    ) -> Optional[Dict[str, str]]:
         """Return the metadata dict for a single provider id (case-insensitive)."""
         provider_id_low = provider_id.lower()
         for p in self.get_raw_providers(provider_type):
@@ -132,9 +141,13 @@ def get_raw_providers(provider_type: ModelType) -> List[Dict[str, str]]:
     return ProviderManager.get_instance().get_raw_providers(provider_type)
 
 
-def get_provider_config(provider_type: ModelType, provider_id: str) -> Optional[Dict[str, str]]:
+def get_provider_config(
+    provider_type: ModelType, provider_id: str
+) -> Optional[Dict[str, str]]:
     """Return metadata for a single provider (None if not found)."""
-    return ProviderManager.get_instance().get_provider_config(provider_type, provider_id)
+    return ProviderManager.get_instance().get_provider_config(
+        provider_type, provider_id
+    )
 
 
 def reload_providers():

@@ -7,7 +7,9 @@ from helpers import self_update
 class SelfUpdateTags(ApiHandler):
     async def process(self, input: dict, request: Request) -> dict | Response:
         branch = str(input.get("branch", "")).strip().lower()
-        current_branch = self_update.get_repo_version_info().get("branch", "").strip().lower()
+        current_branch = (
+            self_update.get_repo_version_info().get("branch", "").strip().lower()
+        )
         available_branch_values = self_update.get_available_branch_values()
         if current_branch in available_branch_values:
             default_branch = current_branch
@@ -20,8 +22,10 @@ class SelfUpdateTags(ApiHandler):
         resolved_branch = branch or default_branch
 
         try:
-            tag_options, higher_major_versions, error = self_update.get_selector_tag_options(
-                resolved_branch,
+            tag_options, higher_major_versions, error = (
+                self_update.get_selector_tag_options(
+                    resolved_branch,
+                )
             )
             return {
                 "success": True,

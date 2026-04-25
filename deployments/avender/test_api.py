@@ -1,1 +1,0 @@
-import os, django; os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings'); django.setup(); from django.test import Client; from django.contrib.auth.models import User; c = Client(); u = User.objects.get(username='admin'); c.force_login(u); print(c.get('/api/saas/plans').content)

@@ -3,13 +3,19 @@
 from helpers.extension import Extension
 from helpers.print_style import PrintStyle
 from helpers.tool import Response
-from plugins._email_integration.helpers.dispatcher import CTX_EMAIL_HANDLER, CTX_EMAIL_ATTACHMENTS
+from plugins._email_integration.helpers.dispatcher import (
+    CTX_EMAIL_HANDLER,
+    CTX_EMAIL_ATTACHMENTS,
+)
 
 
 class EmailResponseIntercept(Extension):
 
     async def execute(
-        self, tool_name: str = "", response: Response | None = None, **kwargs,
+        self,
+        tool_name: str = "",
+        response: Response | None = None,
+        **kwargs,
     ):
         if tool_name != "response":
             return
@@ -34,7 +40,10 @@ class EmailResponseIntercept(Extension):
             await self._send_inline(context, tool, response)
 
     async def _send_inline(
-        self, context, tool, response: Response,
+        self,
+        context,
+        tool,
+        response: Response,
     ):
         from plugins._email_integration.helpers.handler import send_email_reply
 
@@ -45,7 +54,9 @@ class EmailResponseIntercept(Extension):
         attachments = context.data.pop(CTX_EMAIL_ATTACHMENTS, [])
 
         if attachments:
-            PrintStyle.info(f"Email: sending update with {len(attachments)} attachment(s)")
+            PrintStyle.info(
+                f"Email: sending update with {len(attachments)} attachment(s)"
+            )
 
         error = await send_email_reply(context, text, attachments or None)
 

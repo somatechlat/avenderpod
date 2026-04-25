@@ -19,7 +19,9 @@ def load_self_update_manager():
     manager_path = (
         PROJECT_ROOT / "docker" / "run" / "fs" / "exe" / "self_update_manager.py"
     )
-    spec = importlib.util.spec_from_file_location("test_self_update_manager", manager_path)
+    spec = importlib.util.spec_from_file_location(
+        "test_self_update_manager", manager_path
+    )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -126,7 +128,9 @@ def test_self_update_available_branch_values_fallback_to_local_origin(monkeypatc
     assert branches == ["main", "ready", "testing"]
 
 
-def test_self_update_uses_durable_manager_capability_when_present(monkeypatch, tmp_path):
+def test_self_update_uses_durable_manager_capability_when_present(
+    monkeypatch, tmp_path
+):
     durable_manager = tmp_path / "self_update_manager.py"
     repo_manager = tmp_path / "repo-self_update_manager.py"
     durable_manager.write_text("# old manager without latest\n", encoding="utf-8")
@@ -151,7 +155,9 @@ def test_self_update_uses_durable_manager_capability_when_present(monkeypatch, t
     assert self_update.durable_self_update_supports_latest() is False
 
 
-def test_self_update_falls_back_to_repo_manager_capability_when_durable_missing(monkeypatch, tmp_path):
+def test_self_update_falls_back_to_repo_manager_capability_when_durable_missing(
+    monkeypatch, tmp_path
+):
     missing_durable = tmp_path / "missing-self_update_manager.py"
     repo_manager = tmp_path / "repo-self_update_manager.py"
     repo_manager.write_text(
@@ -213,7 +219,9 @@ def test_self_update_selector_tag_options_filter_to_current_major(monkeypatch):
     assert higher_major_versions == [2, 3]
 
 
-def test_self_update_selector_tag_options_keep_main_latest_within_current_major(monkeypatch):
+def test_self_update_selector_tag_options_keep_main_latest_within_current_major(
+    monkeypatch,
+):
     monkeypatch.setattr(
         self_update,
         "get_available_tags",
@@ -251,7 +259,9 @@ def test_self_update_selector_tag_options_keep_main_latest_within_current_major(
     assert higher_major_versions == [2]
 
 
-def test_self_update_selector_tag_options_hide_latest_when_durable_updater_lacks_support(monkeypatch):
+def test_self_update_selector_tag_options_hide_latest_when_durable_updater_lacks_support(
+    monkeypatch,
+):
     monkeypatch.setattr(
         self_update,
         "get_available_tags",
@@ -378,7 +388,9 @@ def test_self_update_update_info_uses_current_branch_for_latest_version(monkeypa
     assert info["major_upgrade_versions"] == [2]
 
 
-def test_self_update_main_branch_latest_stays_within_current_major(monkeypatch, tmp_path):
+def test_self_update_main_branch_latest_stays_within_current_major(
+    monkeypatch, tmp_path
+):
     monkeypatch.setattr(
         self_update,
         "get_available_branch_values",
@@ -473,7 +485,10 @@ def test_self_update_frontend_uses_preloaded_select():
     )
     content = store_path.read_text(encoding="utf-8")
 
-    assert 'const SELF_UPDATE_MANUAL_BACKUP_MODAL_PATH = "settings/backup/backup_restore.html";' in content
+    assert (
+        'const SELF_UPDATE_MANUAL_BACKUP_MODAL_PATH = "settings/backup/backup_restore.html";'
+        in content
+    )
     assert "const MIN_SELECTOR_VERSION = [1, 0];" in content
     assert "availableTagOptions: []" in content
     assert "higherMajorVersions: []" in content
@@ -490,7 +505,7 @@ def test_self_update_frontend_uses_preloaded_select():
     assert "response.tag_options" in content
     assert "response.higher_major_versions" in content
     assert "response.pending || {" in content
-    assert "tag: \"\"," in content
+    assert 'tag: "",' in content
     assert "await this.fetchTags();" in content
     assert '"Preparing update"' in content
     assert '"Saving the request and asking Agent Zero to restart."' in content
@@ -522,7 +537,7 @@ def test_self_update_frontend_uses_preloaded_select():
     assert "this.info?.defaults?.branch ||" in content
     assert "Version ${this.trimmedTag} does not exist on branch" in content
     assert "this.selectedTagExistsOnBranch" in content
-    assert "this.form.tag = \"\";" in content
+    assert 'this.form.tag = "";' in content
     assert "this.availableTags[0]" not in content
     assert 'const response = await fetch("/api/health"' in content
     assert "if (response.ok && observedBackendUnavailable)" in content
@@ -564,7 +579,10 @@ def test_self_update_modal_uses_standard_select_and_manual_backup():
     assert "Website installation guide" in content
     assert "self-update-header-status" in content
     assert ".status-pill.self-update-quick-status" in content
-    assert "getLastStatusLabel($store.selfUpdateStore.info?.last_status?.status)" in content
+    assert (
+        "getLastStatusLabel($store.selfUpdateStore.info?.last_status?.status)"
+        in content
+    )
     assert "Current version vs latest on main" not in content
     assert "quickComparisonIcon" in content
     assert "quickComparisonIconClass" in content
@@ -572,7 +590,10 @@ def test_self_update_modal_uses_standard_select_and_manual_backup():
     assert "{ 'btn-field': !$store.selfUpdateStore.quickUpdateAvailable }" in content
     assert "{ 'btn-field': !$store.selfUpdateStore.canScheduleUpdate }" in content
     assert "formatReleaseTimestamp($store.selfUpdateStore.currentReleasedAt)" in content
-    assert "formatReleaseTimestamp($store.selfUpdateStore.mainBranchLatestReleasedAt)" in content
+    assert (
+        "formatReleaseTimestamp($store.selfUpdateStore.mainBranchLatestReleasedAt)"
+        in content
+    )
     assert "Latest version" in content
     assert "Docker update guide" in content
     assert "https://www.agent-zero.ai/p/docs/get-started/" in content
@@ -581,9 +602,14 @@ def test_self_update_modal_uses_standard_select_and_manual_backup():
     assert "Docker image." in content
     assert "minor release line" in content
     assert "Agent Zero self-update inside the existing image." in content
-    assert "On development branches you may also see versions like <code>v1.5+2</code>" in content
+    assert (
+        "On development branches you may also see versions like <code>v1.5+2</code>"
+        in content
+    )
     assert "This suffix is not used on" in content
-    assert "Only versions from the current major release line are listed here." in content
+    assert (
+        "Only versions from the current major release line are listed here." in content
+    )
     assert "Manual backup" in content
     assert ">Refresh Status<" not in content
     assert "Refresh" in content
@@ -593,7 +619,9 @@ def test_self_update_modal_uses_standard_select_and_manual_backup():
     assert "selectTag(tag)" not in content
 
 
-def test_self_update_repo_version_info_includes_display_version_for_non_main(monkeypatch, tmp_path):
+def test_self_update_repo_version_info_includes_display_version_for_non_main(
+    monkeypatch, tmp_path
+):
     monkeypatch.setattr(
         self_update,
         "_run_git",
@@ -612,7 +640,9 @@ def test_self_update_repo_version_info_includes_display_version_for_non_main(mon
 
 
 def test_self_update_recovery_script_and_docs_are_present():
-    script_path = PROJECT_ROOT / "docker" / "run" / "fs" / "exe" / "trigger_self_update.sh"
+    script_path = (
+        PROJECT_ROOT / "docker" / "run" / "fs" / "exe" / "trigger_self_update.sh"
+    )
     script_content = script_path.read_text(encoding="utf-8")
     docs_path = PROJECT_ROOT / "docs" / "guides" / "troubleshooting.md"
     docs_content = docs_path.read_text(encoding="utf-8")
@@ -661,7 +691,9 @@ def test_self_update_schedule_rejects_missing_tag_on_branch(monkeypatch, tmp_pat
     )
     monkeypatch.setattr(self_update, "_write_yaml", lambda path, payload: None)
 
-    with pytest.raises(ValueError, match=r"Version v1\.1 does not exist on branch development\."):
+    with pytest.raises(
+        ValueError, match=r"Version v1\.1 does not exist on branch development\."
+    ):
         self_update.schedule_update(
             branch="development",
             tag="v1.1",
@@ -673,7 +705,9 @@ def test_self_update_schedule_rejects_missing_tag_on_branch(monkeypatch, tmp_pat
         )
 
 
-def test_self_update_schedule_accepts_latest_when_selector_exposes_it(monkeypatch, tmp_path):
+def test_self_update_schedule_accepts_latest_when_selector_exposes_it(
+    monkeypatch, tmp_path
+):
     monkeypatch.setattr(
         self_update,
         "get_repo_version_info",
@@ -766,7 +800,11 @@ def test_self_update_manager_latest_on_main_uses_current_major_release(monkeypat
         manager,
         "git_output",
         lambda repo_dir, *args: {
-            ("tag", "--merged", "refs/remotes/a0-self-update/main"): "v2.0\nv1.4\nv1.2\n",
+            (
+                "tag",
+                "--merged",
+                "refs/remotes/a0-self-update/main",
+            ): "v2.0\nv1.4\nv1.2\n",
             ("rev-parse", "refs/tags/v1.4^{commit}"): "deadbeef1234",
         }[args],
     )
@@ -786,12 +824,17 @@ def test_self_update_manager_latest_on_main_uses_current_major_release(monkeypat
 
 def test_self_update_manager_explicit_tag_uses_peeled_commit(monkeypatch):
     manager = load_self_update_manager()
-    monkeypatch.setattr(manager, "fetch_release_refs", lambda repo_dir, branch, tag, logger: None)
+    monkeypatch.setattr(
+        manager, "fetch_release_refs", lambda repo_dir, branch, tag, logger: None
+    )
     monkeypatch.setattr(
         manager,
         "git_output",
         lambda repo_dir, *args: {
-            ("rev-parse", "refs/tags/v1.10^{commit}"): "192d6e2cae1a85c0a2e7a6ecf41c153b39f1b4c6",
+            (
+                "rev-parse",
+                "refs/tags/v1.10^{commit}",
+            ): "192d6e2cae1a85c0a2e7a6ecf41c153b39f1b4c6",
         }[args],
     )
 
@@ -878,12 +921,19 @@ def test_self_update_manager_latest_on_non_main_rejects_cross_major(monkeypatch)
         manager,
         "git_output",
         lambda repo_dir, *args: {
-            ("describe", "--tags", "--always", "refs/remotes/a0-self-update/development"): "v2.0-3-gabc1234",
+            (
+                "describe",
+                "--tags",
+                "--always",
+                "refs/remotes/a0-self-update/development",
+            ): "v2.0-3-gabc1234",
             ("rev-parse", "refs/remotes/a0-self-update/development"): "abc123456789",
         }[args],
     )
 
-    with pytest.raises(RuntimeError, match=r"Use an explicit tag to change major versions"):
+    with pytest.raises(
+        RuntimeError, match=r"Use an explicit tag to change major versions"
+    ):
         manager.resolve_requested_target(
             Path("/tmp/repo"),
             "development",
@@ -893,7 +943,9 @@ def test_self_update_manager_latest_on_non_main_rejects_cross_major(monkeypatch)
         )
 
 
-def test_self_update_schedule_rejects_latest_when_durable_updater_lacks_support(monkeypatch, tmp_path):
+def test_self_update_schedule_rejects_latest_when_durable_updater_lacks_support(
+    monkeypatch, tmp_path
+):
     monkeypatch.setattr(
         self_update,
         "get_repo_version_info",

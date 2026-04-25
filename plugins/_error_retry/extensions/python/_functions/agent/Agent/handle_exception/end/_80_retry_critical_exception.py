@@ -1,14 +1,14 @@
 import asyncio
-from datetime import datetime, timezone
 import litellm
 from helpers.extension import Extension
-from agent import LoopData
-from helpers.localization import Localization
 from helpers.errors import RepairableException, HandledException
 from helpers import errors, plugins
 from helpers.print_style import PrintStyle
 
-from plugins._error_retry.extensions.python._functions.agent.Agent.monologue.start._10_reset_critical_exception_counter import DATA_NAME_COUNTER
+from plugins._error_retry.extensions.python._functions.agent.Agent.monologue.start._10_reset_critical_exception_counter import (
+    DATA_NAME_COUNTER,
+)
+
 
 class RetryCriticalException(Extension):
     async def execute(self, data: dict = {}, **kwargs):
@@ -17,11 +17,15 @@ class RetryCriticalException(Extension):
 
         exception = data.get("exception")
         if not exception:
-            self.agent.set_data(DATA_NAME_COUNTER, 0) # reset counter if exception has been handled
+            self.agent.set_data(
+                DATA_NAME_COUNTER, 0
+            )  # reset counter if exception has been handled
             return
 
         if isinstance(exception, (HandledException, RepairableException)):
-            self.agent.set_data(DATA_NAME_COUNTER, 0) # reset counter if exception has been handled
+            self.agent.set_data(
+                DATA_NAME_COUNTER, 0
+            )  # reset counter if exception has been handled
             return
 
         max_retries = 1
@@ -36,6 +40,7 @@ class RetryCriticalException(Extension):
 
         error_message = errors.format_error(exception)
         import uuid as _uuid
+
         msg_id = str(_uuid.uuid4())
         self.agent.context.log.log(
             type="warning",
@@ -56,7 +61,6 @@ class RetryCriticalException(Extension):
 
         data["exception"] = None
 
-
     def when_critical(self, data: dict = {}):
         if not self.agent:
             return
@@ -65,7 +69,7 @@ class RetryCriticalException(Extension):
 
     def try_clear_embeds(self, data: dict = {}):
         """Try to clear embeds before failing on LiteLLM errors"""
-        
+
         if not self.agent:
             return
 

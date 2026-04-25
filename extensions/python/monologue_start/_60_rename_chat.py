@@ -15,12 +15,13 @@ class RenameChat(Extension):
 
         try:
             # prepare history
-            from plugins._model_config.helpers.model_config import get_utility_model_config
+            from plugins._model_config.helpers.model_config import (
+                get_utility_model_config,
+            )
+
             util_cfg = get_utility_model_config(self.agent)
             history_text = self.agent.history.output_text()
-            ctx_length = min(
-                int(util_cfg.get("ctx_length", 128000) * 0.7), 5000
-            )
+            ctx_length = min(int(util_cfg.get("ctx_length", 128000) * 0.7), 5000)
             history_text = tokens.trim_to_tokens(history_text, ctx_length, "start")
             # prepare system and user prompt
             system = self.agent.read_prompt("fw.rename_chat.sys.md")
@@ -40,5 +41,5 @@ class RenameChat(Extension):
                 # apply to context and save
                 self.agent.context.name = new_name
                 persist_chat.save_tmp_chat(self.agent.context)
-        except Exception as e:
+        except Exception:
             pass  # non-critical

@@ -21,9 +21,7 @@ class DocumentQueryTool(Tool):
         queries = (
             kwargs["queries"]
             if "queries" in kwargs
-            else [kwargs["query"]]
-            if ("query" in kwargs and kwargs["query"])
-            else []
+            else [kwargs["query"]] if ("query" in kwargs and kwargs["query"]) else []
         )
         try:
 
@@ -33,7 +31,7 @@ class DocumentQueryTool(Tool):
             def progress_callback(msg):
                 progress.append(msg)
                 self.log.update(progress="\n".join(progress))
-            
+
             helper = DocumentQueryHelper(self.agent, progress_callback)
             if not queries:
                 contents = await asyncio.gather(

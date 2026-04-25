@@ -1,5 +1,5 @@
 import os
-from typing import Literal, TypedDict, TYPE_CHECKING, cast
+from typing import TypedDict, TYPE_CHECKING, cast
 
 from helpers import files, dirty_json, persist_chat, file_tree
 from helpers.print_style import PrintStyle
@@ -25,8 +25,10 @@ class FileStructureInjectionSettings(TypedDict):
     max_lines: int
     gitignore: str
 
+
 class SubAgentSettings(TypedDict):
     enabled: bool
+
 
 class BasicProjectData(TypedDict):
     title: str
@@ -35,6 +37,7 @@ class BasicProjectData(TypedDict):
     color: str
     git_url: str
     file_structure: FileStructureInjectionSettings
+
 
 class GitStatusData(TypedDict, total=False):
     is_git_repo: bool
@@ -45,6 +48,7 @@ class GitStatusData(TypedDict, total=False):
     last_commit: dict
     error: str
 
+
 class EditProjectData(BasicProjectData):
     name: str
     instruction_files_count: int
@@ -53,7 +57,6 @@ class EditProjectData(BasicProjectData):
     secrets: str
     subagents: dict[str, SubAgentSettings]
     git_status: GitStatusData
-
 
 
 def get_projects_parent_folder():
@@ -76,7 +79,7 @@ def delete_project(name: str):
 
 
 def create_project(name: str, data: BasicProjectData):
-    abs_path = files.create_dir_safe(
+    files.create_dir_safe(
         files.get_abs_path(PROJECTS_PARENT_DIR, name), rename_format="{name}_{number}"
     )
     create_project_meta_folders(name)
@@ -88,22 +91,22 @@ def create_project(name: str, data: BasicProjectData):
 def clone_git_project(name: str, git_url: str, git_token: str, data: BasicProjectData):
     """Clone a git repository as a new A0 project. Token is used only for cloning via http header."""
     from helpers import git
-    
+
     abs_path = files.create_dir_safe(
         files.get_abs_path(PROJECTS_PARENT_DIR, name), rename_format="{name}_{number}"
     )
     actual_name = files.basename(abs_path)
-    
+
     try:
         # Clone with token via http.extraHeader (token never in URL or git config)
         git.clone_repo(git_url, abs_path, token=git_token)
         clean_url = git.strip_auth_from_url(git_url)
-        
+
         # Check if cloned repo already has .a0proj
         meta_path = os.path.join(abs_path, PROJECT_META_DIR, PROJECT_HEADER_FILE)
         if os.path.exists(meta_path):
             # Merge: keep cloned content, override only user-specified fields
-            cloned_header: BasicProjectData = dirty_json.parse(files.read_file(meta_path)) # type: ignore
+            cloned_header: BasicProjectData = dirty_json.parse(files.read_file(meta_path))  # type: ignore
             cloned_header["title"] = data.get("title") or cloned_header.get("title", "")
             cloned_header["color"] = data.get("color") or cloned_header.get("color", "")
             cloned_header["git_url"] = clean_url
@@ -114,7 +117,7 @@ def clone_git_project(name: str, git_url: str, git_token: str, data: BasicProjec
             data = _normalizeBasicData(data)
             data["git_url"] = clean_url
             save_project_header(actual_name, data)
-        
+
         return actual_name
     except Exception as e:
         try:
@@ -232,7 +235,7 @@ def load_basic_project_data(name: str) -> BasicProjectData:
 
 def load_edit_project_data(name: str) -> EditProjectData:
     from helpers import git
-    
+
     data = load_basic_project_data(name)
     additional_instructions = get_additional_instructions_files(name)
     variables = load_project_variables(name)
@@ -240,7 +243,7 @@ def load_edit_project_data(name: str) -> EditProjectData:
     subagents = load_project_subagents(name)
     knowledge_files_count = get_knowledge_files_count(name)
     git_status = cast(GitStatusData, git.get_repo_status(get_project_folder(name)))
-    
+
     data = cast(
         EditProjectData,
         {
@@ -317,6 +320,7 @@ def activate_project(context_id: str, name: str, *, mark_dirty: bool = True):
 
     if mark_dirty:
         from helpers.state_monitor_integration import mark_dirty_all
+
         mark_dirty_all(reason="projects.activate_project")
 
 
@@ -334,6 +338,7 @@ def deactivate_project(context_id: str, *, mark_dirty: bool = True):
 
     if mark_dirty:
         from helpers.state_monitor_integration import mark_dirty_all
+
         mark_dirty_all(reason="projects.deactivate_project")
 
 
@@ -346,6 +351,7 @@ def reactivate_project_in_chats(name: str):
         persist_chat.save_tmp_chat(context)
 
     from helpers.state_monitor_integration import mark_dirty_all
+
     mark_dirty_all(reason="projects.reactivate_project_in_chats")
 
 
@@ -358,6 +364,7 @@ def deactivate_project_in_chats(name: str):
         persist_chat.save_tmp_chat(context)
 
     from helpers.state_monitor_integration import mark_dirty_all
+
     mark_dirty_all(reason="projects.deactivate_project_in_chats")
 
 
@@ -467,25 +474,26 @@ def create_project_meta_folders(name: str):
 
 
 def get_knowledge_files_count(name: str):
-    knowledge_folder = files.get_abs_path(
-        get_project_meta(name, PROJECT_KNOWLEDGE_DIR)
-    )
+    knowledge_folder = files.get_abs_path(get_project_meta(name, PROJECT_KNOWLEDGE_DIR))
     return len(files.list_files_in_dir_recursively(knowledge_folder))
 
-def get_file_structure(name: str, basic_data: BasicProjectData|None=None) -> str:
+
+def get_file_structure(name: str, basic_data: BasicProjectData | None = None) -> str:
     project_folder = get_project_folder(name)
     if basic_data is None:
         basic_data = load_basic_project_data(name)
 
-    tree = str(file_tree.file_tree(
-        project_folder,
-        max_depth=basic_data["file_structure"]["max_depth"],
-        max_files=basic_data["file_structure"]["max_files"],
-        max_folders=basic_data["file_structure"]["max_folders"],
-        max_lines=basic_data["file_structure"]["max_lines"],
-        ignore=basic_data["file_structure"]["gitignore"],
-        output_mode=file_tree.OUTPUT_MODE_STRING
-    ))
+    tree = str(
+        file_tree.file_tree(
+            project_folder,
+            max_depth=basic_data["file_structure"]["max_depth"],
+            max_files=basic_data["file_structure"]["max_files"],
+            max_folders=basic_data["file_structure"]["max_folders"],
+            max_lines=basic_data["file_structure"]["max_lines"],
+            ignore=basic_data["file_structure"]["gitignore"],
+            output_mode=file_tree.OUTPUT_MODE_STRING,
+        )
+    )
 
     # empty?
     if "\n" not in tree:

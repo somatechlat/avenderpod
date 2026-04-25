@@ -6,6 +6,7 @@ from helpers import runtime
 from helpers import file_tree
 from helpers import files
 
+
 class IncludeWorkdirExtras(Extension):
     async def execute(self, loop_data: LoopData = LoopData(), **kwargs):
         if not self.agent:
@@ -25,10 +26,10 @@ class IncludeWorkdirExtras(Extension):
         if project_name:
             project = projects.load_basic_project_data(project_name)
             enabled = project["file_structure"]["enabled"]
-            
+
             if not enabled:
                 return
-            
+
             max_depth = project["file_structure"]["max_depth"]
             gitignore_raw = project["file_structure"]["gitignore"]
 
@@ -43,7 +44,7 @@ class IncludeWorkdirExtras(Extension):
 
             if not enabled:
                 return
-            
+
             max_depth = set["workdir_max_depth"]
             max_files = set["workdir_max_files"]
             max_folders = set["workdir_max_folders"]
@@ -83,14 +84,14 @@ class IncludeWorkdirExtras(Extension):
 def cleanup_gitignore(gitignore_raw: str) -> str:
     """Process gitignore: split lines, strip, remove comments, remove empty lines."""
     gitignore_lines = []
-    for line in gitignore_raw.split('\n'):
+    for line in gitignore_raw.split("\n"):
         # Strip whitespace
         line = line.strip()
         # Remove inline comments (everything after #)
-        if '#' in line:
-            line = line.split('#')[0].strip()
+        if "#" in line:
+            line = line.split("#")[0].strip()
         # Keep only non-empty lines
         if line:
             gitignore_lines.append(line)
-    
-    return '\n'.join(gitignore_lines) if gitignore_lines else "nothing ignored"
+
+    return "\n".join(gitignore_lines) if gitignore_lines else "nothing ignored"

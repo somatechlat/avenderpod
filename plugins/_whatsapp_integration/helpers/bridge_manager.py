@@ -41,6 +41,7 @@ DEPENDENCY_FAILURE_MARKERS = (
 # Process wrapper with destructor
 # ------------------------------------------------------------------
 
+
 class _BridgeProcess:
     """Thin wrapper around Popen — kills the process on garbage collection."""
 
@@ -48,6 +49,7 @@ class _BridgeProcess:
         self._process = process
         self._port = port
         self._recent_output: deque[str] = deque(maxlen=MAX_STARTUP_LOG_LINES)
+        self._pairing_notice_sent = False
 
     def poll(self) -> int | None:
         return self._process.poll()
@@ -66,6 +68,12 @@ class _BridgeProcess:
 
     def recent_output(self) -> str:
         return "\n".join(self._recent_output)
+
+    def should_send_pairing_notice(self) -> bool:
+        if self._pairing_notice_sent:
+            return False
+        self._pairing_notice_sent = True
+        return True
 
     @property
     def stdout(self):
@@ -95,7 +103,9 @@ BRIDGE_PACKAGE_LOCK = os.path.join(BRIDGE_DIR, "package-lock.json")
 
 
 def _runtime_scope_component() -> str:
-    raw = os.environ.get("WHATSAPP_NUMBER_ID") or os.environ.get("TENANT_ID") or "default"
+    raw = (
+        os.environ.get("WHATSAPP_NUMBER_ID") or os.environ.get("TENANT_ID") or "default"
+    )
     value = str(raw).strip() or "default"
     return re.sub(r"[^a-zA-Z0-9_.-]", "_", value)[:80]
 
@@ -111,6 +121,7 @@ NODE_MODULES_DIR = os.path.join(BRIDGE_DIR, "node_modules")
 # ------------------------------------------------------------------
 # Public API
 # ------------------------------------------------------------------
+
 
 async def start_bridge(
     port: int,
@@ -174,6 +185,7 @@ def get_running_config() -> dict:
 # Internal
 # ------------------------------------------------------------------
 
+
 def _get_bridge_lock() -> asyncio.Lock:
     global _bridge_lock, _bridge_lock_loop
     loop = asyncio.get_running_loop()
@@ -200,7 +212,9 @@ async def _ensure_bridge_started(
         if await _check_http_up(port):
             return True
 
-        PrintStyle.warning("WhatsApp: bridge is running but HTTP is not responding, restarting")
+        PrintStyle.warning(
+            "WhatsApp: bridge is running but HTTP is not responding, restarting"
+        )
         _stop_bridge_process()
 
     await _ensure_bridge_dependencies()
@@ -244,24 +258,34 @@ async def _start_bridge_once(
     global _bridge_process
 
     cmd = [
-        "node", BRIDGE_SCRIPT,
-        "--port", str(port),
-        "--session", session_dir,
-        "--cache-dir", cache_dir,
-        "--mode", mode,
+        "node",
+        BRIDGE_SCRIPT,
+        "--port",
+        str(port),
+        "--session",
+        session_dir,
+        "--cache-dir",
+        cache_dir,
+        "--mode",
+        mode,
     ]
 
     _kill_port_process(port)
     PrintStyle.info(start_label)
-    _bridge_process = _BridgeProcess(subprocess.Popen(
-        cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        cwd=BRIDGE_DIR,
-    ), port)
+    _bridge_process = _BridgeProcess(
+        subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            cwd=BRIDGE_DIR,
+        ),
+        port,
+    )
     _start_log_reader(_bridge_process)
     _bridge_config.clear()
-    _bridge_config.update({"port": port, "mode": mode})
+    _bridge_config.update(
+        {"port": port, "session_dir": session_dir, "cache_dir": cache_dir, "mode": mode}
+    )
 
     healthy, output = await _wait_for_bridge_startup(
         port=port,
@@ -275,7 +299,9 @@ async def _start_bridge_once(
     return False, output
 
 
-async def _wait_for_bridge_startup(*, port: int, require_connection: bool) -> tuple[bool, str]:
+async def _wait_for_bridge_startup(
+    *, port: int, require_connection: bool
+) -> tuple[bool, str]:
     for _ in range(STARTUP_WAIT_ATTEMPTS):
         await asyncio.sleep(STARTUP_WAIT_SECONDS)
 
@@ -312,6 +338,7 @@ def _looks_like_dependency_failure(output: str) -> bool:
 async def _check_health(port: int) -> bool:
     try:
         from plugins._whatsapp_integration.helpers.wa_client import get_health
+
         health = await get_health(get_bridge_url(port))
         return health.get("status") == "connected"
     except Exception:
@@ -321,6 +348,7 @@ async def _check_health(port: int) -> bool:
 async def _check_http_up(port: int) -> bool:
     try:
         from plugins._whatsapp_integration.helpers.wa_client import get_health
+
         await get_health(get_bridge_url(port))
         return True
     except Exception:
@@ -342,7 +370,9 @@ async def _ensure_bridge_dependencies(force_reinstall: bool = False) -> None:
     await _reinstall_bridge_dependencies()
 
     if not await _validate_bridge_dependencies():
-        raise RuntimeError("WhatsApp: bridge dependencies failed validation after reinstall")
+        raise RuntimeError(
+            "WhatsApp: bridge dependencies failed validation after reinstall"
+        )
 
     _write_dependency_state(await _build_dependency_state())
 
@@ -350,11 +380,19 @@ async def _ensure_bridge_dependencies(force_reinstall: bool = False) -> None:
 async def _build_dependency_state() -> dict[str, Any]:
     return {
         "package_json_hash": _sha256_file(BRIDGE_PACKAGE_JSON),
-        "package_lock_hash": _sha256_file(BRIDGE_PACKAGE_LOCK) if os.path.isfile(BRIDGE_PACKAGE_LOCK) else "",
+        "package_lock_hash": (
+            _sha256_file(BRIDGE_PACKAGE_LOCK)
+            if os.path.isfile(BRIDGE_PACKAGE_LOCK)
+            else ""
+        ),
         "platform": platform.system(),
         "arch": platform.machine(),
-        "node_version": (await _run_subprocess(["node", "--version"], cwd=BRIDGE_DIR)).strip(),
-        "npm_version": (await _run_subprocess(["npm", "--version"], cwd=BRIDGE_DIR)).strip(),
+        "node_version": (
+            await _run_subprocess(["node", "--version"], cwd=BRIDGE_DIR)
+        ).strip(),
+        "npm_version": (
+            await _run_subprocess(["npm", "--version"], cwd=BRIDGE_DIR)
+        ).strip(),
     }
 
 
@@ -384,7 +422,9 @@ async def _reinstall_bridge_dependencies() -> None:
     _ensure_runtime_dir()
 
     if os.path.isdir(NODE_MODULES_DIR):
-        PrintStyle.warning("WhatsApp: bridge dependencies missing, outdated, or corrupt; reinstalling")
+        PrintStyle.warning(
+            "WhatsApp: bridge dependencies missing, outdated, or corrupt; reinstalling"
+        )
         shutil.rmtree(NODE_MODULES_DIR, ignore_errors=True)
     else:
         PrintStyle.info("WhatsApp: installing bridge dependencies")
@@ -468,7 +508,9 @@ async def _run_subprocess(
     stdout, _ = await proc.communicate()
     output = stdout.decode("utf-8", errors="replace").strip()
     if proc.returncode != 0:
-        raise RuntimeError(output or f"{' '.join(command)} exited with code {proc.returncode}")
+        raise RuntimeError(
+            output or f"{' '.join(command)} exited with code {proc.returncode}"
+        )
     return output
 
 
@@ -501,7 +543,9 @@ def _kill_port_process(port: int) -> None:
         if system == "Windows":
             result = subprocess.run(
                 ["netstat", "-ano", "-p", "TCP"],
-                capture_output=True, text=True, timeout=5,
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             for line in result.stdout.splitlines():
                 parts = line.split()
@@ -510,14 +554,17 @@ def _kill_port_process(port: int) -> None:
                         try:
                             subprocess.run(
                                 ["taskkill", "/PID", parts[4], "/F"],
-                                capture_output=True, timeout=5,
+                                capture_output=True,
+                                timeout=5,
                             )
                         except subprocess.SubprocessError:
                             pass
         elif system == "Darwin":
             result = subprocess.run(
                 ["lsof", "-ti", f"tcp:{port}"],
-                capture_output=True, text=True, timeout=5,
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             for pid_str in result.stdout.strip().splitlines():
                 try:
@@ -527,12 +574,14 @@ def _kill_port_process(port: int) -> None:
         else:
             result = subprocess.run(
                 ["fuser", f"{port}/tcp"],
-                capture_output=True, timeout=5,
+                capture_output=True,
+                timeout=5,
             )
             if result.returncode == 0:
                 subprocess.run(
                     ["fuser", "-k", f"{port}/tcp"],
-                    capture_output=True, timeout=5,
+                    capture_output=True,
+                    timeout=5,
                 )
     except Exception:
         pass
@@ -540,7 +589,11 @@ def _kill_port_process(port: int) -> None:
 
 def _start_log_reader(process: _BridgeProcess) -> None:
     def _reader() -> None:
-        from helpers.notification import NotificationManager, NotificationType, NotificationPriority
+        from helpers.notification import (
+            NotificationManager,
+            NotificationType,
+            NotificationPriority,
+        )
 
         assert process.stdout
         for line in iter(process.stdout.readline, b""):
@@ -550,14 +603,14 @@ def _start_log_reader(process: _BridgeProcess) -> None:
                 PrintStyle.standard(f"WhatsApp bridge: {text}")
 
                 # Detect QR codes or pairing status and broadcast to UI if needed
-                if "Scan this QR code" in text or "▄▄▄▄▄" in text:
+                if "Scan this QR code" in text and process.should_send_pairing_notice():
                     NotificationManager.send_notification(
                         type=NotificationType.WARNING,
                         priority=NotificationPriority.HIGH,
                         title="WhatsApp Pairing Required",
                         message="Please scan the QR code in the terminal to connect.",
                         display_time=30,
-                        group="whatsapp_auth"
+                        group="whatsapp_auth",
                     )
                 elif "authenticated" in text.lower():
                     NotificationManager.send_notification(
@@ -566,7 +619,7 @@ def _start_log_reader(process: _BridgeProcess) -> None:
                         title="WhatsApp Connected",
                         message="Your WhatsApp account has been successfully authenticated.",
                         display_time=10,
-                        group="whatsapp_auth"
+                        group="whatsapp_auth",
                     )
                 elif "Waiting for scan" in text:
                     # Avoid spamming but let UI know we are ready

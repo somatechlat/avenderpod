@@ -4,10 +4,20 @@ from helpers.providers import get_provider_config
 import models
 
 # Model name substrings to exclude from litellm fallback results
-_LITELLM_EXCLUDE = frozenset({
-    "dall-e", "gpt-image", "tts", "whisper", "audio",
-    "realtime", "davinci", "babbage", "ada", "vision-preview",
-})
+_LITELLM_EXCLUDE = frozenset(
+    {
+        "dall-e",
+        "gpt-image",
+        "tts",
+        "whisper",
+        "audio",
+        "realtime",
+        "davinci",
+        "babbage",
+        "ada",
+        "vision-preview",
+    }
+)
 
 
 class ModelSearch(ApiHandler):
@@ -48,7 +58,9 @@ class ModelSearch(ApiHandler):
         """Extract models_list sub-config."""
         return cfg.get("models_list") or {}
 
-    async def _fetch_models(self, provider: str, cfg: dict, ml: dict, user_api_base: str = "") -> list[str] | None:
+    async def _fetch_models(
+        self, provider: str, cfg: dict, ml: dict, user_api_base: str = ""
+    ) -> list[str] | None:
         api_key = models.get_api_key(provider)
         api_base = user_api_base or (cfg or {}).get("kwargs", {}).get("api_base", "")
 
@@ -94,7 +106,9 @@ class ModelSearch(ApiHandler):
         # Generic fallback: base + /models
         return base.rstrip("/") + "/models", fmt
 
-    def _build_headers(self, provider: str, api_key: str, cfg: dict | None) -> dict[str, str]:
+    def _build_headers(
+        self, provider: str, api_key: str, cfg: dict | None
+    ) -> dict[str, str]:
         headers: dict[str, str] = {}
         has_key = api_key and api_key != "None"
 
@@ -122,6 +136,7 @@ class ModelSearch(ApiHandler):
     def _litellm_fallback(self, provider: str, cfg: dict | None) -> list[str]:
         try:
             import litellm
+
             registry = getattr(litellm, "models_by_provider", None)
             if not registry:
                 return []
@@ -134,7 +149,7 @@ class ModelSearch(ApiHandler):
             prefix = litellm_provider + "/"
             result: list[str] = []
             for name in raw_models:
-                clean = name[len(prefix):] if name.startswith(prefix) else name
+                clean = name[len(prefix) :] if name.startswith(prefix) else name
                 low = clean.lower()
                 if any(exc in low for exc in _LITELLM_EXCLUDE):
                     continue

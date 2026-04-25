@@ -37,7 +37,11 @@ class RenameWorkDirFile(ApiHandler):
                 )
                 return {"data": result}
 
-            error_msg = "Failed to create folder" if action == "create-folder" else "Rename failed"
+            error_msg = (
+                "Failed to create folder"
+                if action == "create-folder"
+                else "Rename failed"
+            )
             return {"error": error_msg}
 
         except Exception as e:

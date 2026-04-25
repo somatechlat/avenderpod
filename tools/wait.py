@@ -1,9 +1,9 @@
-import asyncio
 from datetime import datetime, timedelta, timezone
 from helpers.tool import Tool, Response
 from helpers.print_style import PrintStyle
 from helpers.wait import managed_wait
 from helpers.localization import Localization
+
 
 class WaitTool(Tool):
 
@@ -23,7 +23,9 @@ class WaitTool(Tool):
 
         if until_timestamp_str:
             try:
-                target_time = Localization.get().localtime_str_to_utc_dt(until_timestamp_str)
+                target_time = Localization.get().localtime_str_to_utc_dt(
+                    until_timestamp_str
+                )
                 if not target_time:
                     raise ValueError(f"Invalid timestamp format: {until_timestamp_str}")
             except ValueError as e:
@@ -44,7 +46,7 @@ class WaitTool(Tool):
                     break_loop=False,
                 )
             target_time = now + wait_duration
-        
+
         if target_time <= now:
             return Response(
                 message=f"Target time {target_time.isoformat()} is in the past.",
@@ -58,15 +60,14 @@ class WaitTool(Tool):
             target_time=target_time,
             is_duration_wait=is_duration_wait,
             log=self.log,
-            get_heading_callback=self.get_heading
+            get_heading_callback=self.get_heading,
         )
 
         if self.log:
             self.log.update(heading=self.get_heading("Done", done=True))
 
         message = self.agent.read_prompt(
-            "fw.wait_complete.md",
-            target_time=target_time.isoformat()
+            "fw.wait_complete.md", target_time=target_time.isoformat()
         )
 
         return Response(
@@ -85,5 +86,5 @@ class WaitTool(Tool):
     def get_heading(self, text: str = "", done: bool = False):
         done_icon = " icon://done_all" if done else ""
         if not text:
-            text = f"Waiting..."
+            text = "Waiting..."
         return f"icon://timer Wait: {text}{done_icon}"

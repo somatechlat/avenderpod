@@ -476,6 +476,47 @@
                 `;
             }
 
+            openCatalogModal(item = null) {
+                this.catalogEditItem = item ? { ...item } : { id: null, name: '', description: '', price: 0.0, metadata: {} };
+                this.showCatalogModal = true;
+            }
+
+            async saveCatalogItem() {
+                const item = this.catalogEditItem;
+                if (!item.name || item.price === '') {
+                    alert('Nombre y precio son obligatorios.');
+                    return;
+                }
+                const action = item.id ? 'update' : 'create';
+                try {
+                    const res = await fetch('/api/plugins/avender/admin_catalog_api', {
+                        method: 'POST',
+                        headers: this.apiHeaders(),
+                        body: JSON.stringify({ action, item })
+                    });
+                    const data = await res.json();
+                    if (data.ok) {
+                        this.showCatalogModal = false;
+                        this.loadCatalog();
+                    } else {
+                        alert(data.error || 'Error guardando producto.');
+                    }
+                } catch (e) { console.error("Error saving catalog item", e); }
+            }
+
+            async deleteCatalogItem(itemId) {
+                if (!confirm('¿Estás seguro de eliminar este producto?')) return;
+                try {
+                    const res = await fetch('/api/plugins/avender/admin_catalog_api', {
+                        method: 'POST',
+                        headers: this.apiHeaders(),
+                        body: JSON.stringify({ action: 'delete', id: itemId })
+                    });
+                    const data = await res.json();
+                    if (data.ok) this.loadCatalog();
+                } catch (e) { console.error("Error deleting catalog item", e); }
+            }
+
             renderCatalog() {
                 return html`
                     <div class="p-8 overflow-y-auto h-full">
@@ -484,9 +525,35 @@
                                 <h2 class="text-3xl font-bold text-gray-900">Catálogo y Precios</h2>
                                 <p class="text-gray-600">Actualiza los productos que el asistente vende.</p>
                             </div>
-                            <button class="bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-indigo-700 shadow-sm">+ Nuevo Producto</button>
+                            <button @click=${() => this.openCatalogModal()} class="bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-indigo-700 shadow-sm">+ Nuevo Producto</button>
                         </div>
                         
+                        ${this.showCatalogModal ? html`
+                            <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                                <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-lg mx-4">
+                                    <h3 class="text-xl font-bold mb-4">${this.catalogEditItem.id ? 'Editar Producto' : 'Nuevo Producto'}</h3>
+                                    <div class="space-y-4">
+                                        <div>
+                                            <label class="block text-sm font-bold text-gray-700 mb-1">Nombre</label>
+                                            <input type="text" .value=${this.catalogEditItem.name} @input=${e => this.catalogEditItem = {...this.catalogEditItem, name: e.target.value}} class="w-full border-gray-300 rounded-lg p-3 border">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-bold text-gray-700 mb-1">Descripción</label>
+                                            <input type="text" .value=${this.catalogEditItem.description || ''} @input=${e => this.catalogEditItem = {...this.catalogEditItem, description: e.target.value}} class="w-full border-gray-300 rounded-lg p-3 border">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-bold text-gray-700 mb-1">Precio</label>
+                                            <input type="number" step="0.01" .value=${this.catalogEditItem.price} @input=${e => this.catalogEditItem = {...this.catalogEditItem, price: parseFloat(e.target.value) || 0}} class="w-full border-gray-300 rounded-lg p-3 border">
+                                        </div>
+                                    </div>
+                                    <div class="flex justify-end gap-3 mt-6">
+                                        <button @click=${() => this.showCatalogModal = false} class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 font-medium">Cancelar</button>
+                                        <button @click=${this.saveCatalogItem} class="px-4 py-2 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-700">Guardar</button>
+                                    </div>
+                                </div>
+                            </div>
+                        ` : ''}
+
                         <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
                             <table class="w-full text-left">
                                 <thead class="bg-gray-50 border-b border-gray-200">
@@ -494,7 +561,7 @@
                                         <th class="p-4 font-semibold text-gray-700">Nombre</th>
                                         <th class="p-4 font-semibold text-gray-700">Descripción</th>
                                         <th class="p-4 font-semibold text-gray-700">Precio</th>
-                                        <th class="p-4 font-semibold text-gray-700 w-24">Acciones</th>
+                                        <th class="p-4 font-semibold text-gray-700 w-32">Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-100">
@@ -504,8 +571,9 @@
                                             <td class="p-4 font-medium text-gray-900">${item.name}</td>
                                             <td class="p-4 text-gray-500 text-sm">${item.description}</td>
                                             <td class="p-4 font-bold text-green-600">$${item.price}</td>
-                                            <td class="p-4">
-                                                <button class="text-indigo-600 font-medium text-sm hover:underline">Editar</button>
+                                            <td class="p-4 flex gap-2">
+                                                <button @click=${() => this.openCatalogModal(item)} class="text-indigo-600 font-medium text-sm hover:underline">Editar</button>
+                                                <button @click=${() => this.deleteCatalogItem(item.id)} class="text-red-600 font-medium text-sm hover:underline">Eliminar</button>
                                             </td>
                                         </tr>
                                     `)}
@@ -514,6 +582,40 @@
                         </div>
                     </div>
                 `;
+            }
+
+            async changeAdminPassword() {
+                const current = this.passwordCurrent || '';
+                const newPass = this.passwordNew || '';
+                const confirm = this.passwordConfirm || '';
+                if (!current || !newPass || !confirm) {
+                    alert('Completa todos los campos de contraseña.');
+                    return;
+                }
+                if (newPass.length < 8) {
+                    alert('La nueva contraseña debe tener al menos 8 caracteres.');
+                    return;
+                }
+                if (newPass !== confirm) {
+                    alert('Las contraseñas nuevas no coinciden.');
+                    return;
+                }
+                try {
+                    const res = await fetch('/api/plugins/avender/auth_api', {
+                        method: 'POST',
+                        headers: this.apiHeaders(),
+                        body: JSON.stringify({ action: 'change_password', current, new: newPass })
+                    });
+                    const data = await res.json();
+                    if (data.ok) {
+                        alert('Contraseña actualizada exitosamente.');
+                        this.passwordCurrent = '';
+                        this.passwordNew = '';
+                        this.passwordConfirm = '';
+                    } else {
+                        alert(data.error || 'Error cambiando contraseña.');
+                    }
+                } catch (e) { console.error("Error changing password", e); }
             }
 
             renderSettings() {
@@ -529,6 +631,85 @@
                                     .value=${this.settings.agent_name || ''}
                                     @input=${(e) => this.settings = {...this.settings, agent_name: e.target.value}}
                                     class="w-full border-gray-300 rounded-lg p-3 border focus:ring-2 focus:ring-indigo-500">
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-1">Nombre Comercial</label>
+                                <input type="text"
+                                    .value=${this.settings.trade_name || ''}
+                                    @input=${(e) => this.settings = {...this.settings, trade_name: e.target.value}}
+                                    class="w-full border-gray-300 rounded-lg p-3 border focus:ring-2 focus:ring-indigo-500">
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-1">Número de WhatsApp</label>
+                                <input type="text"
+                                    .value=${this.settings.whatsapp_number || ''}
+                                    @input=${(e) => this.settings = {...this.settings, whatsapp_number: e.target.value}}
+                                    class="w-full border-gray-300 rounded-lg p-3 border focus:ring-2 focus:ring-indigo-500">
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-1">Horarios de Atención</label>
+                                <textarea rows="3"
+                                    .value=${this.settings.hours || ''}
+                                    @input=${(e) => this.settings = {...this.settings, hours: e.target.value}}
+                                    class="w-full border-gray-300 rounded-lg p-3 border focus:ring-2 focus:ring-indigo-500"></textarea>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-1">Zonas de Envío y Costos</label>
+                                <textarea rows="3"
+                                    .value=${this.settings.delivery_rules || ''}
+                                    @input=${(e) => this.settings = {...this.settings, delivery_rules: e.target.value}}
+                                    class="w-full border-gray-300 rounded-lg p-3 border focus:ring-2 focus:ring-indigo-500"></textarea>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-1">Políticas o Reglas Importantes</label>
+                                <textarea rows="3"
+                                    .value=${this.settings.policies || ''}
+                                    @input=${(e) => this.settings = {...this.settings, policies: e.target.value}}
+                                    class="w-full border-gray-300 rounded-lg p-3 border focus:ring-2 focus:ring-indigo-500"></textarea>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-1">Promociones Activas</label>
+                                <textarea rows="2"
+                                    .value=${this.settings.promotions || ''}
+                                    @input=${(e) => this.settings = {...this.settings, promotions: e.target.value}}
+                                    class="w-full border-gray-300 rounded-lg p-3 border focus:ring-2 focus:ring-indigo-500"></textarea>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-1">Tono del Asistente</label>
+                                <select .value=${this.settings.tone || 'friendly'}
+                                    @change=${(e) => this.settings = {...this.settings, tone: e.target.value}}
+                                    class="w-full border-gray-300 rounded-lg p-3 border focus:ring-2 focus:ring-indigo-500">
+                                    <option value="friendly">Amigable</option>
+                                    <option value="formal">Formal</option>
+                                </select>
+                            </div>
+
+                            <div class="flex items-center gap-3">
+                                <input type="checkbox" .checked=${this.settings.use_slang || false}
+                                    @change=${(e) => this.settings = {...this.settings, use_slang: e.target.checked}}
+                                    class="h-5 w-5 text-indigo-600 rounded border-gray-300">
+                                <label class="text-sm font-bold text-gray-700">Hablar como Ecuatoriano 🇪🇨</label>
+                            </div>
+
+                            <div class="flex items-center gap-3">
+                                <input type="checkbox" .checked=${this.settings.emojis || false}
+                                    @change=${(e) => this.settings = {...this.settings, emojis: e.target.checked}}
+                                    class="h-5 w-5 text-indigo-600 rounded border-gray-300">
+                                <label class="text-sm font-bold text-gray-700">Usar Emojis</label>
+                            </div>
+
+                            <div class="flex items-center gap-3">
+                                <input type="checkbox" .checked=${this.settings.restrict_access || false}
+                                    @change=${(e) => this.settings = {...this.settings, restrict_access: e.target.checked}}
+                                    class="h-5 w-5 text-indigo-600 rounded border-gray-300">
+                                <label class="text-sm font-bold text-gray-700">Lista Blanca de Clientes (Modo Privado)</label>
                             </div>
                             
                             <!-- Age Verification Lock Alert (For Liquor/CBD) -->
@@ -547,6 +728,17 @@
                                     </div>
                                 </div>
                             ` : ''}
+
+                            <!-- Password Change Section -->
+                            <div class="pt-6 mt-6 border-t border-gray-200">
+                                <h3 class="text-lg font-bold text-gray-900 mb-4">Cambiar Contraseña de Administrador</h3>
+                                <div class="space-y-4">
+                                    <input type="password" placeholder="Contraseña actual" .value=${this.passwordCurrent || ''} @input=${e => this.passwordCurrent = e.target.value} class="w-full border-gray-300 rounded-lg p-3 border">
+                                    <input type="password" placeholder="Nueva contraseña (mín. 8 caracteres)" .value=${this.passwordNew || ''} @input=${e => this.passwordNew = e.target.value} class="w-full border-gray-300 rounded-lg p-3 border">
+                                    <input type="password" placeholder="Confirmar nueva contraseña" .value=${this.passwordConfirm || ''} @input=${e => this.passwordConfirm = e.target.value} class="w-full border-gray-300 rounded-lg p-3 border">
+                                    <button @click=${this.changeAdminPassword} class="bg-red-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-red-700">Cambiar Contraseña</button>
+                                </div>
+                            </div>
 
                             <div class="pt-6 mt-6 border-t border-gray-100 flex justify-end">
                                 <button @click=${this.saveSettings} class="bg-gray-900 text-white px-6 py-3 rounded-lg font-bold hover:bg-black transition-colors shadow">

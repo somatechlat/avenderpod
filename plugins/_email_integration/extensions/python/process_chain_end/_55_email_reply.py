@@ -4,7 +4,10 @@ import asyncio
 from helpers.extension import Extension
 from helpers.print_style import PrintStyle
 from agent import AgentContext, LoopData, UserMessage
-from plugins._email_integration.helpers.dispatcher import CTX_EMAIL_HANDLER, CTX_EMAIL_ATTACHMENTS
+from plugins._email_integration.helpers.dispatcher import (
+    CTX_EMAIL_HANDLER,
+    CTX_EMAIL_ATTACHMENTS,
+)
 
 MAX_SEND_RETRIES: int = 2
 CTX_SEND_FAILURES: str = "_email_send_failures"
@@ -26,13 +29,19 @@ class EmailAutoReply(Extension):
 
         attachments = context.data.pop(CTX_EMAIL_ATTACHMENTS, [])
         if attachments:
-            PrintStyle.info(f"Email: sending reply with {len(attachments)} attachment(s)")
+            PrintStyle.info(
+                f"Email: sending reply with {len(attachments)} attachment(s)"
+            )
         asyncio.create_task(self._send_reply(context, response_text, attachments))
 
     async def _send_reply(
-        self, context: AgentContext, response_text: str, attachments: list[str],
+        self,
+        context: AgentContext,
+        response_text: str,
+        attachments: list[str],
     ):
         from plugins._email_integration.helpers.handler import send_email_reply
+
         error = await send_email_reply(context, response_text, attachments)
         if not error:
             context.data[CTX_SEND_FAILURES] = 0
@@ -42,9 +51,7 @@ class EmailAutoReply(Extension):
         if failures <= MAX_SEND_RETRIES:
             _notify_agent_of_failure(context, error, failures)
         else:
-            PrintStyle.error(
-                f"Email send failed {failures} times, giving up: {error}"
-            )
+            PrintStyle.error(f"Email send failed {failures} times, giving up: {error}")
             context.log.log(
                 type="error",
                 heading="Email send failed (max retries reached)",
@@ -55,6 +62,7 @@ class EmailAutoReply(Extension):
 # ------------------------------------------------------------------
 # Helpers
 # ------------------------------------------------------------------
+
 
 def _extract_last_response(context: AgentContext) -> str:
     with context.log._lock:
@@ -68,10 +76,14 @@ def _extract_last_response(context: AgentContext) -> str:
 
 
 def _notify_agent_of_failure(
-    context: AgentContext, error: str, attempt: int,
+    context: AgentContext,
+    error: str,
+    attempt: int,
 ):
     msg = context.agent0.read_prompt(
-        "fw.email.send_failed.md", error=error, attempt=str(attempt),
+        "fw.email.send_failed.md",
+        error=error,
+        attempt=str(attempt),
         max_retries=str(MAX_SEND_RETRIES),
     )
     context.log.log(type="error", heading="Email send failed", content=error)

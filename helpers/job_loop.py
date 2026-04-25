@@ -1,5 +1,4 @@
 import asyncio
-from datetime import datetime
 import time
 from helpers.task_scheduler import TaskScheduler
 from helpers.print_style import PrintStyle
@@ -23,7 +22,10 @@ async def run_loop():
             try:
                 await runtime.call_development_function(pause_loop)
             except Exception as e:
-                PrintStyle().error("Failed to pause job loop by development instance: " + errors.error_text(e))
+                PrintStyle().error(
+                    "Failed to pause job loop by development instance: "
+                    + errors.error_text(e)
+                )
         if not keep_running and (time.time() - pause_time) > (SLEEP_TIME * 2):
             resume_loop()
         if keep_running:
@@ -31,7 +33,9 @@ async def run_loop():
                 await scheduler_tick()
             except Exception as e:
                 PrintStyle().error(errors.format_error(e))
-        await asyncio.sleep(SLEEP_TIME)  # TODO! - if we lower it under 1min, it can run a 5min job multiple times in it's target minute
+        await asyncio.sleep(
+            SLEEP_TIME
+        )  # TODO! - if we lower it under 1min, it can run a 5min job multiple times in it's target minute
 
 
 async def scheduler_tick():
@@ -42,6 +46,7 @@ async def scheduler_tick():
 
     # Run job_loop extensions (e.g. email polling)
     from helpers.extension import call_extensions_async
+
     await call_extensions_async("job_loop")
 
 

@@ -32,7 +32,7 @@ class ApiResetChat(ApiHandler):
                 return Response(
                     '{"error": "context_id is required"}',
                     status=400,
-                    mimetype="application/json"
+                    mimetype="application/json",
                 )
 
             # Check if context exists
@@ -41,7 +41,7 @@ class ApiResetChat(ApiHandler):
                 return Response(
                     '{"error": "Chat context not found"}',
                     status=404,
-                    mimetype="application/json"
+                    mimetype="application/json",
                 )
             if not is_external_api_context(context):
                 return Response(
@@ -65,7 +65,7 @@ class ApiResetChat(ApiHandler):
             return {
                 "success": True,
                 "message": "Chat reset successfully",
-                "context_id": context_id
+                "context_id": context_id,
             }
 
         except Exception as e:
@@ -73,5 +73,5 @@ class ApiResetChat(ApiHandler):
             return Response(
                 json.dumps({"error": f"Internal server error: {str(e)}"}),
                 status=500,
-                mimetype="application/json"
+                mimetype="application/json",
             )

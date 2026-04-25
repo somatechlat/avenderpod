@@ -1,7 +1,7 @@
 from helpers import files
 from helpers import cache
 from helpers import yaml as yaml_helper
-from typing import TypedDict, TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal
 from pydantic import BaseModel, model_validator
 import json
 import os
@@ -95,9 +95,13 @@ def _get_agents_list_from_dir(dir: str, origin: Origin) -> dict[str, SubAgentLis
             agent_yaml_path = files.get_abs_path(dir, subdir, "agent.yaml")
             if files.exists(agent_yaml_path):
                 agent_yaml = files.read_file(agent_yaml_path)
-                agent_data = SubAgentListItem.model_validate(yaml_helper.loads(agent_yaml) or {})
+                agent_data = SubAgentListItem.model_validate(
+                    yaml_helper.loads(agent_yaml) or {}
+                )
             else:
-                agent_json = files.read_file(files.get_abs_path(dir, subdir, "agent.json"))
+                agent_json = files.read_file(
+                    files.get_abs_path(dir, subdir, "agent.json")
+                )
                 agent_data = SubAgentListItem.model_validate_json(agent_json)
             name = agent_data.name or subdir
             agent_data.name = name
@@ -258,7 +262,9 @@ def get_agents_roots() -> list[str]:
     # from helpers import plugins
 
     plugin_agents = plugins.get_enabled_plugin_paths(None, "agents")
-    project_agents = files.find_existing_paths_by_pattern("usr/projects/*/.a0proj/agents")
+    project_agents = files.find_existing_paths_by_pattern(
+        "usr/projects/*/.a0proj/agents"
+    )
     paths = [
         files.get_abs_path(DEFAULT_AGENTS_DIR),
         *plugin_agents,
@@ -339,7 +345,7 @@ def get_available_agents_dict(
 def get_paths(
     agent: "Agent|None",
     *subpaths,
-    must_exist_completely: bool = True, 
+    must_exist_completely: bool = True,
     include_project: bool = True,
     include_user: bool = True,
     include_default: bool = True,
@@ -347,7 +353,8 @@ def get_paths(
     default_root: str = "",
 ) -> list[str]:
     """Returns list of file paths for the given agent and subpaths, searched in order of priority:
-    project/agents/, project/, usr/agents/, plugin agents/, agents/, usr/, plugins/, default."""
+    project/agents/, project/, usr/agents/, plugin agents/, agents/, usr/, plugins/, default.
+    """
     cache_key = cache.determine_cache_key(
         agent,
         *subpaths,
@@ -390,20 +397,28 @@ def get_paths(
 
         # usr/agents/<profile>/...
         path = files.get_abs_path(USER_AGENTS_DIR, profile_name, *subpaths)
-        if (not must_exist_completely) or files.exists(files.get_abs_path(USER_AGENTS_DIR, profile_name, *check_subpaths)):
+        if (not must_exist_completely) or files.exists(
+            files.get_abs_path(USER_AGENTS_DIR, profile_name, *check_subpaths)
+        ):
             paths.append(path)
 
         # plugin agents/<profile>/...
         if include_plugins:
             # from helpers import plugins
-            for plugin_dir in plugins.get_enabled_plugin_paths(agent, "agents", profile_name):
+            for plugin_dir in plugins.get_enabled_plugin_paths(
+                agent, "agents", profile_name
+            ):
                 path = files.get_abs_path(plugin_dir, *subpaths)
-                if (not must_exist_completely) or files.exists(files.get_abs_path(plugin_dir, *check_subpaths)):
+                if (not must_exist_completely) or files.exists(
+                    files.get_abs_path(plugin_dir, *check_subpaths)
+                ):
                     paths.append(path)
 
         # agents/<profile>/...
         path = files.get_abs_path(DEFAULT_AGENTS_DIR, profile_name, *subpaths)
-        if (not must_exist_completely) or files.exists(files.get_abs_path(DEFAULT_AGENTS_DIR, profile_name, *check_subpaths)):
+        if (not must_exist_completely) or files.exists(
+            files.get_abs_path(DEFAULT_AGENTS_DIR, profile_name, *check_subpaths)
+        ):
             paths.append(path)
 
     if include_user:

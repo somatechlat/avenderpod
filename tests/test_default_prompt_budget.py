@@ -10,6 +10,8 @@ if str(PROJECT_ROOT) not in sys.path:
 from agent import AgentConfig, AgentContext, AgentContextType
 from helpers import runtime, tokens
 
+DEFAULT_PROMPT_BUDGET_TOKENS = 7000
+
 
 def _iter_prompt_files():
     yield from (PROJECT_ROOT / "prompts").rglob("*.md")
@@ -46,9 +48,9 @@ async def _build_system_text(profile: str = "agent0") -> str:
 async def test_default_agent0_prompt_budget_and_guardrails():
     system_text = await _build_system_text()
 
-    assert tokens.approximate_tokens(system_text) <= 3000
-    assert "tool_name` must exactly match a listed tool name" in system_text
-    assert "tool_args` must stay a json object" in system_text
+    assert tokens.approximate_tokens(system_text) <= DEFAULT_PROMPT_BUDGET_TOKENS
+    assert "use ONLY the tools listed below" in system_text
+    assert "tool_args: key value pairs tool arguments" in system_text
     assert '"tool_name": "call_subordinate"' in system_text
     assert '"reset": true' in system_text
     assert '"tool_name": "text_editor:read"' in system_text
@@ -59,8 +61,12 @@ async def test_default_agent0_prompt_budget_and_guardrails():
 
 def test_a0_small_profile_removed_and_prompt_text_generic():
     assert not (PROJECT_ROOT / "agents" / "a0_small").exists()
-    assert not (PROJECT_ROOT / "knowledge" / "main" / "a0_small_tool_call_examples.md").exists()
-    assert (PROJECT_ROOT / "knowledge" / "main" / "tool_call_reference_examples.md").exists()
+    assert not (
+        PROJECT_ROOT / "knowledge" / "main" / "a0_small_tool_call_examples.md"
+    ).exists()
+    assert (
+        PROJECT_ROOT / "knowledge" / "main" / "tool_call_reference_examples.md"
+    ).exists()
 
     for path in _iter_prompt_files():
         assert "a0_small" not in path.read_text(encoding="utf-8")

@@ -60,7 +60,9 @@ class UiServerRuntime:
 
     @classmethod
     def create(cls) -> "UiServerRuntime":
-        webapp = Flask("app", static_folder=get_abs_path("./webui"), static_url_path="/")
+        webapp = Flask(
+            "app", static_folder=get_abs_path("./webui"), static_url_path="/"
+        )
         webapp.secret_key = os.getenv("FLASK_SECRET_KEY") or secrets.token_hex(32)
 
         WerkzeugRequest.max_form_memory_size = UPLOAD_LIMIT_BYTES
@@ -82,7 +84,9 @@ class UiServerRuntime:
         socketio_server = socketio.AsyncServer(
             async_mode="asgi",
             namespaces="*",
-            cors_allowed_origins=lambda _origin, environ: validate_ws_origin(environ)[0],
+            cors_allowed_origins=lambda _origin, environ: validate_ws_origin(environ)[
+                0
+            ],
             logger=False,
             engineio_logger=False,
             ping_interval=25,
@@ -204,7 +208,10 @@ class UiRouteHandlers:
             user = dotenv.get_dotenv_value("AUTH_LOGIN")
             password = dotenv.get_dotenv_value("AUTH_PASSWORD")
 
-            if request.form["username"] == user and request.form["password"] == password:
+            if (
+                request.form["username"] == user
+                and request.form["password"] == password
+            ):
                 session["authentication"] = login.get_credentials_hash()
                 return redirect(url_for("serve_index"))
             else:
@@ -269,9 +276,9 @@ class UiRouteHandlers:
             webui_dir = files.get_abs_path(plugin_dir, "webui")
             webui_extensions_dir = files.get_abs_path(plugin_dir, "extensions/webui")
 
-            if not files.is_in_dir(str(asset_file), str(webui_dir)) and not files.is_in_dir(
-                str(asset_file), str(webui_extensions_dir)
-            ):
+            if not files.is_in_dir(
+                str(asset_file), str(webui_dir)
+            ) and not files.is_in_dir(str(asset_file), str(webui_extensions_dir)):
                 return Response("Access denied", 403)
 
             if not files.is_file(asset_file):

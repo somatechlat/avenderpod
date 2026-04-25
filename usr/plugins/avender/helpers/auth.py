@@ -18,7 +18,7 @@ PASSWORD_KEY = "admin_password_hash"
 LEGACY_PASSWORD_KEY = "adminPassword"
 
 
-def _hash_password(password: str, *, salt: str | None = None) -> str:
+def hash_admin_password(password: str, *, salt: str | None = None) -> str:
     if not password:
         raise ValueError("Password is required")
     salt = salt or secrets.token_hex(16)
@@ -45,7 +45,7 @@ def _verify_hash(password: str, encoded: str) -> bool:
 
 
 def set_admin_password(password: str) -> None:
-    save_tenant_config({PASSWORD_KEY: _hash_password(password)})
+    save_tenant_config({PASSWORD_KEY: hash_admin_password(password)})
 
 
 def verify_admin_password(password: str) -> bool:

@@ -8,16 +8,13 @@ from typing import Union, Dict, Any
 from flask import (
     Request,
     Response,
-    jsonify,
     Flask,
     session,
     request,
-    send_file,
     redirect,
     url_for,
 )
 from werkzeug.wrappers.response import Response as BaseResponse
-from agent import AgentContext
 from helpers.print_style import PrintStyle
 from helpers.errors import format_error
 from helpers import files, cache
@@ -98,6 +95,7 @@ class ApiHandler:
     # get context to run agent zero in
     def use_context(self, ctxid: str, create_if_not_exists: bool = True):
         from helpers.context_utils import use_context as _use_context
+
         return _use_context(self.thread_lock, ctxid, create_if_not_exists)
 
 
@@ -240,7 +238,6 @@ def register_api_route(app: Flask, lock: ThreadLockType) -> None:
 def register_watchdogs():
     from helpers import watchdog
     from helpers.ws import CACHE_AREA as WS_CACHE_AREA
-
 
     def on_api_change(items: list[watchdog.WatchItem]):
         PrintStyle.debug("API endpoint watchdog triggered:", items)

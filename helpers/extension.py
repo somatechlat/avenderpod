@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Any, Awaitable, Type, cast
+from typing import Awaitable, Type
 from helpers import modules, files
 from helpers import cache
 from typing import TYPE_CHECKING
@@ -118,7 +118,9 @@ def extensible(func):
             return None
 
         module_parts = [part for part in module_name.split(".") if part]
-        qual_parts = [part for part in qual_name.split(".") if part and part != "<locals>"]
+        qual_parts = [
+            part for part in qual_name.split(".") if part and part != "<locals>"
+        ]
         if not module_parts or not qual_parts:
             return None
 
@@ -216,7 +218,7 @@ class Extension:
         self.kwargs = kwargs
 
     @abstractmethod
-    def execute(self, **kwargs) -> None | Awaitable[None]:
+    def execute(self, *args, **kwargs) -> None | Awaitable[None]:
         pass
 
 

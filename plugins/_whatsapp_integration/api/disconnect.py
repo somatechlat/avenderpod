@@ -12,7 +12,9 @@ class Disconnect(ApiHandler):
     async def process(self, input: dict, request: Request) -> dict:
         try:
             from plugins._whatsapp_integration.helpers import bridge_manager
-            from plugins._whatsapp_integration.helpers.storage_paths import get_bridge_session_dir
+            from plugins._whatsapp_integration.helpers.storage_paths import (
+                get_bridge_session_dir,
+            )
 
             # Stop bridge first
             await bridge_manager.stop_bridge()

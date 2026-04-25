@@ -16,9 +16,9 @@ class EditWorkDirFile(ApiHandler):
 
     def _extract_error_message(self, error_str: str) -> str:
         """Extract user-friendly error message from exception string."""
-        for line in reversed(error_str.split('\n')):
-            if ': ' in line and ('Exception' in line or 'Error' in line):
-                return line.split(': ', 1)[1].strip()
+        for line in reversed(error_str.split("\n")):
+            if ": " in line and ("Exception" in line or "Error" in line):
+                return line.split(": ", 1)[1].strip()
         return error_str.strip()
 
     async def process(self, input: Input, request: Request) -> Output:
@@ -38,11 +38,11 @@ class EditWorkDirFile(ApiHandler):
             content = input.get("content", "")
             if not isinstance(content, str):
                 return {"error": "Content must be a string"}
-            
+
             content_size = len(content.encode("utf-8"))
             if content_size > MAX_EDIT_FILE_SIZE:
                 return {"error": "File exceeds 1 MB and cannot be edited"}
-            
+
             res = await runtime.call_development_function(save_file, file_path, content)
             if not res:
                 return {"error": "Failed to save file"}

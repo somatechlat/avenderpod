@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import List
 
 from helpers.tool import Tool, Response
-from helpers import projects, files, file_tree
-from helpers import skills as skills_helper, runtime
+from helpers import skills as skills_helper
 from helpers.print_style import PrintStyle
 
 
@@ -26,11 +24,7 @@ class SkillsTool(Tool):
     """
 
     def _current_method(self) -> str:
-        return (
-            (self.args.get("method") or self.method or "")
-            .strip()
-            .lower()
-        )
+        return (self.args.get("method") or self.method or "").strip().lower()
 
     @staticmethod
     def _normalize_skill_name(skill_name: str) -> str:
@@ -191,10 +185,10 @@ class SkillsTool(Tool):
         if skill.name in loaded:
             loaded.remove(skill.name)
         loaded.append(skill.name)
-        self.agent.data[DATA_NAME_LOADED_SKILLS] = loaded[-max_loaded_skills():]
+        self.agent.data[DATA_NAME_LOADED_SKILLS] = loaded[-max_loaded_skills() :]
 
         return f"Loaded skill '{skill.name}' into EXTRAS."
 
 
 def max_loaded_skills() -> int:
-    return 5 # TODO move to settings
+    return 5  # TODO move to settings

@@ -13,6 +13,7 @@ from helpers import tokens
 # Types
 # ------------------------------------------------------------------
 
+
 class FileEntry(TypedDict):
     path: str
     content: str
@@ -28,6 +29,7 @@ class ScanResult(TypedDict):
 # ------------------------------------------------------------------
 # Public API
 # ------------------------------------------------------------------
+
 
 def scan_promptinclude_files(
     root: str,
@@ -82,15 +84,23 @@ def scan_promptinclude_files(
                 trimmed = tokens.trim_to_tokens(raw, remaining, direction="start")
                 trimmed_count = tokens.count_tokens(trimmed)
                 total_tokens_used += path_tokens + trimmed_count
-                result_files.append(FileEntry(
-                    path=path, content=trimmed,
-                    token_count=trimmed_count, status="cropped",
-                ))
+                result_files.append(
+                    FileEntry(
+                        path=path,
+                        content=trimmed,
+                        token_count=trimmed_count,
+                        status="cropped",
+                    )
+                )
             else:
-                result_files.append(FileEntry(
-                    path=path, content="",
-                    token_count=0, status="skipped",
-                ))
+                result_files.append(
+                    FileEntry(
+                        path=path,
+                        content="",
+                        token_count=0,
+                        status="skipped",
+                    )
+                )
             budget_exhausted = True
             continue
 
@@ -98,16 +108,24 @@ def scan_promptinclude_files(
             trimmed = tokens.trim_to_tokens(raw, max_file_tokens, direction="start")
             trimmed_count = tokens.count_tokens(trimmed)
             total_tokens_used += path_tokens + trimmed_count
-            result_files.append(FileEntry(
-                path=path, content=trimmed,
-                token_count=trimmed_count, status="cropped",
-            ))
+            result_files.append(
+                FileEntry(
+                    path=path,
+                    content=trimmed,
+                    token_count=trimmed_count,
+                    status="cropped",
+                )
+            )
         else:
             total_tokens_used += path_tokens + file_tokens
-            result_files.append(FileEntry(
-                path=path, content=raw,
-                token_count=file_tokens, status="ok",
-            ))
+            result_files.append(
+                FileEntry(
+                    path=path,
+                    content=raw,
+                    token_count=file_tokens,
+                    status="ok",
+                )
+            )
 
     # remaining unprocessed files from matched list
     remaining_unprocessed = len(matched) - len(result_files) - skipped_count
@@ -120,6 +138,7 @@ def scan_promptinclude_files(
 # ------------------------------------------------------------------
 # Internal helpers
 # ------------------------------------------------------------------
+
 
 def _build_ignore_spec(gitignore: str) -> PathSpec | None:
     if not gitignore or not gitignore.strip():
@@ -147,7 +166,7 @@ def _find_matching_files(
     results: list[str] = []
 
     for dirpath, dirnames, filenames in os.walk(root, topdown=True):
-        depth = dirpath[len(root):].count(os.sep)
+        depth = dirpath[len(root) :].count(os.sep)
         if depth >= max_depth:
             dirnames.clear()
             continue
@@ -158,7 +177,9 @@ def _find_matching_files(
             for d in dirnames:
                 rel = os.path.relpath(os.path.join(dirpath, d), root)
                 rel_posix = rel.replace(os.sep, "/")
-                if ignore_spec.match_file(rel_posix) or ignore_spec.match_file(f"{rel_posix}/"):
+                if ignore_spec.match_file(rel_posix) or ignore_spec.match_file(
+                    f"{rel_posix}/"
+                ):
                     continue
                 filtered_dirs.append(d)
             dirnames[:] = filtered_dirs

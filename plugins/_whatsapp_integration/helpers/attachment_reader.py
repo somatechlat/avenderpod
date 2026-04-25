@@ -13,6 +13,7 @@ from typing import TypedDict
 # Data models
 # ------------------------------------------------------------------
 
+
 class AttachmentData(TypedDict):
     name: str
     content_b64: str
@@ -23,11 +24,13 @@ class AttachmentData(TypedDict):
 # File reader
 # ------------------------------------------------------------------
 
+
 def read_attachment(path: str) -> AttachmentData:
     try:
         if not os.path.isfile(path):
             return AttachmentData(
-                name="", content_b64="", error=f"file not found: {path}")
+                name="", content_b64="", error=f"file not found: {path}"
+            )
         name = os.path.basename(path)
         with open(path, "rb") as f:
             content = f.read()

@@ -11,14 +11,12 @@ Usage:
 """
 
 import argparse
-import os
 import sys
 import yaml
 import re
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Optional, List
 from dataclasses import dataclass, field
-from datetime import datetime
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -29,6 +27,7 @@ from helpers import files
 @dataclass
 class Skill:
     """Represents a skill loaded from SKILL.md"""
+
     name: str
     description: str
     path: Path
@@ -140,7 +139,9 @@ def validate_skill(skill: Skill) -> List[str]:
         if not (1 <= len(skill.name) <= 64):
             issues.append("Name must be 1-64 characters")
         if not re.match(r"^[a-z0-9-]+$", skill.name):
-            issues.append(f"Invalid name format: '{skill.name}' (use lowercase letters, numbers, and hyphens)")
+            issues.append(
+                f"Invalid name format: '{skill.name}' (use lowercase letters, numbers, and hyphens)"
+            )
         if skill.name.startswith("-") or skill.name.endswith("-"):
             issues.append("Name must not start or end with a hyphen")
         if "--" in skill.name:
@@ -153,11 +154,6 @@ def validate_skill(skill: Skill) -> List[str]:
     # Content
     if len(skill.content) < 100:
         issues.append("Skill content is too short (minimum 100 characters)")
-
-    # Check for associated files
-    skill_dir = skill.path
-    has_scripts = (skill_dir / "scripts").exists()
-    has_docs = (skill_dir / "docs").exists()
 
     return issues
 
@@ -178,7 +174,7 @@ def create_skill(name: str, description: str = "", author: str = "") -> Path:
     (skill_dir / "docs").mkdir()
 
     # Create SKILL.md from template
-    skill_content = f'''---
+    skill_content = f"""---
 name: "{name}"
 description: "{description or 'Description of what this skill does and when to use it'}"
 version: "1.0.0"
@@ -222,7 +218,7 @@ Description of what to do next.
 
 - Don't do this
 - Avoid that
-'''
+"""
 
     skill_file = skill_dir / "SKILL.md"
     skill_file.write_text(skill_content, encoding="utf-8")
@@ -272,7 +268,7 @@ Examples:
   %(prog)s show brainstorming       Show skill details
   %(prog)s validate my-skill        Validate a skill
   %(prog)s search python            Search for skills
-        """
+        """,
     )
 
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
@@ -305,14 +301,18 @@ Examples:
         skills = list_skills()
         if args.tags:
             filter_tags = [t.strip().lower() for t in args.tags.split(",")]
-            skills = [s for s in skills if any(t in [tag.lower() for tag in s.tags] for t in filter_tags)]
+            skills = [
+                s
+                for s in skills
+                if any(t in [tag.lower() for tag in s.tags] for t in filter_tags)
+            ]
         print_skill_table(skills)
 
     elif args.command == "create":
         try:
             skill_dir = create_skill(args.name, args.description, args.author)
             print(f"\n✅ Created skill at: {skill_dir}")
-            print(f"\nNext steps:")
+            print("\nNext steps:")
             print(f"  1. Edit {skill_dir / 'SKILL.md'} to add your instructions")
             print(f"  2. Add any helper scripts to {skill_dir / 'scripts'}/")
             print(f"  3. Run: python -m helpers.skills_cli validate {args.name}")
@@ -330,10 +330,12 @@ Examples:
             print(f"Author:      {skill.author or 'Unknown'}")
             print(f"Path:        {skill.path}")
             print(f"Tags:        {', '.join(skill.tags) if skill.tags else 'None'}")
-            print(f"Triggers:    {', '.join(skill.trigger_patterns) if skill.trigger_patterns else 'None'}")
-            print(f"\nDescription:")
+            print(
+                f"Triggers:    {', '.join(skill.trigger_patterns) if skill.trigger_patterns else 'None'}"
+            )
+            print("\nDescription:")
             print(f"  {skill.description}")
-            print(f"\nContent Preview (first 500 chars):")
+            print("\nContent Preview (first 500 chars):")
             print("-" * 60)
             print(skill.content[:500])
             if len(skill.content) > 500:

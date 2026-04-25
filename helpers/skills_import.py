@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-import os
 import shutil
-import tempfile
 import time
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List, Literal, Optional, Tuple
+from typing import List, Literal, Optional, Tuple
 
 from helpers import files
 from helpers.skills import discover_skill_md_files
@@ -132,7 +130,11 @@ def build_import_plan(
                 # If relative fails due to symlink oddities, just use leaf folder name
                 rel = Path(skill_dir.name)
             dest_dir = dest_ns_root / rel
-            plan.append(ImportPlanItem(src_root=root, src_skill_dir=skill_dir, dest_skill_dir=dest_dir))
+            plan.append(
+                ImportPlanItem(
+                    src_root=root, src_skill_dir=skill_dir, dest_skill_dir=dest_dir
+                )
+            )
 
     # Deduplicate by destination path (keep first occurrence)
     seen_dest = set()
@@ -173,6 +175,7 @@ def _resolve_conflict(dest: Path, policy: ConflictPolicy) -> Tuple[Path, bool]:
 def get_project_skills_folder(project_name: str) -> Path:
     """Get the skills folder path for a project."""
     from helpers.projects import get_project_meta
+
     return Path(get_project_meta(project_name, PROJECT_SKILLS_DIR))
 
 
@@ -180,8 +183,11 @@ def get_agent_profile_skills_folder(profile_name: str) -> Path:
     return Path(files.get_abs_path("usr", "agents", profile_name, "skills"))
 
 
-def get_project_agent_profile_skills_folder(project_name: str, profile_name: str) -> Path:
+def get_project_agent_profile_skills_folder(
+    project_name: str, profile_name: str
+) -> Path:
     from helpers.projects import get_project_meta
+
     return Path(get_project_meta(project_name, "agents", profile_name, "skills"))
 
 
@@ -261,4 +267,3 @@ def import_skills(
         destination_root=dest_root,
         namespace=ns,
     )
-

@@ -1,4 +1,5 @@
 """POST /api/plugins/_a0_connector/v1/skills_list."""
+
 from __future__ import annotations
 
 from helpers.api import Request, Response
@@ -30,7 +31,9 @@ class SkillsList(connector_base.ProtectedConnectorApiHandler):
             ]
             if project_name:
                 roots.append(
-                    projects.get_project_meta(project_name, "agents", agent_profile, "skills")
+                    projects.get_project_meta(
+                        project_name, "agents", agent_profile, "skills"
+                    )
                 )
 
             skill_list = [

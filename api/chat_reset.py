@@ -1,4 +1,4 @@
-from helpers.api import ApiHandler, Input, Output, Request, Response
+from helpers.api import ApiHandler, Input, Output, Request
 
 
 from helpers import persist_chat
@@ -20,6 +20,7 @@ class Reset(ApiHandler):
 
         # Reset updates context metadata (log guid/version) and must refresh other tabs' lists.
         from helpers.state_monitor_integration import mark_dirty_all
+
         mark_dirty_all(reason="api.chat_reset.Reset")
 
         return {

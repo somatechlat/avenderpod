@@ -111,8 +111,12 @@ class UpdateCatalogItem(Tool):
             conn.close()
 
             display_name = new_name or row["name"]
-            display_price = f"${new_price:.2f}" if new_price is not None else f"${row['price']:.2f}"
-            PrintStyle.success(f"Avender: Updated catalog item '{display_name}' → {display_price}")
+            display_price = (
+                f"${new_price:.2f}" if new_price is not None else f"${row['price']:.2f}"
+            )
+            PrintStyle.success(
+                f"Avender: Updated catalog item '{display_name}' → {display_price}"
+            )
             return Response(
                 message=f"✅ Ítem '{display_name}' actualizado exitosamente. Precio: {display_price}",
                 break_loop=False,
@@ -145,7 +149,9 @@ class UpdateCatalogItem(Tool):
             conn.commit()
             conn.close()
 
-            PrintStyle.success(f"Avender: Created new catalog item '{item_name}' at ${new_price:.2f}")
+            PrintStyle.success(
+                f"Avender: Created new catalog item '{item_name}' at ${new_price:.2f}"
+            )
             return Response(
                 message=f"✅ Nuevo ítem '{item_name}' creado exitosamente. Precio: ${new_price:.2f}",
                 break_loop=False,

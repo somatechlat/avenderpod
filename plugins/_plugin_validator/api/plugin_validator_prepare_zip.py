@@ -45,7 +45,9 @@ class PluginValidatorPrepareZip(ApiHandler):
         unique = uuid.uuid4().hex[:8]
         stamp = time.strftime("%Y%m%d_%H%M%S")
         upload_path = str(uploads_dir / f"plugin_{stamp}_{unique}_{safe_name}")
-        extract_dir = files.get_abs_path(files.TEMP_DIR, "plugin_validation", f"tmp_plugin_{stamp}_{unique}")
+        extract_dir = files.get_abs_path(
+            files.TEMP_DIR, "plugin_validation", f"tmp_plugin_{stamp}_{unique}"
+        )
 
         try:
             plugin_file.save(upload_path)

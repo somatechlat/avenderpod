@@ -12,7 +12,9 @@ from .models import Tenant, VaultRecord
 def _get_env(name: str, *, required: bool = True, default: str = "") -> str:
     value = os.environ.get(name, default).strip()
     if required and not value:
-        raise EnvironmentError(f"{name} environment variable is required for Vault provisioning.")
+        raise EnvironmentError(
+            f"{name} environment variable is required for Vault provisioning."
+        )
     return value
 
 
@@ -46,7 +48,9 @@ def build_tenant_secret_bundle(tenant: Tenant) -> dict[str, str]:
     }
 
 
-def write_tenant_secrets_to_vault(tenant: Tenant, secrets_bundle: dict[str, Any]) -> str:
+def write_tenant_secrets_to_vault(
+    tenant: Tenant, secrets_bundle: dict[str, Any]
+) -> str:
     addr = _get_env("VAULT_ADDR")
     token = _get_env("VAULT_TOKEN")
     namespace = _get_env("VAULT_NAMESPACE", required=False, default="")
@@ -62,7 +66,9 @@ def write_tenant_secrets_to_vault(tenant: Tenant, secrets_bundle: dict[str, Any]
         timeout=timeout,
     )
     if response.status_code not in (200, 204):
-        raise RuntimeError(f"Vault write failed ({response.status_code}): {response.text}")
+        raise RuntimeError(
+            f"Vault write failed ({response.status_code}): {response.text}"
+        )
 
     full_path = f"{mount}/{path}"
     VaultRecord.objects.update_or_create(
@@ -79,7 +85,12 @@ def provision_tenant_secrets(tenant: Tenant) -> dict[str, str]:
     return secrets_bundle
 
 
-def build_tenant_bootstrap_env(tenant: Tenant, tenant_secrets: dict[str, str]) -> dict[str, str]:
+def build_tenant_bootstrap_env(
+    tenant: Tenant,
+    tenant_secrets: dict[str, str],
+    assigned_port: int,
+    whisper_api_key: str,
+) -> dict[str, str]:
     public_sysadmin_url = _get_env(
         "SYSADMIN_API_PUBLIC_URL",
         required=False,
@@ -90,10 +101,37 @@ def build_tenant_bootstrap_env(tenant: Tenant, tenant_secrets: dict[str, str]) -
             "SYSADMIN_API_PUBLIC_URL (or SYSADMIN_API_URL) must be set for tenant bootstrap."
         )
 
+    whisper_url = _get_env(
+        "WHISPER_API_URL",
+        required=False,
+        default="",
+    )
+    if not whisper_url:
+        # Fallback to constructing from known proxy port
+        whisper_proxy_port = _get_env(
+            "WHISPER_PROXY_PORT", required=False, default="45002"
+        )
+        # In production the tenant VM must reach the cluster's Whisper proxy.
+        # If the cluster has a public domain, use that. Otherwise the operator
+        # must set WHISPER_API_URL explicitly.
+        whisper_url = f"http://{public_sysadmin_url.rsplit(':', 1)[0]}:{whisper_proxy_port}/v1/audio/transcriptions"
+
+    a0_image = _get_env(
+        "A0_IMAGE", required=False, default="agent0ai/agent-zero:latest"
+    )
+
     return {
         "TENANT_ID": str(tenant.id),
         "SYSADMIN_API_URL": public_sysadmin_url,
         "SYSADMIN_API_KEY": _sysadmin_api_key(),
         "AVENDER_SETUP_TOKEN": tenant_secrets["AVENDER_SETUP_TOKEN"],
         "MCP_SERVER_TOKEN": tenant_secrets["MCP_SERVER_TOKEN"],
+        "WHISPER_API_URL": whisper_url,
+        "WHISPER_API_KEY": whisper_api_key,
+        "ASSIGNED_PORT": str(assigned_port),
+        "A0_IMAGE": a0_image,
+        "A0_MEMORY_LIMIT": "3g",
+        "A0_CPU_LIMIT": "2.0",
+        "A0_MEMORY_RESERVATION": "1g",
+        "A0_CPU_RESERVATION": "1.0",
     }

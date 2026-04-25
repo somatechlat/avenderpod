@@ -1,4 +1,5 @@
 """Context event streaming bridge for the a0-connector plugin."""
+
 from __future__ import annotations
 
 import asyncio

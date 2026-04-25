@@ -72,9 +72,7 @@ class CalculateTotal(Tool):
             if row:
                 item_total = row["price"] * qty
                 total += item_total
-                breakdown_lines.append(
-                    f"  {row['name']} x{qty} = ${item_total:.2f}"
-                )
+                breakdown_lines.append(f"  {row['name']} x{qty} = ${item_total:.2f}")
             else:
                 missing_items.append(name)
 
@@ -96,9 +94,6 @@ class CalculateTotal(Tool):
             total += delivery_charge
 
         breakdown = "\n".join(breakdown_lines)
-        result = (
-            f"Desglose del pedido:\n{breakdown}\n"
-            f"TOTAL: ${total:.2f}"
-        )
+        result = f"Desglose del pedido:\n{breakdown}\n" f"TOTAL: ${total:.2f}"
         PrintStyle.success(f"Avender calculate_total: ${total:.2f}")
         return Response(message=result, break_loop=False)

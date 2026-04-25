@@ -8,7 +8,6 @@ from helpers import guids
 from langchain_community.vectorstores import FAISS
 
 # faiss needs to be patched for python 3.12 on arm #TODO remove once not needed
-from helpers import faiss_monkey_patch
 import faiss
 
 
@@ -16,9 +15,11 @@ from langchain_community.docstore.in_memory import InMemoryDocstore
 from langchain_community.vectorstores.utils import (
     DistanceStrategy,
 )
-from langchain_core.embeddings import Embeddings
 
-import os, json, hashlib, re
+import os
+import json
+import hashlib
+import re
 
 import numpy as np
 
@@ -26,7 +27,7 @@ from helpers.print_style import PrintStyle
 from helpers import files, plugins, projects
 from langchain_core.documents import Document
 from . import knowledge_import
-from helpers.log import Log, LogItem
+from helpers.log import LogItem
 from enum import Enum
 from agent import Agent, AgentContext
 import models
@@ -62,7 +63,10 @@ class Memory:
 
     @staticmethod
     def _get_embedding_config(agent=None):
-        from plugins._model_config.helpers.model_config import get_embedding_model_config_object
+        from plugins._model_config.helpers.model_config import (
+            get_embedding_model_config_object,
+        )
+
         return get_embedding_model_config_object(agent)
 
     @staticmethod
@@ -463,7 +467,9 @@ class Memory:
             with open(hash_path, "w") as f:
                 f.write(h.hexdigest())
         except Exception as e:
-            PrintStyle(font_color="yellow").print(f"Warning: could not write FAISS hash: {e}")
+            PrintStyle(font_color="yellow").print(
+                f"Warning: could not write FAISS hash: {e}"
+            )
 
     @staticmethod
     def _verify_index_hash(abs_dir: str) -> bool:
@@ -480,14 +486,14 @@ class Memory:
                     h.update(chunk)
             return h.hexdigest() == stored
         except Exception as e:
-            PrintStyle(font_color="yellow").print(f"Warning: FAISS hash check failed: {e}")
+            PrintStyle(font_color="yellow").print(
+                f"Warning: FAISS hash check failed: {e}"
+            )
             return True
 
     @staticmethod
     def _get_comparator(condition: str):
-        _FILTER_SAFE = re.compile(
-            r"^[a-zA-Z0-9_\-\.\ \t'\"=<>!()\[\],:\+]+$"
-        )
+        _FILTER_SAFE = re.compile(r"^[a-zA-Z0-9_\-\.\ \t'\"=<>!()\[\],:\+]+$")
         if len(condition) > 512 or not _FILTER_SAFE.match(condition):
             PrintStyle.error(
                 f"Memory filter rejected (unsafe characters or too long): {condition!r}"
@@ -583,7 +589,7 @@ def get_agent_memory_subdir(agent: Agent) -> str:
 
     if not config:
         return "default"
-    
+
     # Check if project isolation is enabled and we are in a project
     if config.get("project_memory_isolation", True):
         project_name = projects.get_context_project_name(agent.context)
@@ -611,9 +617,7 @@ def get_existing_memory_subdirs() -> list[str]:
 
         project_subdirs = files.get_subdirectories(get_projects_parent_folder())
         for project_subdir in project_subdirs:
-            if files.exists(
-                get_project_meta(project_subdir), "memory", "index.faiss"
-            ):
+            if files.exists(get_project_meta(project_subdir), "memory", "index.faiss"):
                 subdirs.append(f"projects/{project_subdir}")
 
         # Ensure 'default' is always available

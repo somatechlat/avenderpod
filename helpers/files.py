@@ -23,6 +23,7 @@ TEMP_DIR = "tmp"
 API_DIR = "api"
 _base_dir = os.path.dirname(os.path.abspath(os.path.join(__file__, "../")))
 
+
 class VariablesPlugin(ABC):
     @abstractmethod
     def get_variables(self, file: str, backup_dirs: list[str] | None = None, **kwargs) -> dict[str, Any]:  # type: ignore
@@ -218,6 +219,7 @@ def read_file(relative_path: str, encoding="utf-8"):
     with open(absolute_path, "r", encoding=encoding) as f:
         return f.read()
 
+
 def read_file_json(relative_path: str, encoding="utf-8"):
     # Try to get the absolute path for the file from the original directory or backup directories
     absolute_path = get_abs_path(relative_path)
@@ -226,11 +228,13 @@ def read_file_json(relative_path: str, encoding="utf-8"):
     with open(absolute_path, "r", encoding=encoding) as f:
         return json.load(f)
 
+
 def read_file_yaml(relative_path: str, encoding="utf-8"):
     absolute_path = get_abs_path(relative_path)
 
     with open(absolute_path, "r", encoding=encoding) as f:
         return yaml.loads(f.read())
+
 
 def read_file_bin(relative_path: str):
     # Try to get the absolute path for the file from the original directory or backup directories
@@ -463,10 +467,12 @@ def write_file(relative_path: str, content: str, encoding: str = "utf-8"):
     with open(abs_path, "w", encoding=encoding) as f:
         f.write(content)
 
+
 def delete_file(relative_path: str):
     abs_path = get_abs_path(relative_path)
     if exists(abs_path):
         os.remove(abs_path)
+
 
 def write_file_bin(relative_path: str, content: bytes):
     abs_path = get_abs_path(relative_path)
@@ -505,7 +511,7 @@ def delete_dir(relative_path: str):
 
                 # try again after changing permissions
                 shutil.rmtree(abs_path, ignore_errors=True)
-            except:
+            except Exception:
                 # suppress all errors - we're ensuring no errors propagate
                 pass
 
@@ -525,6 +531,7 @@ def move_dir(old_path: str, new_path: str):
     except OSError:
         # os.rename fails across Docker volume mount points
         import shutil
+
         shutil.move(abs_old, abs_new)
 
 

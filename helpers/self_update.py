@@ -138,7 +138,14 @@ def get_repo_dir(repo_dir: str | Path | None = None) -> Path:
 def get_repo_self_update_manager_path(
     repo_dir: str | Path | None = None,
 ) -> Path:
-    return get_repo_dir(repo_dir) / "docker" / "run" / "fs" / "exe" / "self_update_manager.py"
+    return (
+        get_repo_dir(repo_dir)
+        / "docker"
+        / "run"
+        / "fs"
+        / "exe"
+        / "self_update_manager.py"
+    )
 
 
 def _get_official_remote_url() -> str:
@@ -302,7 +309,7 @@ def _get_remote_branch_names() -> list[str]:
         ref_name = parts[1]
         if not ref_name.startswith(prefix):
             continue
-        branches.append(ref_name[len(prefix):])
+        branches.append(ref_name[len(prefix) :])
 
     sorted_branches = _sort_branch_names(branches)
     _remote_branch_list_cache = (now, sorted_branches)
@@ -329,7 +336,7 @@ def _get_local_origin_branch_names(
         ref_name = line.strip()
         if not ref_name.startswith(prefix):
             continue
-        branches.append(ref_name[len(prefix):])
+        branches.append(ref_name[len(prefix) :])
     return _sort_branch_names(branches)
 
 
@@ -410,7 +417,9 @@ def _get_remote_branch_merged_tags(branch: str) -> set[str]:
             _get_official_remote_url(),
             f"refs/heads/{normalized_branch}:refs/remotes/origin/{normalized_branch}",
         )
-        output = _run_git(repository, "tag", "--merged", f"refs/remotes/origin/{normalized_branch}")
+        output = _run_git(
+            repository, "tag", "--merged", f"refs/remotes/origin/{normalized_branch}"
+        )
         merged_tags = {line.strip() for line in output.splitlines() if line.strip()}
 
     _remote_branch_tag_cache[normalized_branch] = (now, merged_tags)
@@ -541,7 +550,9 @@ def _filter_selector_supported_tags(tags: list[str]) -> list[str]:
 
 
 def _sort_selector_supported_tags(tags: list[str]) -> list[str]:
-    return sorted(tags, key=lambda tag: _parse_selector_version(tag) or (-1, -1), reverse=True)
+    return sorted(
+        tags, key=lambda tag: _parse_selector_version(tag) or (-1, -1), reverse=True
+    )
 
 
 def is_valid_selector_tag(tag: str) -> bool:
@@ -848,7 +859,9 @@ def get_update_info(repo_dir: str | Path | None = None) -> dict[str, Any]:
         },
         "defaults": {
             "branch": default_branch,
-            "tag": current_version if _is_selector_supported_tag(current_version) else "",
+            "tag": (
+                current_version if _is_selector_supported_tag(current_version) else ""
+            ),
             "backup_usr": True,
             "backup_path": str(get_default_backup_dir(repository)),
             "backup_name": build_default_backup_name(current_version, current_version),

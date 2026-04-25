@@ -1,9 +1,12 @@
-import asyncio, os, sys, platform, errno
+import asyncio
+import os
+import sys
+import platform
+import errno
 
 _IS_WIN = platform.system() == "Windows"
 if _IS_WIN:
     import winpty  # pip install pywinpty # type: ignore
-    import msvcrt
 
 
 #  Make stdin / stdout tolerant to broken UTF-8 so input() never aborts
@@ -150,7 +153,10 @@ class TTYSession:
 
 
 async def _spawn_posix_pty(cmd, cwd, env, echo):
-    import pty, asyncio, os, termios
+    import pty
+    import asyncio
+    import os
+    import termios
 
     master, slave = pty.openpty()
 
@@ -208,10 +214,14 @@ async def _spawn_winpty(cmd, cwd, env, echo):
     # Clean PowerShell startup: no logo, no profile, bypass execution policy for deterministic behavior
     if cmd.strip().lower().startswith("powershell"):
         if "-nolog" not in cmd.lower():
-            cmd = cmd.replace("powershell.exe", "powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass", 1)
+            cmd = cmd.replace(
+                "powershell.exe",
+                "powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass",
+                1,
+            )
 
     cols, rows = 80, 25
-    child = winpty.PtyProcess.spawn(cmd, dimensions=(rows, cols), cwd=cwd or os.getcwd(), env=env) # type: ignore
+    child = winpty.PtyProcess.spawn(cmd, dimensions=(rows, cols), cwd=cwd or os.getcwd(), env=env)  # type: ignore
 
     loop = asyncio.get_running_loop()
     reader = asyncio.StreamReader()
@@ -222,7 +232,9 @@ async def _spawn_winpty(cmd, cwd, env, echo):
                 # Run blocking read in executor to not block event loop
                 data = await loop.run_in_executor(None, child.read, 1 << 16)
                 if data:
-                    reader.feed_data(data.encode('utf-8') if isinstance(data, str) else data)
+                    reader.feed_data(
+                        data.encode("utf-8") if isinstance(data, str) else data
+                    )
             except EOFError:
                 break
             except Exception:
@@ -236,10 +248,10 @@ async def _spawn_winpty(cmd, cwd, env, echo):
         def write(self, d):
             # Use winpty's write method, not os.write
             if isinstance(d, bytes):
-                d = d.decode('utf-8', errors='replace')
+                d = d.decode("utf-8", errors="replace")
             # Windows needs \r\n for proper line endings
             if _IS_WIN:
-              d = d.replace('\n', '\r\n')
+                d = d.replace("\n", "\r\n")
             child.write(d)
 
         async def drain(self):
@@ -273,7 +285,9 @@ async def _spawn_winpty(cmd, cwd, env, echo):
 if __name__ == "__main__":
 
     async def interactive_shell():
-        shell_cmd, prompt_hint = ("powershell.exe", ">") if _IS_WIN else ("/bin/bash", "$")
+        shell_cmd, prompt_hint = (
+            ("powershell.exe", ">") if _IS_WIN else ("/bin/bash", "$")
+        )
 
         # echo=False → suppress the shell’s own echo of commands
         term = TTYSession(shell_cmd)

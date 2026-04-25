@@ -1,4 +1,5 @@
 """POST /api/plugins/_a0_connector/v1/message_send."""
+
 from __future__ import annotations
 
 import base64
@@ -31,7 +32,9 @@ class MessageSend(connector_base.ProtectedConnectorApiHandler):
 
         context_id = str(input.get("context_id", "")).strip() or None
         current_context_id = (
-            str(input.get("current_context", input.get("current_context_id", ""))).strip()
+            str(
+                input.get("current_context", input.get("current_context_id", ""))
+            ).strip()
             or None
         )
         project_name = str(input.get("project_name", "")).strip() or None
@@ -103,7 +106,9 @@ class MessageSend(connector_base.ProtectedConnectorApiHandler):
 
         try:
             task = context.communicate(
-                UserMessage(message=message, attachments=attachment_paths, id=message_id)
+                UserMessage(
+                    message=message, attachments=attachment_paths, id=message_id
+                )
             )
             result = await task.result()
             return {

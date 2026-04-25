@@ -4,7 +4,6 @@ from datetime import datetime, timezone
 import json
 import os
 import time
-from turtle import stamp
 import urllib.request
 import uuid
 import zipfile
@@ -134,9 +133,8 @@ def install_from_zip(zip_path: str, original_filename: str | None = None) -> dic
             files.delete_dir(dest)
             raise
 
-
         # does it have python files?
-        python_change = bool(files.find_existing_paths_by_pattern(dest+"/**/*.py"))
+        python_change = bool(files.find_existing_paths_by_pattern(dest + "/**/*.py"))
 
         after_plugin_change([plugin_name], python_change=python_change)
 
@@ -151,7 +149,7 @@ def install_from_zip(zip_path: str, original_filename: str | None = None) -> dic
         try:
             files.delete_dir(extract_dir)
             files.delete_file(zip_path)
-        except Exception as e:
+        except Exception:
             pass
 
 
@@ -161,6 +159,7 @@ def _download_thumbnail(thumbnail_url: str, plugin_dir: str) -> None:
         if not thumbnail_url:
             return
         from urllib.parse import urlparse
+
         parsed = urlparse(thumbnail_url)
         if parsed.scheme not in ("http", "https"):
             return
@@ -179,7 +178,9 @@ def _download_thumbnail(thumbnail_url: str, plugin_dir: str) -> None:
         print_style.PrintStyle.warning(f"Failed to download plugin thumbnail: {e}")
 
 
-def install_from_git(url: str, token: str | None = None, plugin_name: str = "", thumbnail_url: str = "") -> dict:
+def install_from_git(
+    url: str, token: str | None = None, plugin_name: str = "", thumbnail_url: str = ""
+) -> dict:
     """Clone git repo into usr/plugins/, validate plugin.yaml.
     Returns dict with plugin name and metadata."""
     from helpers.git import clone_repo
@@ -214,9 +215,9 @@ def install_from_git(url: str, token: str | None = None, plugin_name: str = "", 
         raise
 
     # does it have python files?
-    python_change = bool(files.find_existing_paths_by_pattern(final_dir+"/**/*.py"))
+    python_change = bool(files.find_existing_paths_by_pattern(final_dir + "/**/*.py"))
 
-    after_plugin_change([plugin_name],python_change=python_change)
+    after_plugin_change([plugin_name], python_change=python_change)
 
     return {
         "success": True,
@@ -272,10 +273,14 @@ def update_from_git(plugin_name: str) -> dict:
         "title": meta.title if meta else plugin_name,
         "path": files.deabsolute_path(plugin_dir),
         "current_commit": head.hexsha,
-        "current_commit_timestamp": datetime.fromtimestamp(head.committed_date, timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+        "current_commit_timestamp": datetime.fromtimestamp(
+            head.committed_date, timezone.utc
+        ).strftime("%Y-%m-%d %H:%M:%S"),
         "version": getattr(meta, "version", "") or "",
         "branch": repo.active_branch.name if not repo.head.is_detached else "",
-        "remote_url": git.strip_auth_from_url(repo.remotes.origin.url) if repo.remotes else "",
+        "remote_url": (
+            git.strip_auth_from_url(repo.remotes.origin.url) if repo.remotes else ""
+        ),
         "directory_name": Path(plugin_dir).name,
     }
 
@@ -283,8 +288,10 @@ def update_from_git(plugin_name: str) -> dict:
 def run_install_hook(plugin_name: str):
     return plugins.call_plugin_hook(plugin_name, "install")
 
+
 def run_pre_update_hook(plugin_name: str):
     return plugins.call_plugin_hook(plugin_name, "pre_update")
+
 
 def get_plugin_hub_index(force: bool = False) -> dict[str, Any]:
     """Return the plugin index plus installed Plugin Hub keys."""
@@ -314,12 +321,15 @@ def get_plugin_hub_index(force: bool = False) -> dict[str, Any]:
         if not plugin_dir:
             continue
         webui_dir = Path(plugin_dir) / "webui"
-        has_thumb = any((webui_dir / f"thumbnail.{ext}").is_file() for ext in _thumb_exts)
+        has_thumb = any(
+            (webui_dir / f"thumbnail.{ext}").is_file() for ext in _thumb_exts
+        )
         if has_thumb:
             continue
         thumb_url = plugin_data.get("thumbnail") or ""
         if not thumb_url:
             from urllib.parse import urlparse
+
             raw_base = None
             github = plugin_data.get("github") or ""
             if github:

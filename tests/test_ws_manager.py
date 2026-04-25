@@ -144,10 +144,7 @@ async def test_route_event_no_handler_returns_standard_error():
     assert result["handlerId"].endswith("WsManager")
     assert result["ok"] is False
     assert result["error"]["code"] == "NO_HANDLERS"
-    assert (
-        result["error"]["error"]
-        == f"No handler for namespace '{NAMESPACE}'"
-    )
+    assert result["error"]["error"] == f"No handler for namespace '{NAMESPACE}'"
 
 
 @pytest.mark.asyncio
@@ -520,6 +517,7 @@ async def test_timestamps_are_timezone_aware():
         await manager.route_event(NAMESPACE, "unknown", {}, "sid-utc")
         assert info.last_activity.tzinfo is not None
 
+
 class DuplicateHandler(WsHandler):
     async def process(self, event: str, data: dict[str, Any], sid: str):
         return {"handledBy": self.identifier}
@@ -578,7 +576,9 @@ class ErrorHandler(WsHandler):
 class ResultHandler(WsHandler):
     async def process(self, event: str, data: dict[str, Any], sid: str):
         if event == "result_event":
-            return WsResult.ok({"sid": sid}, correlation_id="explicit", duration_ms=1.234)
+            return WsResult.ok(
+                {"sid": sid}, correlation_id="explicit", duration_ms=1.234
+            )
         return WsResult.error(
             code="E_RESULT",
             message="boom",
@@ -717,7 +717,9 @@ async def test_route_event_all_respects_exclude_handlers():
     for entry in aggregated:
         assert entry["correlationId"]
         assert entry["results"]
-        assert all(result["handlerId"] == alpha.identifier for result in entry["results"])
+        assert all(
+            result["handlerId"] == alpha.identifier for result in entry["results"]
+        )
 
 
 @pytest.mark.asyncio

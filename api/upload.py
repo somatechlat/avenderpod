@@ -23,8 +23,7 @@ class UploadFile(ApiHandler):
 
         return {"filenames": saved_filenames}  # Return saved filenames
 
-
-    def allowed_file(self,filename):
+    def allowed_file(self, filename):
         return True
         # ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "txt", "pdf", "csv", "html", "json", "md"}
         # return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS

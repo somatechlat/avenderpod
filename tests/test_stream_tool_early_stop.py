@@ -42,9 +42,12 @@ def test_extract_json_root_string_returns_canonical_snapshot():
 
     assert root == '{"tool_name":"response","tool_args":{"text":"brace } inside"}}'
     assert extract_tools.json_parse_dirty(root)["tool_args"]["text"] == "brace } inside"
-    assert extract_tools.extract_json_root_string(
-        '{"tool_name":"response","tool_args":{"text":"missing"'
-    ) is None
+    assert (
+        extract_tools.extract_json_root_string(
+            '{"tool_name":"response","tool_args":{"text":"missing"'
+        )
+        is None
+    )
     assert extract_tools.extract_json_root_string('[{"tool_name":"response"}]') is None
 
 
@@ -93,4 +96,7 @@ async def test_unified_call_stops_after_canonical_root_snapshot(monkeypatch):
     assert reasoning == ""
     assert stream.index == 1
     assert len(seen) == 1
-    assert seen[0][1] == '{"tool_name":"response","tool_args":{"text":"hello"}} trailing text'
+    assert (
+        seen[0][1]
+        == '{"tool_name":"response","tool_args":{"text":"hello"}} trailing text'
+    )

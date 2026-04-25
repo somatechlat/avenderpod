@@ -1,5 +1,11 @@
 import { html } from 'https://cdn.jsdelivr.net/gh/lit/dist@3/core/lit-core.min.js';
 
+function fieldTag(required = false) {
+    return required
+        ? html`<span class="ml-2 text-xs font-semibold text-red-700">Requerido</span>`
+        : html`<span class="ml-2 text-xs font-semibold text-slate-500">Opcional</span>`;
+}
+
 export function renderHeader() {
     return html`
         <div class="text-center mb-8">
@@ -15,7 +21,7 @@ export function renderHeader() {
 export function renderProgressBar() {
     return html`
         <div class="w-full bg-gray-200 rounded-full h-2.5 mb-8">
-            <div class="bg-indigo-600 h-2.5 rounded-full transition-all duration-500" style="width: ${(this.step / 5) * 100}%"></div>
+            <div class="bg-indigo-600 h-2.5 rounded-full transition-all duration-500" style="width: ${Math.min((this.step / 7) * 100, 100)}%"></div>
         </div>
     `;
 }
@@ -27,23 +33,23 @@ export function renderStep1() {
             <p class="text-gray-500 mb-6 text-sm">Estos datos son privados y ayudan al asistente a conocer la empresa.</p>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
-                    <label class="block text-base font-medium text-gray-700">Tipo de Documento</label>
+                    <label class="block text-base font-medium text-gray-700">Tipo de Documento ${fieldTag(true)}</label>
                     <select .value=${this.formData.idType} @change=${e => this.updateField('idType', e.target.value)} class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 text-base border bg-white">
                         <option value="RUC">RUC (Empresa)</option>
                         <option value="CEDULA">Cédula (Personal)</option>
                     </select>
                 </div>
                 <div>
-                    <label class="block text-base font-medium text-gray-700">Número de Identificación</label>
+                    <label class="block text-base font-medium text-gray-700">Número de Identificación ${fieldTag(true)}</label>
                     <input type="text" .value=${this.formData.idNumber} @input=${e => this.updateField('idNumber', e.target.value)} placeholder="Ej: 1712345678001" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 text-base border">
                 </div>
                 <div class="md:col-span-2">
-                    <label class="block text-base font-medium text-gray-700">Razón Social o Tu Nombre</label>
+                    <label class="block text-base font-medium text-gray-700">Razón Social o Tu Nombre ${fieldTag(false)}</label>
                     <p class="text-xs text-gray-500 mb-1">Nombre legal registrado en el SRI o tu nombre completo.</p>
                     <input type="text" .value=${this.formData.legalName} @input=${e => this.updateField('legalName', e.target.value)} placeholder="Ej: Juan Pérez S.A." class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 text-base border">
                 </div>
                 <div class="md:col-span-2">
-                    <label class="block text-base font-medium text-gray-700">Nombre Comercial</label>
+                    <label class="block text-base font-medium text-gray-700">Nombre Comercial ${fieldTag(true)}</label>
                     <p class="text-xs text-gray-500 mb-1">💡 Así se presentará el asistente. Ej: "Hola, soy Sofía de Burger House".</p>
                     <input type="text" .value=${this.formData.tradeName} @input=${e => this.updateField('tradeName', e.target.value)} placeholder="Ej: Burger House" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 text-base border">
                 </div>
@@ -59,7 +65,7 @@ export function renderStep2() {
             <p class="text-gray-500 mb-6 text-sm">¿Cómo trabajas y cobras? Esto le dirá al asistente qué responder.</p>
             <div class="space-y-6">
                 <div>
-                    <label class="block text-base font-medium text-gray-700">Dirección Matriz (Tu Local)</label>
+                    <label class="block text-base font-medium text-gray-700">Dirección Matriz (Tu Local) ${fieldTag(true)}</label>
                     <div class="mt-1 flex items-center mb-3 bg-indigo-50 p-3 rounded-lg border border-indigo-100 cursor-pointer" @click=${() => this.showMap = !this.showMap}>
                         <input type="checkbox" .checked=${this.showMap} class="h-6 w-6 text-indigo-600 border-gray-300 rounded pointer-events-none">
                         <span class="ml-3 block text-base text-indigo-900 font-semibold">Tocar mapa para fijar ubicación (GPS)</span>
@@ -75,7 +81,7 @@ export function renderStep2() {
                     ` : ''}
                 </div>
                 <div>
-                    <label class="block text-base font-medium text-gray-700">Horarios de Atención</label>
+                    <label class="block text-base font-medium text-gray-700">Horarios de Atención ${fieldTag(false)}</label>
                     <div class="mt-1 flex items-center mb-3 bg-gray-50 p-3 rounded-lg border border-gray-200 cursor-pointer" @click=${() => this.updateField('useCustomHours', !this.formData.useCustomHours)}>
                         <input type="checkbox" .checked=${this.formData.useCustomHours} class="h-6 w-6 text-indigo-600 border-gray-300 rounded pointer-events-none">
                         <span class="ml-3 block text-base text-gray-900 font-semibold">Tengo horarios especiales o cierro días</span>
@@ -87,11 +93,11 @@ export function renderStep2() {
                     `}
                 </div>
                 <div>
-                    <label class="block text-base font-medium text-gray-700">Zonas de Envío y Costos</label>
+                    <label class="block text-base font-medium text-gray-700">Zonas de Envío y Costos ${fieldTag(false)}</label>
                     <textarea .value=${this.formData.deliveryRules} @input=${e => this.updateField('deliveryRules', e.target.value)} rows="3" placeholder="Norte: $2.00, Sur: $3.00." class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm p-3 text-base border"></textarea>
                 </div>
                 <div>
-                    <label class="block text-base font-medium text-gray-700 mb-2">Métodos de Pago Aceptados</label>
+                    <label class="block text-base font-medium text-gray-700 mb-2">Métodos de Pago Aceptados ${fieldTag(false)}</label>
                     <div class="space-y-3">
                         <label class="flex items-center p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
                             <input type="checkbox" .checked=${this.formData.payTransfer} @change=${e => this.updateField('payTransfer', e.target.checked)} class="h-6 w-6 text-indigo-600 rounded">
@@ -124,7 +130,7 @@ export function renderStep3() {
             <h2 class="text-2xl font-bold mb-2">Paso 3: Tu Catálogo</h2>
             <div class="space-y-6">
                 <div>
-                    <label class="block text-base font-medium text-gray-700 mb-4">Giro de tu negocio:</label>
+                    <label class="block text-base font-medium text-gray-700 mb-4">Giro de tu negocio: ${fieldTag(true)}</label>
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                         ${this.industries.map(ind => html`
                             <button type="button" @click=${() => {
@@ -208,7 +214,7 @@ export function renderStep3() {
                 </div>
 
                 <div>
-                    <label class="block text-base font-medium text-gray-700">Políticas o Reglas Importantes</label>
+                    <label class="block text-base font-medium text-gray-700">Políticas o Reglas Importantes ${fieldTag(false)}</label>
                     <textarea .value=${this.formData.policies} @input=${e => this.updateField('policies', e.target.value)} rows="3" class="mt-1 block w-full rounded-lg border-gray-300 p-3"></textarea>
                 </div>
             </div>
@@ -222,18 +228,18 @@ export function renderStep4() {
             <h2 class="text-2xl font-bold mb-2">Paso 4: Personalidad</h2>
             <div class="space-y-6">
                 <div>
-                    <label class="block text-base font-medium text-gray-700">Nombre del Vendedor</label>
+                    <label class="block text-base font-medium text-gray-700">Nombre del Vendedor ${fieldTag(false)}</label>
                     <input type="text" .value=${this.formData.agentName} @input=${e => this.updateField('agentName', e.target.value)} placeholder="Ej: Sofía" class="mt-1 block w-full rounded-lg border-gray-300 p-3 border">
                 </div>
                 <div>
-                    <label class="block text-base font-medium text-gray-700">Idioma</label>
+                    <label class="block text-base font-medium text-gray-700">Idioma ${fieldTag(false)}</label>
                     <select .value=${this.formData.language} @change=${e => this.updateField('language', e.target.value)} class="mt-1 block w-full rounded-lg border-gray-300 p-3 border">
                         <option value="es">Español</option>
                         <option value="en">Inglés</option>
                     </select>
                 </div>
                 <div>
-                    <label class="block text-base font-medium text-gray-700">Tono</label>
+                    <label class="block text-base font-medium text-gray-700">Tono ${fieldTag(false)}</label>
                     <select .value=${this.formData.tone} @change=${e => this.updateField('tone', e.target.value)} class="mt-1 block w-full rounded-lg border-gray-300 p-3 border">
                         <option value="friendly">Amigable</option>
                         <option value="formal">Formal</option>
@@ -262,12 +268,12 @@ export function renderStep5() {
             <h2 class="text-2xl font-bold mb-2">Paso 5: Seguridad y Control</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                    <label title="El número telefónico donde tus clientes enviarán los mensajes" class="block text-base font-medium text-gray-700">Número de WhatsApp del Negocio</label>
+                    <label title="El número telefónico donde tus clientes enviarán los mensajes" class="block text-base font-medium text-gray-700">Número de WhatsApp del Negocio ${fieldTag(true)}</label>
                     <input type="text" title="Ingresa tu número con código de país, ej. +5939..." .value=${this.formData.whatsappNumber} @input=${e => this.updateField('whatsappNumber', e.target.value)} placeholder="+593..." class="mt-1 block w-full rounded-lg border-gray-300 p-3 border focus:ring-indigo-500 focus:border-indigo-500">
                 </div>
                 <div>
-                    <label title="Crea una contraseña segura para entrar a tu Panel de Control de Ventas" class="block text-base font-medium text-gray-700">Contraseña de Administrador</label>
-                    <input type="password" title="Mínimo 6 caracteres" .value=${this.formData.adminPassword} @input=${e => this.updateField('adminPassword', e.target.value)} placeholder="••••••••" class="mt-1 block w-full rounded-lg border-gray-300 p-3 border focus:ring-indigo-500 focus:border-indigo-500">
+                    <label title="Crea una contraseña segura para entrar a tu Panel de Control de Ventas" class="block text-base font-medium text-gray-700">Contraseña de Administrador ${fieldTag(true)}</label>
+                    <input type="password" title="Mínimo 8 caracteres" .value=${this.formData.adminPassword} @input=${e => this.updateField('adminPassword', e.target.value)} placeholder="••••••••" class="mt-1 block w-full rounded-lg border-gray-300 p-3 border focus:ring-indigo-500 focus:border-indigo-500">
                 </div>
             </div>
 
@@ -392,6 +398,9 @@ export function renderStep7() {
 }
 
 export function renderNavigation() {
+    const validation = this.getStepValidation ? this.getStepValidation(this.step) : { valid: true, missing: [] };
+    const canProceed = this.step >= 6 || validation.valid;
+
     return html`
         <div class="mt-10 flex justify-between pt-6 border-t border-gray-200">
             ${this.step > 1 ? html`
@@ -399,13 +408,19 @@ export function renderNavigation() {
             ` : html`<div class="w-20"></div>`}
 
             ${this.step < 6 ? html`
-                <button @click=${() => this.step++} class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-lg shadow-md ml-auto text-lg">Siguiente</button>
+                <button
+                    @click=${this.goToNextStep}
+                    ?disabled=${!canProceed}
+                    title=${!canProceed ? `Completa los campos requeridos: ${validation.missing.join(', ')}` : ''}
+                    class="font-bold py-3 px-8 rounded-lg shadow-md ml-auto text-lg ${canProceed ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-indigo-300 text-white cursor-not-allowed'}"
+                >Siguiente</button>
             ` : html`
                 <button @click=${this.submitSetup} class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg shadow-md ml-auto flex items-center text-lg" ?disabled=${this.loading}>
                     <span>${this.loading ? 'Guardando...' : '🚀 ¡Terminar y Activar!'}</span>
                 </button>
             `}
         </div>
+        ${this.errorMessage ? html`<p class="mt-3 text-sm font-semibold text-red-600">${this.errorMessage}</p>` : ''}
     `;
 }
 
@@ -444,5 +459,4 @@ export function renderCopilot() {
             <button @click=${() => this.showCopilot = !this.showCopilot} class="bg-indigo-600 hover:bg-indigo-700 text-white rounded-full p-4 shadow-lg float-right text-2xl">✨</button>
         </div>
     `;
-}
 }
