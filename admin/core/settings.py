@@ -15,13 +15,20 @@ from pathlib import Path
 
 from django.core.exceptions import ImproperlyConfigured
 
+
+def read_secret(name: str, *, default: str = "") -> str:
+    file_path = os.environ.get(f"{name}_FILE", "").strip()
+    if file_path:
+        return Path(file_path).read_text(encoding="utf-8").strip()
+    return os.environ.get(name, default).strip()
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 DEBUG = os.environ.get("DJANGO_DEBUG", "false").lower() == "true"
 
-# SECRET_KEY: MUST be set via environment variable in production.
-SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
+# SECRET_KEY must come from Vault/Docker secret file in production.
+SECRET_KEY = read_secret("DJANGO_SECRET_KEY")
 if not SECRET_KEY:
     if DEBUG:
         import secrets
@@ -29,7 +36,7 @@ if not SECRET_KEY:
         SECRET_KEY = secrets.token_urlsafe(50)
     else:
         raise ImproperlyConfigured(
-            "DJANGO_SECRET_KEY is required when DJANGO_DEBUG is false"
+            "DJANGO_SECRET_KEY_FILE is required when DJANGO_DEBUG is false"
         )
 
 ALLOWED_HOSTS = os.environ.get(
@@ -104,7 +111,7 @@ DATABASES = {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": os.environ.get("POSTGRES_DB", "avender_db"),
         "USER": os.environ.get("POSTGRES_USER", "avender_user"),
-        "PASSWORD": os.environ.get("POSTGRES_PASSWORD", ""),
+        "PASSWORD": read_secret("POSTGRES_PASSWORD"),
         "HOST": os.environ.get("POSTGRES_HOST", "avender_postgres"),
         "PORT": os.environ.get("POSTGRES_PORT", "5432"),
     }

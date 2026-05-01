@@ -1,0 +1,65 @@
+{
+  "_comment": "Vultr Firewall Group for Avender Cluster + Tenant VMs. Apply this group to the cluster control plane VM and all tenant VMs.",
+  "firewall_group_name": "avender-vpc-only",
+  "rules": [
+    {
+      "_comment": "SSH access from bastion/jump host only (optional — remove if using Vultr console)",
+      "action": "accept",
+      "protocol": "tcp",
+      "port": "22",
+      "source": "BASTION_IP/32",
+      "notes": "SSH from bastion only"
+    },
+    {
+      "_comment": "SysAdmin API + Whisper Proxy — internal VPC only",
+      "action": "accept",
+      "protocol": "tcp",
+      "port": "8000",
+      "source": "VPC_CIDR",
+      "notes": "Cluster services from VPC"
+    },
+    {
+      "_comment": "PostgreSQL — internal VPC only",
+      "action": "accept",
+      "protocol": "tcp",
+      "port": "5432",
+      "source": "VPC_CIDR",
+      "notes": "Database from VPC"
+    },
+    {
+      "_comment": "Tenant Agent Zero WebUI — internal VPC only",
+      "action": "accept",
+      "protocol": "tcp",
+      "port": "45001-45100",
+      "source": "VPC_CIDR",
+      "notes": "Tenant agent ports from VPC"
+    },
+    {
+      "_comment": "Drop all other inbound traffic",
+      "action": "drop",
+      "protocol": "",
+      "port": "",
+      "source": "0.0.0.0/0",
+      "notes": "Deny all other inbound"
+    }
+  ],
+  "outbound_rules": [
+    {
+      "_comment": "Allow all outbound (Docker pull, apt, etc.)",
+      "action": "accept",
+      "protocol": "",
+      "port": "",
+      "source": "0.0.0.0/0",
+      "notes": "Allow all outbound"
+    }
+  ],
+  "setup_instructions": [
+    "1. Create VPC in Vultr dashboard (or via API). Note the VPC ID and CIDR block.",
+    "2. Create this firewall group in Vultr dashboard (or via API). Note the group ID.",
+    "3. Replace BASTION_IP with your jump host IP, or remove the SSH rule.",
+    "4. Replace VPC_CIDR with your actual VPC CIDR (e.g. 10.240.0.0/16).",
+    "5. Attach the firewall group to the cluster control plane VM.",
+    "6. The VULTR_FIREWALL_GROUP_ID env var in docker-compose.yml is used to auto-attach tenant VMs.",
+    "7. The VULTR_VPC_ID env var is passed to the Vultr instance creation API."
+  ]
+}

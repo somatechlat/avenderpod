@@ -1,24 +1,43 @@
-import base64
-import tempfile
 import os
-import requests
+import base64
+import asyncio
+import tempfile
+from typing import Any
+
 from helpers.print_style import PrintStyle
 
-# Whisper API Configuration — OpenAI-compatible endpoint on faster-whisper-server
-WHISPER_API_URL = os.environ.get(
-    "WHISPER_API_URL", "http://avender_whisper:8000/v1/audio/transcriptions"
-)
-WHISPER_API_KEY = os.environ.get("WHISPER_API_KEY", "")
+_models: dict[str, Any] = {}
+_model_locks: dict[str, asyncio.Lock] = {}
+_downloaded_models: set[str] = set()
+
+
+def _normalize_model_name(model_name: str | None) -> str:
+    return (model_name or os.environ.get("STT_MODEL_SIZE") or "base").strip() or "base"
 
 
 async def preload(model_name: str):
-    # Remote API doesn't need preloading in the same way, but we'll keep the signature
-    PrintStyle.standard(f"Whisper remote API active: {model_name}")
-    return True
+    return await _preload(model_name)
 
 
 async def _preload(model_name: str):
-    return True
+    model_name = _normalize_model_name(model_name)
+    if model_name in _models:
+        return True
+
+    lock = _model_locks.setdefault(model_name, asyncio.Lock())
+    async with lock:
+        if model_name in _models:
+            return True
+        try:
+            import whisper
+
+            PrintStyle.standard(f"Loading local Whisper model: {model_name}")
+            _models[model_name] = await asyncio.to_thread(whisper.load_model, model_name)
+            _downloaded_models.add(model_name)
+            return True
+        except Exception as e:
+            PrintStyle.error(f"Failed to load local Whisper model {model_name}: {e}")
+            raise
 
 
 async def is_downloading():
@@ -26,51 +45,50 @@ async def is_downloading():
 
 
 async def is_downloaded():
-    return True
+    return bool(_downloaded_models)
 
 
-async def transcribe(model_name: str, audio_bytes_b64: str):
-    return await _transcribe(model_name, audio_bytes_b64)
+async def transcribe(
+    model_name: str,
+    audio_bytes_b64: str,
+    language: str | None = None,
+):
+    return await _transcribe(model_name, audio_bytes_b64, language=language)
 
 
-async def _transcribe(model_name: str, audio_bytes_b64: str):
-    # Decode audio bytes if encoded as a base64 string
+async def _transcribe(
+    model_name: str,
+    audio_bytes_b64: str,
+    language: str | None = None,
+):
+    model_name = _normalize_model_name(model_name)
+    language = (language or os.environ.get("STT_LANGUAGE") or "es").strip() or "es"
     audio_bytes = base64.b64decode(audio_bytes_b64)
 
-    # Create temp audio file
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as audio_file:
         audio_file.write(audio_bytes)
         temp_path = audio_file.name
 
     try:
-        # Transcribe using remote API (OpenAI-compatible multipart format)
-        headers = {}
-        if WHISPER_API_KEY:
-            headers["X-API-Key"] = WHISPER_API_KEY
-        with open(temp_path, "rb") as f:
-            form_files = {"file": (os.path.basename(temp_path), f, "audio/wav")}
-            form_data = {"model": "whisper-1"}
-            response = requests.post(
-                WHISPER_API_URL,
-                files=form_files,
-                data=form_data,
-                headers=headers,
-                timeout=60,
+        await _preload(model_name)
+        model = _models[model_name]
+
+        def _run_transcription():
+            return model.transcribe(
+                temp_path,
+                language=language,
+                fp16=False,
             )
 
-        if response.status_code == 200:
-            return response.json()
-        else:
-            PrintStyle.error(
-                f"Whisper API error: {response.status_code} - {response.text}"
-            )
-            return {"text": "[Error en transcripción externa]"}
+        result = await asyncio.to_thread(_run_transcription)
+        text = str(result.get("text", "")).strip()
+        return {"text": text}
 
     except Exception as e:
-        PrintStyle.error(f"Failed to connect to Whisper API: {str(e)}")
-        return {"text": f"[Error de conexión: {str(e)}]"}
+        PrintStyle.error(f"Local Whisper transcription failed: {e}")
+        return {"text": f"[Error de transcripción local: {str(e)}]"}
     finally:
         try:
             os.remove(temp_path)
         except Exception:
-            pass  # ignore errors during cleanup
+            pass

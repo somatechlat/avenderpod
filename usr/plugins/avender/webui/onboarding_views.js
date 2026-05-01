@@ -41,7 +41,9 @@ export function renderStep1() {
                 </div>
                 <div>
                     <label class="block text-base font-medium text-gray-700">Número de Identificación ${fieldTag(true)}</label>
-                    <input type="text" .value=${this.formData.idNumber} @input=${e => this.updateField('idNumber', e.target.value)} placeholder="Ej: 1712345678001" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 text-base border">
+                    <input type="text" .value=${this.formData.idNumber} @input=${e => this.updateField('idNumber', e.target.value.replace(/\D/g, ''))} placeholder="Ej: 1712345678001" maxlength="13" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 text-base border">
+                    ${this.formData.idType === 'RUC' && this.formData.idNumber && this.formData.idNumber.length !== 13 ? html`<p class="text-xs text-red-600 mt-1">El RUC debe tener 13 dígitos.</p>` : ''}
+                    ${this.formData.idType === 'CEDULA' && this.formData.idNumber && this.formData.idNumber.length !== 10 ? html`<p class="text-xs text-red-600 mt-1">La Cédula debe tener 10 dígitos.</p>` : ''}
                 </div>
                 <div class="md:col-span-2">
                     <label class="block text-base font-medium text-gray-700">Razón Social o Tu Nombre ${fieldTag(false)}</label>
@@ -158,10 +160,24 @@ export function renderStep3() {
                     <h3 class="text-lg font-bold text-blue-900 mb-2">Tu Catálogo de Productos</h3>
                     <div class="flex items-center justify-between border-t border-blue-200 pt-4 mt-2">
                         <span class="text-sm font-medium text-blue-900">¿Ya tienes tu propia lista de precios?</span>
-                        <label class="cursor-pointer bg-white border border-blue-300 text-blue-700 px-4 py-2 rounded-lg shadow-sm text-sm font-bold hover:bg-blue-100 ${this.catalogLoading ? 'opacity-50' : ''}">
-                            <span>${this.catalogLoading ? 'Procesando...' : 'Subir mi archivo'}</span>
-                            <input type="file" accept=".csv,.txt,.pdf,.doc,.xls,.png,.jpg" class="sr-only" @change=${this.handleFileUpload} ?disabled=${this.catalogLoading}>
-                        </label>
+                        <div class="flex items-center gap-2">
+                            <div class="relative group">
+                                <span class="text-blue-400 cursor-help text-lg">ⓘ</span>
+                                <div class="absolute bottom-full right-0 mb-2 w-64 bg-gray-900 text-white text-xs rounded-lg p-3 shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                                    <p class="font-bold mb-1">Formatos recomendados:</p>
+                                    <ul class="list-disc pl-4 space-y-1">
+                                        <li>PDF con texto seleccionable (no imágenes escaneadas)</li>
+                                        <li>Excel / CSV con columnas: Producto, Precio</li>
+                                        <li>Imagen clara y legible</li>
+                                    </ul>
+                                    <p class="mt-2 text-gray-300">Máximo 25 MB. Si tu PDF es escaneado, la extracción puede ser imperfecta.</p>
+                                </div>
+                            </div>
+                            <label class="cursor-pointer bg-white border border-blue-300 text-blue-700 px-4 py-2 rounded-lg shadow-sm text-sm font-bold hover:bg-blue-100 ${this.catalogLoading ? 'opacity-50' : ''}">
+                                <span>${this.catalogLoading ? 'Procesando...' : 'Subir mi archivo'}</span>
+                                <input type="file" accept=".csv,.txt,.pdf,.doc,.xls,.png,.jpg" class="sr-only" @change=${this.handleFileUpload} ?disabled=${this.catalogLoading}>
+                            </label>
+                        </div>
 
                         <button @click=${() => { this.showCatalogModal = true; this.loadPresets(); }} class="bg-indigo-600 text-white px-4 py-2 rounded-lg shadow-sm text-sm font-bold hover:bg-indigo-700 transition-colors text-center ml-4">
                             Crear Manualmente
@@ -190,12 +206,25 @@ export function renderStep3() {
                                     <tbody>
                                         ${this.formData.catalogItems.map((item, index) => html`
                                             <tr class="border-b hover:bg-gray-50 transition-colors">
-                                                <td class="px-3 py-2"><input type="text" title="Nombre de tu producto o servicio" .value=${item.name} @input=${e => { item.name = e.target.value; this.requestUpdate(); }} class="w-full bg-transparent border-0 text-sm focus:ring-indigo-500"></td>
+                                                <td class="px-3 py-2">
+                                                    <div class="flex items-center gap-2">
+                                                        ${item.image ? html`
+                                                            <img src=${item.image} alt="" class="w-8 h-8 rounded object-cover border border-gray-200 flex-shrink-0" title="Imagen cargada">
+                                                        ` : html`
+                                                            <div class="w-8 h-8 rounded bg-gray-100 flex items-center justify-center flex-shrink-0 text-gray-400 text-xs">📷</div>
+                                                        `}
+                                                        <input type="text" title="Nombre de tu producto o servicio" .value=${item.name} @input=${e => { item.name = e.target.value; this.requestUpdate(); }} class="w-full bg-transparent border-0 text-sm focus:ring-indigo-500">
+                                                    </div>
+                                                </td>
                                                 <td class="px-3 py-2"><input type="number" step="0.01" title="Precio final al cliente" .value=${item.price} @input=${e => { item.price = e.target.value; this.requestUpdate(); }} class="w-full bg-transparent border-0 text-sm focus:ring-indigo-500"></td>
                                                 <td class="px-3 py-2 text-center flex justify-around items-center gap-2">
-                                                        <label title="Subir foto del producto" class="cursor-pointer text-blue-500 hover:text-blue-700">
-                                                            <input type="file" accept="image/*" class="hidden" @change=${e => this.handleItemImageUpload(e, index)}>
-                                                        <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                                                    <label title=${item.image ? "Cambiar foto del producto" : "Subir foto del producto"} class="cursor-pointer ${item.image ? 'text-green-600 hover:text-green-800' : 'text-blue-500 hover:text-blue-700'}">
+                                                        <input type="file" accept="image/*" class="hidden" @change=${e => this.handleItemImageUpload(e, index)}>
+                                                        ${item.image ? html`
+                                                            <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                                        ` : html`
+                                                            <svg class="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                                                        `}
                                                     </label>
                                                     <button title="Eliminar producto" @click=${() => { this.formData.catalogItems.splice(index, 1); this.requestUpdate(); }} class="text-red-500 hover:text-red-700">✕</button>
                                                 </td>
@@ -269,7 +298,8 @@ export function renderStep5() {
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <label title="El número telefónico donde tus clientes enviarán los mensajes" class="block text-base font-medium text-gray-700">Número de WhatsApp del Negocio ${fieldTag(true)}</label>
-                    <input type="text" title="Ingresa tu número con código de país, ej. +5939..." .value=${this.formData.whatsappNumber} @input=${e => this.updateField('whatsappNumber', e.target.value)} placeholder="+593..." class="mt-1 block w-full rounded-lg border-gray-300 p-3 border focus:ring-indigo-500 focus:border-indigo-500">
+                    <input type="text" title="Ingresa tu número con código de país, ej. +5939..." .value=${this.formData.whatsappNumber} @input=${e => this.updateField('whatsappNumber', e.target.value)} @blur=${e => this.updateField('whatsappNumber', this.formatWhatsAppNumber(e.target.value))} placeholder="+593..." class="mt-1 block w-full rounded-lg border-gray-300 p-3 border focus:ring-indigo-500 focus:border-indigo-500">
+                    ${this.formData.whatsappNumber && !/^\+[1-9]\d{7,14}$/.test(this.formData.whatsappNumber) ? html`<p class="text-xs text-red-600 mt-1">Ingresa un número válido con código de país (ej: +593999999999).</p>` : ''}
                 </div>
                 <div>
                     <label title="Crea una contraseña segura para entrar a tu Panel de Control de Ventas" class="block text-base font-medium text-gray-700">Contraseña de Administrador ${fieldTag(true)}</label>
@@ -283,7 +313,7 @@ export function renderStep5() {
                         <span class="font-bold text-red-900 block text-lg">Control de Edad (Para negocios +18) 🔒</span>
                         <span class="text-sm text-red-700">La IA pedirá una foto de la cédula al cliente antes de permitir cualquier venta.</span>
                     </div>
-                    <input type="checkbox" .checked=${this.formData.restrictAccess} @change=${e => this.updateField('restrictAccess', e.target.checked)} class="h-6 w-6 text-red-600 rounded border-red-300 focus:ring-red-500">
+                    <input type="checkbox" .checked=${this.formData.requireAgeVerification} @change=${e => this.updateField('requireAgeVerification', e.target.checked)} class="h-6 w-6 text-red-600 rounded border-red-300 focus:ring-red-500">
                 </div>
             </div>
 
@@ -293,10 +323,10 @@ export function renderStep5() {
                         <span class="font-bold text-indigo-900 block text-lg">Lista Blanca de Clientes (Modo Privado) 🛡️</span>
                         <span class="text-sm text-indigo-700">Restringe tu asistente para que solo responda a números específicos.</span>
                     </div>
-                    <input type="checkbox" .checked=${this.formData.enableWhitelist} @change=${e => this.updateField('enableWhitelist', e.target.checked)} class="h-6 w-6 text-indigo-600 rounded border-indigo-300 focus:ring-indigo-500">
+                    <input type="checkbox" .checked=${this.formData.restrictAccess} @change=${e => this.updateField('restrictAccess', e.target.checked)} class="h-6 w-6 text-indigo-600 rounded border-indigo-300 focus:ring-indigo-500">
                 </div>
 
-                ${this.formData.enableWhitelist ? html`
+                ${this.formData.restrictAccess ? html`
                     <div class="mt-4 pt-4 border-t border-indigo-200">
                         <label class="block text-base font-medium text-indigo-900 mb-2">Agregar número permitido</label>
                         <div class="flex gap-2">
@@ -457,6 +487,73 @@ export function renderCopilot() {
                 </div>
             ` : ''}
             <button @click=${() => this.showCopilot = !this.showCopilot} class="bg-indigo-600 hover:bg-indigo-700 text-white rounded-full p-4 shadow-lg float-right text-2xl">✨</button>
+        </div>
+    `;
+}
+
+export function renderCatalogModal() {
+    const items = this.formData.catalogItems || [];
+    return html`
+        <div class="fixed inset-0 z-[90] flex items-center justify-center bg-gray-900/60 backdrop-blur-sm" @click=${() => { this.showCatalogModal = false; }}>
+            <div class="bg-white/95 rounded-2xl shadow-2xl border border-white/50 w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col" @click=${e => e.stopPropagation()}>
+                <div class="p-6 border-b border-gray-200 flex justify-between items-center bg-white rounded-t-2xl">
+                    <div>
+                        <h3 class="text-xl font-bold text-gray-900">Revisa tu Catálogo</h3>
+                        <p class="text-sm text-gray-500 mt-1">Edita, elimina o agrega productos antes de continuar.</p>
+                    </div>
+                    <button @click=${() => { this.showCatalogModal = false; }} class="text-gray-400 hover:text-gray-600 text-2xl leading-none">✕</button>
+                </div>
+
+                <div class="p-6 overflow-y-auto flex-grow">
+                    ${items.length === 0 ? html`
+                        <div class="text-center text-gray-500 py-8">
+                            <p class="text-lg mb-2">No hay productos aún.</p>
+                            <p class="text-sm">Usa los campos de abajo para agregar el primero.</p>
+                        </div>
+                    ` : html`
+                        <div class="space-y-3 mb-6">
+                            ${items.map((item, index) => html`
+                                <div class="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-xl p-3">
+                                    <div class="flex-1 min-w-0">
+                                        <input type="text" .value=${item.name} @input=${e => { item.name = e.target.value; this.requestUpdate(); }} placeholder="Nombre del producto" class="w-full bg-transparent border-0 font-semibold text-sm focus:ring-0 p-0 mb-1">
+                                        <input type="text" .value=${item.description || ''} @input=${e => { item.description = e.target.value; this.requestUpdate(); }} placeholder="Descripción (opcional)" class="w-full bg-transparent border-0 text-xs text-gray-500 focus:ring-0 p-0">
+                                    </div>
+                                    <div class="w-24">
+                                        <input type="number" step="0.01" .value=${item.price} @input=${e => { item.price = e.target.value; this.requestUpdate(); }} placeholder="Precio" class="w-full bg-white border border-gray-300 rounded-lg text-sm p-2 text-right focus:ring-indigo-500 focus:border-indigo-500">
+                                    </div>
+                                    <button @click=${() => { this.formData.catalogItems.splice(index, 1); this.requestUpdate(); }} class="text-red-500 hover:text-red-700 p-2" title="Eliminar">✕</button>
+                                </div>
+                            `)}
+                        </div>
+                    `}
+
+                    <div class="border-t border-gray-200 pt-4">
+                        <p class="text-sm font-semibold text-gray-700 mb-3">Agregar nuevo producto</p>
+                        <div class="flex items-end gap-2">
+                            <div class="flex-1">
+                                <input type="text" .value=${this.newItem.name} @input=${e => this.newItem.name = e.target.value} placeholder="Nombre" class="w-full rounded-lg border-gray-300 p-2 text-sm border focus:ring-indigo-500 focus:border-indigo-500 mb-2">
+                                <input type="text" .value=${this.newItem.description} @input=${e => this.newItem.description = e.target.value} placeholder="Descripción" class="w-full rounded-lg border-gray-300 p-2 text-sm border focus:ring-indigo-500 focus:border-indigo-500">
+                            </div>
+                            <div class="w-28">
+                                <input type="number" step="0.01" .value=${this.newItem.price} @input=${e => this.newItem.price = e.target.value} placeholder="Precio" class="w-full rounded-lg border-gray-300 p-2 text-sm border focus:ring-indigo-500 focus:border-indigo-500">
+                            </div>
+                            <button @click=${() => {
+                                if (!this.newItem.name || !this.newItem.price) return;
+                                this.formData.catalogItems.push({ ...this.newItem });
+                                this.newItem = { name: '', description: '', price: '' };
+                                this.requestUpdate();
+                            }} class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition-colors mb-0">+</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-6 border-t border-gray-200 bg-gray-50 rounded-b-2xl flex justify-between items-center">
+                    <span class="text-sm text-gray-500">${items.length} producto${items.length !== 1 ? 's' : ''}</span>
+                    <button @click=${() => { this.showCatalogModal = false; }} class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg shadow-sm transition-colors">
+                        ${items.length > 0 ? 'Confirmar y Cerrar' : 'Cerrar'}
+                    </button>
+                </div>
+            </div>
         </div>
     `;
 }

@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import mimetypes
 import os
 import uuid
+import base64
 
-import aiohttp
 from aiogram.types import Message as TgMessage
 
-from helpers import files
+from helpers import files, whisper
 from helpers.print_style import PrintStyle
 from plugins._telegram_integration.helpers import telegram_client as tc
 from plugins._telegram_integration.helpers.constants import DOWNLOAD_FOLDER
@@ -114,30 +113,11 @@ async def transcribe_first_audio(attachments: list[str]) -> str:
     if not audio_path:
         return ""
 
-    whisper_url = os.environ.get("WHISPER_API_URL", "").strip()
-    if not whisper_url:
-        whisper_url = "http://avender_whisper:8000/v1/audio/transcriptions"
-
     try:
-        form = aiohttp.FormData()
         with open(audio_path, "rb") as f:
-            file_data = f.read()
-        form.add_field(
-            "file",
-            file_data,
-            filename=os.path.basename(audio_path),
-            content_type=mimetypes.guess_type(audio_path)[0] or "audio/ogg",
-        )
-        form.add_field("model", "whisper-1")
-        form.add_field("language", "es")
-
-        async with aiohttp.ClientSession() as session:
-            async with session.post(whisper_url, data=form) as resp:
-                if resp.status != 200:
-                    PrintStyle.warning(f"Telegram: whisper returned HTTP {resp.status}")
-                    return ""
-                data = await resp.json()
-                return str(data.get("text", "")).strip()
+            encoded = base64.b64encode(f.read()).decode("ascii")
+        data = await whisper.transcribe("base", encoded, language="es")
+        return str(data.get("text", "")).strip()
     except Exception as e:
         PrintStyle.warning(f"Telegram: whisper error: {e}")
         return ""

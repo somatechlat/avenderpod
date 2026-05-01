@@ -6,11 +6,12 @@ from typing import Any
 
 import requests
 
-from .models import Tenant, VaultRecord
+from .models import ServiceCredential, Tenant, VaultRecord
+from .secret_values import read_secret
 
 
 def _get_env(name: str, *, required: bool = True, default: str = "") -> str:
-    value = os.environ.get(name, default).strip()
+    value = read_secret(name, default=default)
     if required and not value:
         raise EnvironmentError(
             f"{name} environment variable is required for Vault provisioning."
@@ -41,10 +42,27 @@ def _sysadmin_api_key() -> str:
 
 
 def build_tenant_secret_bundle(tenant: Tenant) -> dict[str, str]:
+    tenant_api_key = secrets.token_urlsafe(48)
+    ServiceCredential.objects.update_or_create(
+        tenant=tenant,
+        name="tenant-runtime",
+        defaults={
+            "key_prefix": tenant_api_key[:12],
+            "key_hash": ServiceCredential.hash_key(tenant_api_key),
+            "is_active": True,
+            "scopes": [
+                "tenant:status",
+                "tenant:usage",
+                "creator_override:init",
+                "creator_override:verify",
+            ],
+        },
+    )
     return {
         "TENANT_ID": str(tenant.id),
         "AVENDER_SETUP_TOKEN": secrets.token_hex(32),
         "MCP_SERVER_TOKEN": secrets.token_hex(32),
+        "SYSADMIN_TENANT_API_KEY": tenant_api_key,
     }
 
 
@@ -89,49 +107,71 @@ def build_tenant_bootstrap_env(
     tenant: Tenant,
     tenant_secrets: dict[str, str],
     assigned_port: int,
-    whisper_api_key: str,
 ) -> dict[str, str]:
-    public_sysadmin_url = _get_env(
-        "SYSADMIN_API_PUBLIC_URL",
+    # Cluster VPC IP is the private IP of the cluster control plane VM.
+    # All tenant-to-cluster communication happens over the Vultr VPC.
+    cluster_vpc_ip = os.environ.get("CLUSTER_VPC_IP", "").strip()
+
+    # SysAdmin API is on port 45000 of the cluster VM
+    sysadmin_url = _get_env(
+        "SYSADMIN_API_URL",
         required=False,
-        default=os.environ.get("SYSADMIN_API_URL", ""),
+        default=f"http://{cluster_vpc_ip}:45000/api/saas" if cluster_vpc_ip else "",
     )
-    if not public_sysadmin_url:
+    if not sysadmin_url:
         raise EnvironmentError(
-            "SYSADMIN_API_PUBLIC_URL (or SYSADMIN_API_URL) must be set for tenant bootstrap."
+            "CLUSTER_VPC_IP (or SYSADMIN_API_URL) must be set for tenant bootstrap."
         )
 
-    whisper_url = _get_env(
-        "WHISPER_API_URL",
-        required=False,
-        default="",
-    )
-    if not whisper_url:
-        # Fallback to constructing from known proxy port
-        whisper_proxy_port = _get_env(
-            "WHISPER_PROXY_PORT", required=False, default="45002"
+    plan = tenant.plan
+    a0_image = (
+        plan.a0_image
+        if plan
+        else _get_env(
+            "A0_IMAGE", required=False, default="agent0ai/agent-zero-tenant:latest"
         )
-        # In production the tenant VM must reach the cluster's Whisper proxy.
-        # If the cluster has a public domain, use that. Otherwise the operator
-        # must set WHISPER_API_URL explicitly.
-        whisper_url = f"http://{public_sysadmin_url.rsplit(':', 1)[0]}:{whisper_proxy_port}/v1/audio/transcriptions"
-
-    a0_image = _get_env(
-        "A0_IMAGE", required=False, default="agent0ai/agent-zero:latest"
     )
 
     return {
         "TENANT_ID": str(tenant.id),
-        "SYSADMIN_API_URL": public_sysadmin_url,
-        "SYSADMIN_API_KEY": _sysadmin_api_key(),
+        "A0_PLAN_ID": str(plan.id) if plan else "",
+        "A0_PLAN_NAME": plan.name if plan else "",
+        "A0_MAX_CONVERSATIONS_PER_MONTH": str(plan.max_conversations if plan else 0),
+        "A0_MAX_MESSAGES_PER_DAY": str(plan.max_messages_per_day if plan else 0),
+        "A0_MAX_MESSAGES_PER_MINUTE": str(plan.max_messages_per_minute if plan else 0),
+        "A0_MAX_WHATSAPP_NUMBERS": str(plan.max_numbers if plan else 0),
+        "A0_MAX_CATALOG_ITEMS": str(plan.max_catalog_items if plan else 0),
+        "A0_MAX_TRANSCRIPTION_MINUTES_PER_MONTH": str(
+            plan.max_transcription_minutes if plan else 0
+        ),
+        "A0_MAX_STORAGE_MB": str(plan.max_storage_mb if plan else 0),
+        "A0_MAX_USERS": str(plan.max_users if plan else 0),
+        "A0_MAX_AGENT_CONTEXTS": str(plan.max_agent_contexts if plan else 0),
+        "A0_ALLOW_CATALOG_UPLOAD": str(plan.allow_catalog_upload if plan else False),
+        "A0_ALLOW_VOICE_MESSAGES": str(plan.allow_voice_messages if plan else False),
+        "A0_ALLOW_HUMAN_HANDOFF": str(plan.allow_human_handoff if plan else False),
+        "A0_ALLOW_CREATOR_OVERRIDE": str(
+            plan.allow_creator_override if plan else False
+        ),
+        "A0_ALLOW_CUSTOM_DOMAIN": str(plan.allow_custom_domain if plan else False),
+        "A0_ALLOW_INTEGRATIONS": str(plan.allow_integrations if plan else False),
+        "A0_ALLOW_MOBILE_APP": str(plan.allow_mobile_app if plan else False),
+        "A0_ALLOW_MULTICHANNEL": str(plan.allow_multichannel if plan else False),
+        "A0_ALLOW_OUTBOUND_REACTIVATION": str(
+            plan.allow_outbound_reactivation if plan else False
+        ),
+        "A0_ALLOW_CALL_HANDLING": str(plan.allow_call_handling if plan else False),
+        "SYSADMIN_API_URL": sysadmin_url,
+        "SYSADMIN_API_KEY": tenant_secrets.get("SYSADMIN_TENANT_API_KEY")
+        or _sysadmin_api_key(),
         "AVENDER_SETUP_TOKEN": tenant_secrets["AVENDER_SETUP_TOKEN"],
         "MCP_SERVER_TOKEN": tenant_secrets["MCP_SERVER_TOKEN"],
-        "WHISPER_API_URL": whisper_url,
-        "WHISPER_API_KEY": whisper_api_key,
+        "STT_MODEL_SIZE": "base",
+        "STT_LANGUAGE": "es",
         "ASSIGNED_PORT": str(assigned_port),
         "A0_IMAGE": a0_image,
-        "A0_MEMORY_LIMIT": "3g",
-        "A0_CPU_LIMIT": "2.0",
-        "A0_MEMORY_RESERVATION": "1g",
-        "A0_CPU_RESERVATION": "1.0",
+        "A0_MEMORY_LIMIT": plan.a0_memory_limit if plan else "3g",
+        "A0_CPU_LIMIT": plan.a0_cpu_limit if plan else "2.0",
+        "A0_MEMORY_RESERVATION": plan.a0_memory_reservation if plan else "1g",
+        "A0_CPU_RESERVATION": plan.a0_cpu_reservation if plan else "1.0",
     }

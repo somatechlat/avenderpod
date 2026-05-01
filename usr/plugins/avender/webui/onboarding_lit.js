@@ -22,7 +22,10 @@ export class AvenderWizard extends LitElement {
         industries: { type: Array },
         showCatalogModal: { type: Boolean },
         newItem: { type: Object },
-        loadingMessage: { type: String }
+        loadingMessage: { type: String },
+        qrStatus: { type: String },
+        qrDataUrl: { type: String },
+        qrPollTimer: { type: Object }
     };
 
     constructor() {
@@ -56,7 +59,7 @@ export class AvenderWizard extends LitElement {
             payCash: false,
             payLink: false,
             paymentUrl: '',
-            archetype: 'restaurant',
+            archetype: '',
             policies: '',
             agentName: '',
             language: 'es',
@@ -66,7 +69,6 @@ export class AvenderWizard extends LitElement {
             whatsappNumber: '',
             adminPassword: '',
             restrictAccess: false,
-            enableWhitelist: false,
             allowedNumbers: '',
             catalogFile: null,
             catalogItems: [],
@@ -90,6 +92,11 @@ export class AvenderWizard extends LitElement {
             { id: 'cbd', name: 'Cannabis / CBD', icon: '🌿' },
             { id: 'other', name: 'Otro Negocio', icon: '📦' }
         ];
+        const params = new URLSearchParams(window.location.search);
+        this.setupToken = params.get('setup_token') || params.get('token') || localStorage.getItem('avender_setup_token') || '';
+        if (this.setupToken) {
+            localStorage.setItem('avender_setup_token', this.setupToken);
+        }
     }
 
     createRenderRoot() {
@@ -130,13 +137,32 @@ export class AvenderWizard extends LitElement {
                 </div>
             </div>
 
+            ${this.showCatalogModal ? this.renderCatalogModal() : ''}
             ${this.renderCopilot()}
         `;
+    }
+
+    async connectedCallback() {
+        super.connectedCallback();
+        // Check if onboarding is already complete and redirect
+        try {
+            const res = await fetch('/api/plugins/avender/onboarding_api', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({}) });
+            const data = await res.json();
+            if (!data.ok && data.error && data.error.includes('already completed')) {
+                window.location.href = './admin.html';
+            }
+        } catch (e) { /* ignore */ }
     }
 
     disconnectedCallback() {
         super.disconnectedCallback();
         if (this.qrPollTimer) clearInterval(this.qrPollTimer);
+        if (this.loaderInterval) clearInterval(this.loaderInterval);
+        if (this._statusPollTimer) clearTimeout(this._statusPollTimer);
+        if (this.mapInstance) {
+            this.mapInstance.remove();
+            this.mapInstance = null;
+        }
     }
 }
 

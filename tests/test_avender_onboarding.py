@@ -19,24 +19,17 @@ AVENDER_DB = Path("usr/workdir/avender.db")
 
 
 def reset_tenant_state():
-    """Fail-not-Skip Diagnostic: Resets the onboarding state entirely for testing inside the isolated container."""
+    """Fail-not-Skip Diagnostic: Resets the onboarding state entirely for testing."""
     try:
-        subprocess.run(
-            [
-                "docker",
-                "exec",
-                "avender_agent_zero",
-                "python3",
-                "-c",
-                "import sqlite3; conn = sqlite3.connect('/a0/usr/workdir/avender.db'); "
-                "c = conn.cursor(); c.execute(\"DELETE FROM tenant_config WHERE key='onboarding_complete'\"); "
-                "c.execute('DELETE FROM catalog_item'); conn.commit(); conn.close()",
-            ],
-            check=True,
-            capture_output=True,
-        )
-    except subprocess.CalledProcessError as e:
-        print(f"Warning: Could not reset DB inside container: {e.stderr}")
+        import sqlite3
+        conn = sqlite3.connect(str(AVENDER_DB))
+        c = conn.cursor()
+        c.execute("DELETE FROM tenant_config WHERE key='onboarding_complete'")
+        c.execute("DELETE FROM catalog_item")
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"Warning: Could not reset DB: {e}")
 
 
 def test_onboarding_wizard_and_catalog_ingestion():
@@ -46,6 +39,7 @@ def test_onboarding_wizard_and_catalog_ingestion():
         "idType": "RUC",
         "idNumber": "1790000000001",
         "tradeName": "Test ISO Business",
+        "headquarters": "Av. Principal 123, Quito",
         "archetype": "doctor",
         "policies": "Strictly no walk-ins.",
         "hours": "Mon-Fri 08:00-18:00",
@@ -78,48 +72,21 @@ def test_onboarding_wizard_and_catalog_ingestion():
     assert data.get("ok") is True, f"API failed: {data}"
     assert data.get("tradeName") == "Test ISO Business"
 
-    # Verify DB State directly inside the container
+    # Verify DB State directly
     print("[TEST] Verifying Database persistence...")
+    import sqlite3
 
     # Check onboarding completion flag
-    flag_proc = subprocess.run(
-        [
-            "docker",
-            "exec",
-            "avender_agent_zero",
-            "python3",
-            "-c",
-            "import sqlite3; conn = sqlite3.connect('/a0/usr/workdir/avender.db'); "
-            "c = conn.cursor(); c.execute(\"SELECT value FROM tenant_config WHERE key='onboarding_complete'\"); "
-            "print(c.fetchone()[0])",
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-
-    assert (
-        flag_proc.stdout.strip() == "true"
-    ), "onboarding_complete flag not set to true"
+    conn = sqlite3.connect(str(AVENDER_DB))
+    c = conn.cursor()
+    c.execute("SELECT value FROM tenant_config WHERE key='onboarding_complete'")
+    row = c.fetchone()
+    assert row is not None and row[0] == "true", "onboarding_complete flag not set to true"
 
     # Check catalog insertion
-    catalog_proc = subprocess.run(
-        [
-            "docker",
-            "exec",
-            "avender_agent_zero",
-            "python3",
-            "-c",
-            "import sqlite3, json; conn = sqlite3.connect('/a0/usr/workdir/avender.db'); "
-            "c = conn.cursor(); c.execute('SELECT name, price FROM catalog_item'); "
-            "print(json.dumps([{'name': r[0], 'price': r[1]} for r in c.fetchall()]))",
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-
-    items = json.loads(catalog_proc.stdout)
+    c.execute("SELECT name, price FROM catalog_item")
+    items = [{"name": r[0], "price": r[1]} for r in c.fetchall()]
+    conn.close()
     assert len(items) >= 2, f"Expected at least 2 parsed items, found {len(items)}"
     print(
         "\n[SUCCESS] Catalog items were successfully parsed via Nemotron LLM and inserted:"

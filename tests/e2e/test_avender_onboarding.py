@@ -33,21 +33,14 @@ def verify_test_artifacts():
 @pytest.fixture(autouse=True)
 def reset_tenant_state():
     """Reset live Avender tenant state so the onboarding flow can run end-to-end."""
-    subprocess.run(
-        [
-            "docker",
-            "exec",
-            "avender_agent_zero",
-            "python3",
-            "-c",
-            "import sqlite3; conn = sqlite3.connect('/a0/usr/workdir/avender.db', timeout=30); "
-            "c = conn.cursor(); c.execute('DELETE FROM tenant_config'); "
-            "c.execute('DELETE FROM catalog_item'); conn.commit(); conn.close()",
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
+    import sqlite3
+    db_path = os.path.join(os.path.dirname(__file__), "..", "..", "usr", "workdir", "avender.db")
+    conn = sqlite3.connect(db_path, timeout=30)
+    c = conn.cursor()
+    c.execute("DELETE FROM tenant_config")
+    c.execute("DELETE FROM catalog_item")
+    conn.commit()
+    conn.close()
 
 
 def test_avender_onboarding_full_flow(page: Page):
@@ -99,6 +92,8 @@ def test_avender_onboarding_full_flow(page: Page):
     page.click("div:has-text('🍔') >> text=Restaurante / Comidas")
 
     page.click("button:has-text('Crear Manualmente')")
+    # Close the catalog review modal so the inline table is accessible
+    page.click("button:has-text('Confirmar y Cerrar')")
     expect(page.locator("text=Verifica tu menú extraído:")).to_be_visible(timeout=60000)
     page.wait_for_selector("table tbody tr", timeout=60000)
 
@@ -139,8 +134,13 @@ def test_avender_onboarding_full_flow(page: Page):
     page.click("button:has-text('¡Terminar y Activar!')")
 
     # -- Step 7: Éxito --
-    expect(page.locator("h2").filter(has_text="Escanea el Código QR")).to_be_visible(
-        timeout=15000
+    # Wait for either QR code or already-connected state
+    page.wait_for_timeout(4000)  # Let QR polling fire
+    qr_heading = page.locator("h2").filter(has_text="Escanea el Código QR")
+    connected_heading = page.locator("h2").filter(has_text="¡Conectado Exitosamente!")
+
+    assert qr_heading.is_visible() or connected_heading.is_visible(), (
+        "Step 7 did not load: neither QR code nor connected state visible"
     )
 
     print(

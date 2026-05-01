@@ -13,6 +13,32 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Space+Grotesk:wght@500;700;900&display=swap" rel="stylesheet">
     
     <!-- Tailwind CSS (Compiled) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Space Grotesk', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            bg: '#090d14',
+                            panel: '#111827',
+                            pink: '#f43f5e',
+                            blue: '#38bdf8',
+                            cyan: '#22d3ee',
+                        }
+                    },
+                    backgroundImage: {
+                        'gradient-brand': 'linear-gradient(to right, #f43f5e, #38bdf8)',
+                    }
+                }
+            }
+        }
+    </script>
     <link href="{% static 'tenants/css/output.css' %}" rel="stylesheet">
     
     <style>
@@ -94,7 +120,13 @@
                 
                 this.showWizard = false;
                 this.wizardStep = 1;
-                this.wizardData = { name: '', email: '', plan_name: 'Basic' };
+                this.wizardData = {
+                    business_name: '',
+                    owner_full_name: '',
+                    owner_email: '',
+                    owner_phone_e164: '',
+                    plan_name: 'free'
+                };
                 this.wizardLoading = false;
                 this.wizardError = '';
                 
@@ -148,15 +180,26 @@
 
             // Wizard methods...
             openWizard() {
-                this.wizardData = { name: '', email: '', plan_name: this.plans.length > 0 ? this.plans[0].name : 'Basic' };
+                const firstPlan = this.plans.find(p => p.is_active) || this.plans[0];
+                this.wizardData = {
+                    business_name: '',
+                    owner_full_name: '',
+                    owner_email: '',
+                    owner_phone_e164: '',
+                    plan_name: firstPlan ? (firstPlan.slug || firstPlan.name) : 'free'
+                };
                 this.wizardStep = 1;
                 this.wizardError = '';
                 this.showWizard = true;
             }
             closeWizard() { this.showWizard = false; }
             nextStep() {
-                if (this.wizardStep === 1 && (!this.wizardData.name || !this.wizardData.email)) {
+                if (this.wizardStep === 1 && (!this.wizardData.business_name || !this.wizardData.owner_full_name || !this.wizardData.owner_email || !this.wizardData.owner_phone_e164)) {
                     this.wizardError = "Todos los campos son obligatorios.";
+                    return;
+                }
+                if (this.wizardStep === 1 && !/^\+[1-9]\d{7,14}$/.test(this.wizardData.owner_phone_e164)) {
+                    this.wizardError = "El celular debe incluir codigo de pais. Ej: +593979445965.";
                     return;
                 }
                 this.wizardError = '';
@@ -345,12 +388,21 @@
                                     </tr>
                                 `) : ''}
                                 
-                                ${this.currentView === 'plans' ? this.renderTable('SaaS Plans', ['ID', 'Nombre', 'Precio/Mes', 'Conversaciones'], this.plans, p => html`
+                                ${this.currentView === 'plans' ? this.renderTable('SaaS Plans', ['Plan', 'Precio', 'Limites', 'Features'], this.plans, p => html`
                                     <tr class="hover:bg-white/5 transition duration-200">
-                                        <td class="p-6 font-mono text-xs text-slate-500">${p.id}</td>
-                                        <td class="p-6 font-bold text-white text-lg">${p.name}</td>
-                                        <td class="p-6 text-brand-blue font-bold">$${p.price_monthly}</td>
-                                        <td class="p-6 text-slate-400">${p.max_conversations}</td>
+                                        <td class="p-6">
+                                            <p class="font-bold text-white text-lg">${p.name} ${!p.is_active ? html`<span class="text-xs text-slate-500 ml-2">Inactivo</span>` : ''}</p>
+                                            <p class="text-xs text-slate-500 mt-1">${p.description || p.slug}</p>
+                                        </td>
+                                        <td class="p-6 text-brand-blue font-bold">${p.is_custom_priced ? 'A medida' : `$${p.price_monthly}/mes`}</td>
+                                        <td class="p-6 text-slate-400 text-sm">${p.max_conversations} conv. / ${p.max_messages_per_day} msg-dia / ${p.max_numbers} WA</td>
+                                        <td class="p-6 text-slate-400 text-sm">${[
+                                            p.allow_mobile_app ? 'App' : '',
+                                            p.allow_voice_messages ? 'Audios' : '',
+                                            p.allow_multichannel ? 'Multicanal' : '',
+                                            p.allow_integrations ? 'Integraciones' : '',
+                                            p.allow_call_handling ? 'Llamadas' : ''
+                                        ].filter(Boolean).join(', ') || 'Basico'}</td>
                                     </tr>
                                 `) : ''}
 
@@ -390,11 +442,21 @@
                                             <div class="space-y-6">
                                                 <div>
                                                     <label class="block text-sm font-bold text-slate-400 mb-2 uppercase tracking-wider">Nombre de la Empresa</label>
-                                                    <input type="text" .value=${this.wizardData.name} @input=${e=>this.wizardData.name=e.target.value} placeholder="Ej: Zapatería El Sol" class="w-full bg-black/40 border border-white/10 text-white rounded-2xl px-5 py-4 focus:outline-none focus:border-brand-pink focus:ring-1 focus:ring-brand-pink transition">
+                                                    <input type="text" .value=${this.wizardData.business_name} @input=${e=>this.wizardData.business_name=e.target.value} placeholder="Ej: Zapateria El Sol" class="w-full bg-black/40 border border-white/10 text-white rounded-2xl px-5 py-4 focus:outline-none focus:border-brand-pink focus:ring-1 focus:ring-brand-pink transition">
                                                 </div>
                                                 <div>
-                                                    <label class="block text-sm font-bold text-slate-400 mb-2 uppercase tracking-wider">Correo Electrónico</label>
-                                                    <input type="email" .value=${this.wizardData.email} @input=${e=>this.wizardData.email=e.target.value} placeholder="admin@empresa.com" class="w-full bg-black/40 border border-white/10 text-white rounded-2xl px-5 py-4 focus:outline-none focus:border-brand-pink focus:ring-1 focus:ring-brand-pink transition">
+                                                    <label class="block text-sm font-bold text-slate-400 mb-2 uppercase tracking-wider">Nombre del Dueño</label>
+                                                    <input type="text" .value=${this.wizardData.owner_full_name} @input=${e=>this.wizardData.owner_full_name=e.target.value} placeholder="Ej: Maria Perez" class="w-full bg-black/40 border border-white/10 text-white rounded-2xl px-5 py-4 focus:outline-none focus:border-brand-pink focus:ring-1 focus:ring-brand-pink transition">
+                                                </div>
+                                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label class="block text-sm font-bold text-slate-400 mb-2 uppercase tracking-wider">Correo Electrónico</label>
+                                                        <input type="email" .value=${this.wizardData.owner_email} @input=${e=>this.wizardData.owner_email=e.target.value} placeholder="admin@empresa.com" class="w-full bg-black/40 border border-white/10 text-white rounded-2xl px-5 py-4 focus:outline-none focus:border-brand-pink focus:ring-1 focus:ring-brand-pink transition">
+                                                    </div>
+                                                    <div>
+                                                        <label class="block text-sm font-bold text-slate-400 mb-2 uppercase tracking-wider">Celular WhatsApp</label>
+                                                        <input type="tel" .value=${this.wizardData.owner_phone_e164} @input=${e=>this.wizardData.owner_phone_e164=e.target.value} placeholder="+593979445965" class="w-full bg-black/40 border border-white/10 text-white rounded-2xl px-5 py-4 focus:outline-none focus:border-brand-pink focus:ring-1 focus:ring-brand-pink transition">
+                                                    </div>
                                                 </div>
                                             </div>
                                         ` : ''}
@@ -403,14 +465,14 @@
                                             <div class="space-y-4">
                                                 <label class="block text-sm font-bold text-slate-400 mb-4 uppercase tracking-wider">Selecciona un Plan SaaS</label>
                                                 <div class="grid gap-4">
-                                                    ${this.plans.map(p => html`
-                                                        <div @click=${() => this.wizardData.plan_name = p.name} class="cursor-pointer border-2 rounded-2xl p-6 transition duration-300 ${this.wizardData.plan_name === p.name ? 'border-brand-pink bg-brand-pink/5' : 'border-white/10 hover:border-white/20 bg-black/20'}">
+                                                    ${this.plans.filter(p => p.is_active).map(p => html`
+                                                        <div @click=${() => this.wizardData.plan_name = p.slug || p.name} class="cursor-pointer border-2 rounded-2xl p-6 transition duration-300 ${this.wizardData.plan_name === (p.slug || p.name) ? 'border-brand-pink bg-brand-pink/5' : 'border-white/10 hover:border-white/20 bg-black/20'}">
                                                             <div class="flex justify-between items-center">
                                                                 <div>
-                                                                    <span class="block font-black text-white text-xl">${p.name} Plan</span>
-                                                                    <span class="block text-sm text-slate-400 mt-1">${p.max_conversations} convers./mes</span>
+                                                                    <span class="block font-black text-white text-xl">${p.name} ${p.marketing_badge ? html`<span class="text-xs text-brand-pink ml-2">${p.marketing_badge}</span>` : ''}</span>
+                                                                    <span class="block text-sm text-slate-400 mt-1">${p.max_conversations} conversaciones/mes · ${p.max_messages_per_day} mensajes/dia</span>
                                                                 </div>
-                                                                <span class="font-display font-black text-3xl text-gradient">$${p.price_monthly}</span>
+                                                                <span class="font-display font-black text-3xl text-gradient">${p.is_custom_priced ? 'A medida' : `$${p.price_monthly}`}</span>
                                                             </div>
                                                         </div>
                                                     `)}
@@ -424,7 +486,7 @@
                                                     <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
                                                 </div>
                                                 <h4 class="text-2xl font-display font-black text-white mb-2">Todo Listo</h4>
-                                                <p class="text-slate-400 text-lg">Se provisionará la infraestructura para <strong class="text-white">${this.wizardData.name}</strong> bajo el plan <strong class="text-white">${this.wizardData.plan_name}</strong>.</p>
+                                                <p class="text-slate-400 text-lg">Se provisionara la infraestructura para <strong class="text-white">${this.wizardData.business_name}</strong> bajo el plan <strong class="text-white">${this.wizardData.plan_name}</strong>.</p>
                                             </div>
                                         ` : ''}
                                     </div>
@@ -447,5 +509,24 @@
         .animate-fade-in { animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
+    <script>
+        window.addEventListener('error', (event) => {
+            const fallback = document.getElementById('dashboard-fallback-error');
+            if (fallback) {
+                fallback.classList.remove('hidden');
+                fallback.querySelector('[data-error-message]').textContent = event.message || 'No se pudo cargar el panel.';
+            }
+        });
+    </script>
+</head>
+<body>
+    <saas-control-plane></saas-control-plane>
+    <div id="dashboard-fallback-error" class="hidden min-h-screen p-8 text-white">
+        <div class="max-w-xl rounded-lg border border-red-500/30 bg-red-950/40 p-6">
+            <h1 class="text-xl font-bold">No se pudo cargar el panel SysAdmin</h1>
+            <p class="mt-3 text-sm text-red-100" data-error-message>Revise la consola del navegador o recargue la pagina.</p>
+            <a class="mt-5 inline-block rounded bg-white px-4 py-2 text-sm font-bold text-slate-950" href="/admin/">Abrir Django Admin</a>
+        </div>
+    </div>
 </body>
 </html>

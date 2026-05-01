@@ -15,7 +15,6 @@ from usr.plugins.avender.helpers.db import (
 
 SESSION_HOURS = 12
 PASSWORD_KEY = "admin_password_hash"
-LEGACY_PASSWORD_KEY = "adminPassword"
 
 
 def hash_admin_password(password: str, *, salt: str | None = None) -> str:
@@ -45,19 +44,20 @@ def _verify_hash(password: str, encoded: str) -> bool:
 
 
 def set_admin_password(password: str) -> None:
+    """Set admin password and invalidate all existing sessions."""
     save_tenant_config({PASSWORD_KEY: hash_admin_password(password)})
+    # Invalidate all sessions on password change
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM auth_sessions")
+    conn.commit()
+    conn.close()
 
 
 def verify_admin_password(password: str) -> bool:
     encoded = get_tenant_config(PASSWORD_KEY)
     if isinstance(encoded, str) and _verify_hash(password, encoded):
         return True
-
-    legacy = get_tenant_config(LEGACY_PASSWORD_KEY)
-    if legacy and hmac.compare_digest(str(password), str(legacy)):
-        set_admin_password(password)
-        return True
-
     return False
 
 

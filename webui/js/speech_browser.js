@@ -36,8 +36,8 @@ class MicrophoneInput {
         this.analysisFrame = null;
 
         this.options = {
-            modelSize: 'tiny',
-            language: 'en',
+            modelSize: 'base',
+            language: 'es',
             silenceThreshold: 0.15,
             silenceDuration: 1000,
             waitingTimeout: 2000,

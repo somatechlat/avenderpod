@@ -6,14 +6,13 @@ Requires agent context.
 
 import asyncio
 import base64
-import mimetypes
 import os
 import re
 import uuid
 import aiohttp
 
 from agent import Agent, AgentContext, UserMessage
-from helpers import plugins, files, runtime
+from helpers import plugins, files, runtime, whisper
 from helpers import message_queue as mq
 from helpers import integration_commands
 from helpers.persist_chat import save_tmp_chat
@@ -394,39 +393,19 @@ def _md_to_whatsapp(text: str) -> str:
 
 
 async def _transcribe_audio(msg: dict, attachments: list[str]) -> None:
-    """Transcribe audio/ptt messages via internal Whisper server."""
+    """Transcribe audio/ptt messages with the tenant-local Whisper model."""
     if msg.get("mediaType") in ("audio", "ptt") and attachments:
         try:
             audio_path = files.fix_dev_path(attachments[0])
             if os.path.exists(audio_path):
-                form = aiohttp.FormData()
                 with open(audio_path, "rb") as f:
-                    file_data = f.read()
-                content_type = mimetypes.guess_type(audio_path)[0] or "audio/ogg"
-                form.add_field(
-                    "file",
-                    file_data,
-                    filename=os.path.basename(audio_path),
-                    content_type=content_type,
-                )
-                form.add_field("model", "whisper-1")
-                form.add_field("language", "es")
-
-                whisper_url = os.environ.get(
-                    "WHISPER_API_URL",
-                    "http://avender_whisper:8000/v1/audio/transcriptions",
-                )
-                async with aiohttp.ClientSession() as session:
-                    async with session.post(whisper_url, data=form) as resp:
-                        if resp.status == 200:
-                            data = await resp.json()
-                            text = data.get("text", "").strip()
-                            if text:
-                                msg["body"] = f"[Nota de voz transcrita]: {text}"
-                        else:
-                            msg["body"] = (
-                                f"[Nota de voz recibida (error transcripción: {resp.status})]"
-                            )
+                    encoded = base64.b64encode(f.read()).decode("ascii")
+                data = await whisper.transcribe("base", encoded, language="es")
+                text = str(data.get("text", "")).strip()
+                if text:
+                    msg["body"] = f"[Nota de voz transcrita]: {text}"
+                else:
+                    msg["body"] = "[Nota de voz recibida sin texto detectable]"
         except Exception as e:
             PrintStyle.warning(f"WhatsApp: whisper error: {e}")
 

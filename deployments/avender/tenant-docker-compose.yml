@@ -4,11 +4,13 @@
 # This file is copied to each tenant Vultr VM and run via cloud-init.
 # It runs ONE independent Agent Zero container with no shared volumes.
 # All data is persisted in a per-tenant Docker named volume.
+#
+# Image: agent0ai/agent-zero-tenant (minimal, no SearXNG/SSH/supervisord)
 # ============================================================================
 
 services:
   agent_zero:
-    image: ${A0_IMAGE:-agent0ai/agent-zero:latest}
+    image: ${A0_IMAGE:-agent0ai/agent-zero-tenant:latest}
     restart: unless-stopped
     container_name: agent-zero-${TENANT_ID}
     deploy:
@@ -24,14 +26,15 @@ services:
     volumes:
       # Per-tenant named volume — completely isolated from other tenants
       - "a0_${TENANT_ID}:/a0/usr/workdir"
+      - "${TENANT_SECRETS_DIR:-/etc/avender/secrets}:/run/secrets:ro"
     environment:
       TENANT_ID: ${TENANT_ID}
-      AVENDER_SETUP_TOKEN: ${AVENDER_SETUP_TOKEN}
+      AVENDER_SETUP_TOKEN_FILE: /run/secrets/AVENDER_SETUP_TOKEN
       SYSADMIN_API_URL: ${SYSADMIN_API_URL}
-      SYSADMIN_API_KEY: ${SYSADMIN_API_KEY}
-      MCP_SERVER_TOKEN: ${MCP_SERVER_TOKEN}
-      WHISPER_API_URL: ${WHISPER_API_URL}
-      WHISPER_API_KEY: ${WHISPER_API_KEY}
+      SYSADMIN_API_KEY_FILE: /run/secrets/SYSADMIN_API_KEY
+      MCP_SERVER_TOKEN_FILE: /run/secrets/MCP_SERVER_TOKEN
+      STT_MODEL_SIZE: base
+      STT_LANGUAGE: es
       WEB_UI_HOST: 0.0.0.0
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:80 || exit 1"]

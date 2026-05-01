@@ -10,14 +10,38 @@ python manage.py migrate --noinput
 echo "📦 Collecting static files..."
 python manage.py collectstatic --noinput
 
-# Create superuser from environment variables if not exists
-if [ -n "$DJANGO_SUPERUSER_USERNAME" ] && [ -n "$DJANGO_SUPERUSER_PASSWORD" ]; then
+read_secret() {
+    local name="$1"
+    local file_var="${name}_FILE"
+    local file_path="${!file_var:-}"
+    if [ -n "$file_path" ] && [ -f "$file_path" ]; then
+        cat "$file_path"
+    else
+        printf '%s' "${!name:-}"
+    fi
+}
+
+# Create superuser from non-secret username plus password secret file if not exists.
+if [ -n "$DJANGO_SUPERUSER_USERNAME" ] && [ -n "$(read_secret DJANGO_SUPERUSER_PASSWORD)" ]; then
     echo "👤 Creating superuser (if not exists)..."
-    python manage.py createsuperuser \
-        --noinput \
-        --username "$DJANGO_SUPERUSER_USERNAME" \
-        --email "${DJANGO_SUPERUSER_EMAIL:-admin@avender.local}" \
-        2>/dev/null || echo "  Superuser already exists."
+    python manage.py shell <<'PY'
+import os
+from pathlib import Path
+from django.contrib.auth import get_user_model
+
+username = os.environ["DJANGO_SUPERUSER_USERNAME"]
+email = os.environ.get("DJANGO_SUPERUSER_EMAIL", "admin@avender.local")
+password_file = os.environ.get("DJANGO_SUPERUSER_PASSWORD_FILE", "")
+password = Path(password_file).read_text(encoding="utf-8").strip()
+user_model = get_user_model()
+user, created = user_model.objects.get_or_create(
+    username=username,
+    defaults={"email": email, "is_staff": True, "is_superuser": True},
+)
+if created:
+    user.set_password(password)
+    user.save(update_fields=["password"])
+PY
 fi
 
 echo "🚀 Starting SysAdmin Control Plane on port 8000..."

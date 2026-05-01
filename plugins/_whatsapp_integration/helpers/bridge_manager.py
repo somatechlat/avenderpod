@@ -15,6 +15,7 @@ import re
 import shutil
 import subprocess
 import threading
+import time
 from collections import deque
 from pathlib import Path
 from typing import Any, Sequence
@@ -35,6 +36,7 @@ DEPENDENCY_FAILURE_MARKERS = (
     "Cannot find module",
     "Cannot find package",
 )
+PAIRING_NOTICE_COOLDOWN_SECONDS = 900
 
 
 # ------------------------------------------------------------------
@@ -49,7 +51,6 @@ class _BridgeProcess:
         self._process = process
         self._port = port
         self._recent_output: deque[str] = deque(maxlen=MAX_STARTUP_LOG_LINES)
-        self._pairing_notice_sent = False
 
     def poll(self) -> int | None:
         return self._process.poll()
@@ -68,12 +69,6 @@ class _BridgeProcess:
 
     def recent_output(self) -> str:
         return "\n".join(self._recent_output)
-
-    def should_send_pairing_notice(self) -> bool:
-        if self._pairing_notice_sent:
-            return False
-        self._pairing_notice_sent = True
-        return True
 
     @property
     def stdout(self):
@@ -94,6 +89,7 @@ class _BridgeProcess:
 
 
 _bridge_process: _BridgeProcess | None = None
+_last_pairing_notice_at: float = 0.0
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 BRIDGE_DIR = str(Path(__file__).parent.parent / "whatsapp-bridge")
@@ -603,7 +599,7 @@ def _start_log_reader(process: _BridgeProcess) -> None:
                 PrintStyle.standard(f"WhatsApp bridge: {text}")
 
                 # Detect QR codes or pairing status and broadcast to UI if needed
-                if "Scan this QR code" in text and process.should_send_pairing_notice():
+                if "Scan this QR code" in text and _should_send_pairing_notice():
                     NotificationManager.send_notification(
                         type=NotificationType.WARNING,
                         priority=NotificationPriority.HIGH,
@@ -629,6 +625,15 @@ def _start_log_reader(process: _BridgeProcess) -> None:
 
     thread = threading.Thread(target=_reader, daemon=True)
     thread.start()
+
+
+def _should_send_pairing_notice() -> bool:
+    global _last_pairing_notice_at
+    now = time.monotonic()
+    if now - _last_pairing_notice_at < PAIRING_NOTICE_COOLDOWN_SECONDS:
+        return False
+    _last_pairing_notice_at = now
+    return True
 
 
 def _summarize_output(output: str, max_lines: int = 12) -> str:

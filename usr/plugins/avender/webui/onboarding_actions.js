@@ -61,6 +61,12 @@ export function initMap() {
 export async function handleFileUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
+    // Client-side file size limit: 25MB
+    if (file.size > 25 * 1024 * 1024) {
+        this.catalogError = "El archivo es demasiado grande. El límite es de 25 MB.";
+        this.requestUpdate();
+        return;
+    }
     this.catalogFileName = file.name;
     this.catalogLoading = true;
     this.catalogError = '';
@@ -76,7 +82,7 @@ export async function handleFileUpload(event) {
         "Estructurando el catálogo final..."
     ];
 
-    const loaderInterval = setInterval(() => {
+    this.loaderInterval = setInterval(() => {
         msgIndex = (msgIndex + 1) % messages.length;
         this.loadingMessage = messages[msgIndex];
         this.requestUpdate();
@@ -93,56 +99,44 @@ export async function handleFileUpload(event) {
             const resp = await fetch('/api/plugins/avender/parse_catalog_api', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({catalogFile: this.formData.catalogFile})
+                body: JSON.stringify({
+                    catalogFile: this.formData.catalogFile,
+                    archetype: this.formData.archetype || 'restaurant',
+                    setupToken: this.setupToken || ''
+                })
             });
-            const data = await resp.json();
-            if (data.ok && data.status === 'processing') {
-                // Poll status
-                const checkStatus = async () => {
-                    try {
-                        const statusResp = await fetch('/api/plugins/avender/parse_catalog_status_api', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({})
-                        });
-                        const statusData = await statusResp.json();
-                        if (statusData.status === 'done') {
-                            this.formData.catalogItems = statusData.items;
-                            clearInterval(loaderInterval);
-                            this.catalogLoading = false;
-                            this.requestUpdate();
-                        } else if (statusData.status === 'error') {
-                            this.catalogError = statusData.error || "Error al extraer ítems.";
-                            clearInterval(loaderInterval);
-                            this.catalogLoading = false;
-                            this.requestUpdate();
-                        } else {
-                            // Keep waiting
-                            setTimeout(checkStatus, 3000);
-                        }
-                    } catch (err) {
-                        this.catalogError = "Error de red al consultar el estado.";
-                        clearInterval(loaderInterval);
-                        this.catalogLoading = false;
-                        this.requestUpdate();
-                    }
+            let data = null;
+            try {
+                data = await resp.json();
+            } catch (jsonErr) {
+                data = {
+                    ok: false,
+                    error: `Respuesta inválida del servidor (${resp.status}).`
                 };
-                setTimeout(checkStatus, 3000);
-            } else if (data.ok) {
-                // Sync fallback
-                this.formData.catalogItems = data.items;
-                clearInterval(loaderInterval);
+            }
+
+            if (!resp.ok && data && !data.error) {
+                data.error = `Error del servidor (${resp.status}).`;
+            }
+            if (data.ok) {
+                const items = data.items || [];
+                this.formData.catalogItems = items;
+                clearInterval(this.loaderInterval);
                 this.catalogLoading = false;
+                // Open review modal when items were extracted from PDF
+                if (items.length > 0) {
+                    this.showCatalogModal = true;
+                }
                 this.requestUpdate();
             } else {
                 this.catalogError = data.error || "Error al procesar el archivo.";
-                clearInterval(loaderInterval);
+                clearInterval(this.loaderInterval);
                 this.catalogLoading = false;
                 this.requestUpdate();
             }
         } catch(err) {
             this.catalogError = "Error de conexión al procesar el archivo.";
-            clearInterval(loaderInterval);
+            clearInterval(this.loaderInterval);
             this.catalogLoading = false;
             this.requestUpdate();
         }
@@ -279,7 +273,8 @@ export async function sendChat() {
 
     const payload = {
         question: this.chatInput,
-        file: this.chatFile
+        file: this.chatFile,
+        setupToken: this.setupToken || ''
     };
 
     this.chatInput = '';
@@ -321,6 +316,24 @@ export function updateField(field, value) {
     this.requestUpdate();
 }
 
+export function formatWhatsAppNumber(raw) {
+    // Ecuador +593 auto-prefix: strip everything except digits,
+    // then prepend +593 if there is no leading +.
+    let digits = raw.replace(/[^0-9]/g, '');
+    if (!raw.startsWith('+')) {
+        if (digits.startsWith('593')) {
+            digits = '+' + digits;
+        } else if (digits.startsWith('0')) {
+            digits = '+593' + digits.slice(1);
+        } else {
+            digits = '+593' + digits;
+        }
+    } else {
+        digits = '+' + digits;
+    }
+    return digits;
+}
+
 export function getStepValidation(step = this.step) {
     const requiredByStep = {
         1: [
@@ -347,7 +360,27 @@ export function getStepValidation(step = this.step) {
         if (!value) missing.push(label);
     }
 
-    if (step === 5 && this.formData.enableWhitelist) {
+    // Step 1: RUC / Cédula length validation
+    if (step === 1) {
+        const idType = this.formData.idType;
+        const idNum = (this.formData.idNumber || '').trim();
+        if (idType === 'RUC' && idNum.length !== 13) {
+            missing.push("RUC debe tener 13 dígitos");
+        }
+        if (idType === 'CEDULA' && idNum.length !== 10) {
+            missing.push("Cédula debe tener 10 dígitos");
+        }
+    }
+
+    // Step 3: at least one catalog item
+    if (step === 3) {
+        const count = (this.formData.catalogItems || []).length;
+        if (count < 1) {
+            missing.push("Al menos 1 producto en el catálogo");
+        }
+    }
+
+    if (step === 5 && this.formData.restrictAccess) {
         const hasAllowedNumbers = this.formData.allowedNumbers
             .split(",")
             .map(n => n.trim())
@@ -357,8 +390,15 @@ export function getStepValidation(step = this.step) {
         }
     }
 
-    if (step === 5 && this.formData.adminPassword && this.formData.adminPassword.length < 8) {
-        missing.push("Contraseña de Administrador (mínimo 8 caracteres)");
+    // Step 5: WhatsApp format validation
+    if (step === 5) {
+        const wa = (this.formData.whatsappNumber || '').trim();
+        if (!/^\+[1-9]\d{7,14}$/.test(wa)) {
+            missing.push("Número de WhatsApp válido (ej: +593999999999)");
+        }
+        if (this.formData.adminPassword && this.formData.adminPassword.length < 8) {
+            missing.push("Contraseña de Administrador (mínimo 8 caracteres)");
+        }
     }
 
     return {
@@ -381,8 +421,16 @@ export function goToNextStep() {
 }
 
 export async function submitSetup() {
-    if (!this.formData.whatsappNumber || !this.formData.tradeName) {
-        this.errorMessage = "Por favor completa los campos obligatorios.";
+    if (this.loading) return; // Guard against double-submit
+    const missing = [];
+    for (let step = 1; step <= 5; step += 1) {
+        const validation = this.getStepValidation(step);
+        if (!validation.valid) {
+            missing.push(...validation.missing);
+        }
+    }
+    if (missing.length > 0) {
+        this.errorMessage = `Completa los campos requeridos: ${[...new Set(missing)].join(", ")}`;
         return;
     }
 
@@ -394,7 +442,10 @@ export async function submitSetup() {
         const resp = await fetch('/api/plugins/avender/onboarding_api', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(this.formData)
+            body: JSON.stringify({
+                ...this.formData,
+                setupToken: this.setupToken || ''
+            })
         });
         const data = await resp.json();
 
@@ -413,11 +464,13 @@ export async function submitSetup() {
 }
 
 export async function pollQrCode() {
+    // Clear any existing poll before starting a new one
+    if (this.qrPollTimer) clearInterval(this.qrPollTimer);
     this.qrStatus = 'loading';
     this.qrDataUrl = null;
     this.requestUpdate();
 
-    this.qrPollTimer = setInterval(async () => {
+    const doPoll = async () => {
         try {
             const response = await fetch('/api/plugins/_whatsapp_integration/qr_code', {
                 method: 'POST',
@@ -433,14 +486,21 @@ export async function pollQrCode() {
 
             if (data.status === 'connected') {
                 clearInterval(this.qrPollTimer);
+                this.qrPollTimer = null;
                 this.qrStatus = 'connected';
             } else if (data.qr) {
                 this.qrStatus = 'qr_ready';
                 this.qrDataUrl = data.qr;
+            } else {
+                this.qrStatus = data.status || 'loading';
             }
         } catch (err) {
             console.warn('QR poll error:', err);
         }
         this.requestUpdate();
-    }, 3000);
+    };
+
+    // Poll immediately, then every 2 seconds
+    doPoll();
+    this.qrPollTimer = setInterval(doPoll, 2000);
 }

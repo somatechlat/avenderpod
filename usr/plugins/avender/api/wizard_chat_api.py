@@ -1,5 +1,6 @@
 from helpers.api import ApiHandler, Request, Response
 from helpers.print_style import PrintStyle
+from usr.plugins.avender.helpers.setup_auth import require_setup_token_until_onboarded
 from agent import UserMessage
 import base64
 import os
@@ -22,6 +23,10 @@ class WizardChatHandler(ApiHandler):
         return False
 
     async def process(self, input: dict, request: Request) -> dict | Response:
+        setup_error = require_setup_token_until_onboarded(input, request)
+        if setup_error:
+            return setup_error
+
         try:
             question = input.get("question", "")
             file_data = input.get("file", None)
@@ -42,6 +47,10 @@ class WizardChatHandler(ApiHandler):
                     encoded = content_b64
 
                 file_bytes = base64.b64decode(encoded)
+
+                # File size limit: 10MB
+                if len(file_bytes) > 10 * 1024 * 1024:
+                    return {"ok": False, "error": "El archivo es demasiado grande. El límite es 10 MB."}
 
                 audio_exts = [".ogg", ".mp3", ".wav", ".m4a", ".webm", ".aac", ".oga"]
                 is_audio = any(file_name.endswith(ext) for ext in audio_exts)

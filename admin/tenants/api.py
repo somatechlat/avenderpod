@@ -1,154 +1,63 @@
-import random
+import secrets
 import hmac
 import os
 import requests
+import re
 from django.utils import timezone
 from datetime import timedelta
-from ninja import Router, Schema
+from ninja import Router
+from ninja.errors import HttpError
 from django.shortcuts import get_object_or_404
 from django.http import HttpResponseForbidden
+from django.db import transaction
+from django.contrib.auth.models import User
+from django.contrib.auth.hashers import check_password
 from .models import (
     Tenant,
     Plan,
     CatalogItem,
     TenantConfig,
     InteractionRecord,
+    Subscription,
+    TenantPlanHistory,
+    TenantUsage,
     VaultRecord,
     GlobalConfig,
+)
+from .schemas import (
+    CatalogItemIn,
+    CatalogItemOut,
+    ChallengeIn,
+    ConfigIn,
+    InteractionRecordOut,
+    PendingChallengeOut,
+    PlanIn,
+    PlanOut,
+    PlanPatch,
+    TenantIn,
+    TenantOut,
+    TenantStatusOut,
+    TenantUsageIn,
+    TenantUsageOut,
+    VaultRecordOut,
+)
+from .security import (
+    SessionOrServiceAuth,
+    audit_event,
+    check_sysadmin,
+    check_tenant_access,
+    get_service_credential,
+    has_platform_perm,
+    is_service_request,
 )
 from .vultr_service import deploy_tenant_pod, suspend_tenant_pod, reactivate_tenant_pod
 from .vault_service import provision_tenant_secrets, build_tenant_bootstrap_env
 from common.messages import get_message
 
 
-class SessionOrServiceAuth:
-    """
-    Accept either:
-    - authenticated Django session user
-    - X-API-KEY matching SYSADMIN_API_KEY (service-to-service)
-    """
-
-    def __call__(self, request):
-        user = getattr(request, "user", None)
-        if user is not None and user.is_authenticated:
-            return user
-
-        expected = os.environ.get("SYSADMIN_API_KEY", "").strip()
-        provided = request.headers.get("X-API-KEY", "").strip()
-        # Fail closed for weak keys.
-        if len(expected) >= 32 and provided and hmac.compare_digest(expected, provided):
-            return "service"
-        return None
-
-
 router = Router(auth=SessionOrServiceAuth())
 
-
-def is_service_request(request) -> bool:
-    return getattr(request, "auth", None) == "service"
-
-
-def check_sysadmin(request):
-    """Ensure user is a superuser (SysAdmin)"""
-    if is_service_request(request):
-        return False
-    if not request.user.is_superuser:
-        return False
-    return True
-
-
-def check_tenant_access(request, tenant: Tenant):
-    """Ensure user is a SysAdmin OR the owner of the tenant."""
-    if is_service_request(request):
-        return False
-    if request.user.is_superuser:
-        return True
-    if tenant.owner == request.user:
-        return True
-    return False
-
-
-# --- SCHEMAS ---
-
-
-class TenantIn(Schema):
-    name: str
-    email: str
-    plan_name: str
-
-
-class TenantOut(Schema):
-    id: str
-    name: str
-    email: str
-    status: str
-    assigned_port: int | None
-
-
-class CatalogItemIn(Schema):
-    name: str
-    price: float
-    description: str | None = None
-    metadata: dict | None = None
-
-
-class CatalogItemOut(Schema):
-    id: str
-    name: str
-    price: float
-    description: str | None
-    metadata: dict
-
-
-class ConfigIn(Schema):
-    key: str
-    value: str
-
-
-class PlanOut(Schema):
-    id: str
-    name: str
-    price_monthly: float
-    max_conversations: int
-
-
-class VaultRecordOut(Schema):
-    id: str
-    tenant_name: str
-    vault_path: str
-    created_at: str
-
-
-class InteractionRecordOut(Schema):
-    id: str
-    tenant_name: str
-    customer_wa_id: str
-    archetype: str
-    status: str
-    created_at: str
-
-
-class ChallengeIn(Schema):
-    tenant_id: str
-    password: str
-    pin: str
-
-
-class PendingChallengeOut(Schema):
-    tenant_id: str
-    tenant_name: str
-    pin: str
-    expires_at: str
-
-
-class TenantStatusOut(Schema):
-    tenant_id: str
-    tenant_name: str
-    status: str
-    container_status: str
-    last_heartbeat: str | None
-    whisper_connection_ok: bool
-    assigned_port: int | None
+PHONE_E164_RE = re.compile(r"^\+[1-9]\d{7,14}$")
 
 
 # --- SYSTEM ENDPOINTS (SysAdmin Only) ---
@@ -156,9 +65,37 @@ class TenantStatusOut(Schema):
 
 @router.get("/plans", response=list[PlanOut])
 def list_plans(request):
-    if not check_sysadmin(request):
+    if not has_platform_perm(request, "tenants.view_plan"):
         return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
-    return Plan.objects.all()
+    return Plan.objects.order_by("-is_active", "price_monthly", "name")
+
+
+@router.post("/plans", response=PlanOut)
+def create_plan(request, payload: PlanIn):
+    if not has_platform_perm(request, "tenants.add_plan"):
+        return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
+    plan = Plan.objects.create(**payload.dict())
+    audit_event(request, "plan.created", target_type="Plan", target_id=str(plan.id))
+    return plan
+
+
+@router.patch("/plans/{plan_id}", response=PlanOut)
+def update_plan(request, plan_id: str, payload: PlanPatch):
+    if not has_platform_perm(request, "tenants.change_plan"):
+        return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
+    plan = get_object_or_404(Plan, id=plan_id)
+    changes = payload.dict(exclude_unset=True)
+    for key, value in changes.items():
+        setattr(plan, key, value)
+    plan.save()
+    audit_event(
+        request,
+        "plan.updated",
+        target_type="Plan",
+        target_id=str(plan.id),
+        metadata={"fields": sorted(changes.keys())},
+    )
+    return plan
 
 
 @router.get("/vault", response=list[VaultRecordOut])
@@ -204,25 +141,62 @@ def list_interactions(request):
 
 @router.post("/tenants", response=TenantOut)
 def create_tenant(request, payload: TenantIn):
-    if not check_sysadmin(request):
+    if not has_platform_perm(request, "tenants.add_tenant"):
         return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
 
-    plan = Plan.objects.filter(name__iexact=payload.plan_name).first()
-
-    tenant = Tenant.objects.create(
-        name=payload.name,
-        email=payload.email,
-        plan=plan,
-        status="pending",
-        owner=request.user,  # The sysadmin creating it is assigned owner for now, can be changed later
+    plan = (
+        Plan.objects.filter(slug__iexact=payload.plan_name).first()
+        or Plan.objects.filter(name__iexact=payload.plan_name).first()
     )
+    if not plan:
+        raise HttpError(400, "Active plan is required before tenant deployment.")
+    if not plan.is_active:
+        raise HttpError(400, "Selected plan is inactive.")
+
+    business_name = payload.business_name.strip()
+    owner_email = payload.owner_email.strip().lower()
+    owner_full_name = payload.owner_full_name.strip()
+    owner_phone = payload.owner_phone_e164.strip()
+    if not business_name or not owner_full_name:
+        raise HttpError(400, "Business name and owner name are required.")
+    if not PHONE_E164_RE.match(owner_phone):
+        raise HttpError(400, "Owner phone must be in E.164 format, e.g. +593979445965.")
+
+    with transaction.atomic():
+        owner_user, created = User.objects.get_or_create(
+            username=owner_email,
+            defaults={
+                "email": owner_email,
+                "first_name": owner_full_name[:150],
+            },
+        )
+        if created:
+            owner_user.set_unusable_password()
+            owner_user.save(update_fields=["password"])
+        elif not owner_user.email:
+            owner_user.email = owner_email
+            owner_user.save(update_fields=["email"])
+
+        tenant = Tenant.objects.create(
+            name=business_name,
+            email=owner_email,
+            owner_full_name=owner_full_name,
+            owner_phone_e164=owner_phone,
+            plan=plan,
+            status="pending",
+            owner=owner_user,
+        )
+        Subscription.objects.create(tenant=tenant, plan=plan, status="active")
+        TenantPlanHistory.objects.create(
+            tenant=tenant,
+            old_plan=None,
+            new_plan=plan,
+            changed_by=request.user,
+            reason="initial tenant provisioning",
+        )
 
     try:
         tenant_secrets = provision_tenant_secrets(tenant)
-        # Generate per-tenant Whisper API key
-        import secrets
-
-        tenant.whisper_api_key = secrets.token_hex(32)
         # Compute unique port BEFORE bootstrap so it can be passed to cloud-init
         existing_ports = set(
             Tenant.objects.exclude(id=tenant.id)
@@ -235,22 +209,31 @@ def create_tenant(request, payload: TenantIn):
         tenant.assigned_port = assigned_port
         tenant.save()
         bootstrap_env = build_tenant_bootstrap_env(
-            tenant, tenant_secrets, assigned_port, tenant.whisper_api_key
+            tenant, tenant_secrets, assigned_port
         )
         deploy_tenant_pod(tenant, bootstrap_env=bootstrap_env)
     except (EnvironmentError, RuntimeError, ValueError) as e:
         tenant.status = "pending"
         tenant.save()
         # Return 502 so the caller knows provisioning failed
-        from ninja.errors import HttpError
-
         raise HttpError(502, f"Tenant provisioning failed: {str(e)}")
 
+    audit_event(
+        request,
+        "tenant.created",
+        tenant=tenant,
+        target_type="Tenant",
+        target_id=str(tenant.id),
+        metadata={"plan": plan.slug or plan.name},
+    )
     return tenant
 
 
 @router.get("/tenants", response=list[TenantOut])
 def list_tenants(request):
+    user = getattr(request, "user", None)
+    if not user or not user.is_authenticated:
+        return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
     if request.user.is_superuser:
         return Tenant.objects.all()
     # If not superuser, return only their tenants
@@ -259,12 +242,15 @@ def list_tenants(request):
 
 @router.post("/tenants/{tenant_id}/suspend")
 def suspend_tenant(request, tenant_id: str):
-    if not check_sysadmin(request):
+    if not has_platform_perm(request, "tenants.suspend_tenant"):
         return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
 
     tenant = get_object_or_404(Tenant, id=tenant_id)
     try:
         result = suspend_tenant_pod(tenant)
+        audit_event(
+            request, "tenant.suspended", tenant=tenant, target_id=str(tenant.id)
+        )
         return {
             "ok": True,
             "message": get_message("SUCCESS_POD_SUSPENDED", name=tenant.name),
@@ -280,12 +266,15 @@ def suspend_tenant(request, tenant_id: str):
 
 @router.post("/tenants/{tenant_id}/reactivate")
 def reactivate_tenant(request, tenant_id: str):
-    if not check_sysadmin(request):
+    if not has_platform_perm(request, "tenants.reactivate_tenant"):
         return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
 
     tenant = get_object_or_404(Tenant, id=tenant_id)
     try:
         result = reactivate_tenant_pod(tenant)
+        audit_event(
+            request, "tenant.reactivated", tenant=tenant, target_id=str(tenant.id)
+        )
         return {
             "ok": True,
             "message": get_message("SUCCESS_POD_REACTIVATED", name=tenant.name),
@@ -352,6 +341,62 @@ def set_tenant_config(request, tenant_id: str, payload: ConfigIn):
     }
 
 
+@router.get("/tenants/{tenant_id}/usage", response=TenantUsageOut)
+def get_tenant_usage(request, tenant_id: str):
+    tenant = get_object_or_404(Tenant, id=tenant_id)
+    if not check_tenant_access(request, tenant):
+        return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
+
+    period_start = timezone.now().replace(
+        day=1, hour=0, minute=0, second=0, microsecond=0
+    )
+    usage, _ = TenantUsage.objects.get_or_create(
+        tenant=tenant,
+        period_start=period_start,
+        defaults={"last_reported_at": timezone.now()},
+    )
+    return {
+        "tenant_id": str(tenant.id),
+        "period_start": usage.period_start.isoformat(),
+        "conversations_used": usage.conversations_used,
+        "messages_used": usage.messages_used,
+        "transcription_seconds_used": usage.transcription_seconds_used,
+        "catalog_items_used": usage.catalog_items_used,
+        "storage_bytes_used": usage.storage_bytes_used,
+    }
+
+
+@router.post("/tenants/{tenant_id}/usage/report", response=TenantUsageOut)
+def report_tenant_usage(request, tenant_id: str, payload: TenantUsageIn):
+    tenant = get_object_or_404(Tenant, id=tenant_id)
+    if not check_tenant_access(request, tenant):
+        return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
+
+    period_start = timezone.now().replace(
+        day=1, hour=0, minute=0, second=0, microsecond=0
+    )
+    usage, _ = TenantUsage.objects.get_or_create(
+        tenant=tenant, period_start=period_start
+    )
+    usage.conversations_used += max(payload.conversations_used, 0)
+    usage.messages_used += max(payload.messages_used, 0)
+    usage.transcription_seconds_used += max(payload.transcription_seconds_used, 0)
+    usage.catalog_items_used += max(payload.catalog_items_used, 0)
+    usage.storage_bytes_used += max(payload.storage_bytes_used, 0)
+    usage.last_reported_at = timezone.now()
+    usage.save()
+
+    return {
+        "tenant_id": str(tenant.id),
+        "period_start": usage.period_start.isoformat(),
+        "conversations_used": usage.conversations_used,
+        "messages_used": usage.messages_used,
+        "transcription_seconds_used": usage.transcription_seconds_used,
+        "catalog_items_used": usage.catalog_items_used,
+        "storage_bytes_used": usage.storage_bytes_used,
+    }
+
+
 # --- CREATOR OVERRIDE (GOD MODE) ENDPOINTS ---
 
 
@@ -364,7 +409,7 @@ def init_challenge(request, tenant_id: str):
     tenant = get_object_or_404(Tenant, id=tenant_id)
     if not (is_service_request(request) or check_tenant_access(request, tenant)):
         return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
-    pin = str(random.randint(1000, 9999))
+    pin = str(secrets.randbelow(9000) + 1000)
     tenant.creator_session_pin = pin
     tenant.pin_expires_at = timezone.now() + timedelta(minutes=5)
     tenant.save()
@@ -380,14 +425,22 @@ def verify_challenge(request, payload: ChallengeIn):
         return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
 
     tenant = get_object_or_404(Tenant, id=payload.tenant_id)
+    credential = get_service_credential(request)
+    if credential and credential.tenant_id != tenant.id:
+        return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
 
     # 1. Verify Global Master Password
     master_pass_config = GlobalConfig.objects.filter(
         key="MASTER_CREATOR_PASSWORD"
     ).first()
-    if not master_pass_config or not hmac.compare_digest(
-        str(master_pass_config.value), str(payload.password)
-    ):
+    stored_password = str(master_pass_config.value) if master_pass_config else ""
+    is_valid_password = False
+    if stored_password.startswith(("pbkdf2_", "argon2", "bcrypt")):
+        is_valid_password = check_password(str(payload.password), stored_password)
+    elif stored_password:
+        # Backward-compatible read path. New deployments should store a hash or Vault ref.
+        is_valid_password = hmac.compare_digest(stored_password, str(payload.password))
+    if not is_valid_password:
         return {"ok": False, "message": "Invalid Master Password."}
 
     # 2. Verify Session PIN
@@ -401,6 +454,9 @@ def verify_challenge(request, payload: ChallengeIn):
     tenant.creator_session_pin = None
     tenant.pin_expires_at = None
     tenant.save()
+    audit_event(
+        request, "creator_override.verified", tenant=tenant, target_id=str(tenant.id)
+    )
 
     return {"ok": True, "message": "Creator access granted."}
 
@@ -414,6 +470,9 @@ def get_tenant_status(request, tenant_id: str):
         return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
 
     tenant = get_object_or_404(Tenant, id=tenant_id)
+    credential = get_service_credential(request)
+    if credential and credential.tenant_id != tenant.id:
+        return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
 
     # Defaults
     container_status = "unknown"
@@ -422,8 +481,8 @@ def get_tenant_status(request, tenant_id: str):
 
     # Attempt to reach the tenant VM's Agent Zero health endpoint
     if tenant.assigned_port and tenant.status in ("active", "suspended"):
-        # Vultr instances expose the agent on their public IP at assigned_port
-        # We query the Vultr API to get the instance's public IP
+        # In VPC-only mode we query the Vultr API for the instance's
+        # PRIVATE IP (within the VPC), not the public IP.
         try:
             from .vultr_service import VULTR_API_BASE, _vultr_headers
 
@@ -434,9 +493,15 @@ def get_tenant_status(request, tenant_id: str):
             )
             if vultr_resp.status_code == 200:
                 instance_data = vultr_resp.json().get("instance", {})
-                public_ip = instance_data.get("main_ip", "")
-                if public_ip:
-                    health_url = f"http://{public_ip}:{tenant.assigned_port}"
+                # Use VPC private IP for health checks (not public IP)
+                vpc_ip = ""
+                vpcs = instance_data.get("vpcs", [])
+                if vpcs:
+                    vpc_ip = vpcs[0].get("ip_address", "")
+
+                target_ip = vpc_ip or instance_data.get("main_ip", "")
+                if target_ip:
+                    health_url = f"http://{target_ip}:{tenant.assigned_port}"
                     try:
                         health_resp = requests.get(health_url, timeout=10)
                         if health_resp.status_code == 200:
@@ -447,22 +512,11 @@ def get_tenant_status(request, tenant_id: str):
                     except requests.RequestException:
                         container_status = "unreachable"
 
-                    # Test Whisper connectivity through the tenant container
-                    # by asking the cluster proxy if this tenant's key was used recently
-                    # (simplified: we just check if the proxy is reachable)
-                    whisper_url = os.environ.get("WHISPER_API_URL", "")
-                    if whisper_url:
-                        try:
-                            proxy_health = requests.get(
-                                whisper_url.replace(
-                                    "/v1/audio/transcriptions", "/health"
-                                ),
-                                timeout=5,
-                            )
-                            whisper_ok = proxy_health.status_code == 200
-                        except requests.RequestException:
-                            whisper_ok = False
-        except Exception:
+                    # Whisper runs inside each tenant agent. A healthy tenant
+                    # container means the isolated local STT runtime is reachable
+                    # to the agent process; no central proxy is checked here.
+                    whisper_ok = container_status == "healthy"
+        except (requests.RequestException, ValueError, KeyError):
             container_status = "error"
 
     return {

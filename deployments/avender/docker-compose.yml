@@ -1,13 +1,56 @@
 # ============================================================================
 # ¡A VENDER! — Production Docker Compose Orchestration (v3.1)
 # ============================================================================
-# Port Range: 45000–45002 (isolated from host dev services)
-# Stack: 5 services — sysadmin, db (postgres), whisper, whisper_proxy, agent_zero
-# Startup Order: db → sysadmin → whisper → whisper_proxy → agent_zero
-# RAM Budget: ~5GB total
+# Port Range: 45000–45001 (isolated from host dev services)
+# Stack: sysadmin, db (postgres), vault, agent_zero
+# Startup Order: vault → db → sysadmin → agent_zero
+# RAM Budget: ~5GB total including tenant-local Whisper
 # ============================================================================
 
 services:
+
+  # ==========================================================================
+  # TIER 0 — HASHICORP VAULT (LOCAL SECRET STORE)
+  # ==========================================================================
+  vault:
+    image: hashicorp/vault:1.16
+    restart: unless-stopped
+    container_name: avender_vault
+    cap_add:
+      - IPC_LOCK
+    command: vault server -config=/vault/config/vault.local.hcl
+    volumes:
+      - vault_data:/vault/file
+      - ./vault.local.hcl:/vault/config/vault.local.hcl:ro
+    expose:
+      - "8200"
+    healthcheck:
+      test: ["CMD-SHELL", "VAULT_ADDR=http://127.0.0.1:8200 vault status >/dev/null 2>&1 || [ $$? -eq 2 ]"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks:
+      - avender_network
+
+  vault_bootstrap:
+    image: python:3.12-alpine
+    container_name: avender_vault_bootstrap
+    depends_on:
+      vault:
+        condition: service_started
+    working_dir: /bootstrap
+    volumes:
+      - ./vault_bootstrap.py:/bootstrap/vault_bootstrap.py:ro
+      - ${AVENDER_SECRETS_DIR:-./secrets}:/avender/secrets
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_KV_MOUNT: ${VAULT_KV_MOUNT:-secret}
+      AVENDER_SECRETS_DIR: /avender/secrets
+      VAULT_BOOTSTRAP_DIR: /avender/secrets/vault
+    command: python /bootstrap/vault_bootstrap.py
+    restart: "no"
+    networks:
+      - avender_network
 
   # ==========================================================================
   # TIER 0 — POSTGRESQL DATABASE
@@ -25,9 +68,10 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-avender_db}
       POSTGRES_USER: ${POSTGRES_USER:-avender_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
     volumes:
       - avender_pg_data:/var/lib/postgresql/data
+      - ${AVENDER_SECRETS_DIR:-./secrets}/postgres_password:/run/secrets/postgres_password:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-avender_user} -d ${POSTGRES_DB:-avender_db}"]
       interval: 10s
@@ -48,6 +92,8 @@ services:
     depends_on:
       avender_postgres:
         condition: service_healthy
+      vault_bootstrap:
+        condition: service_completed_successfully
     deploy:
       resources:
         limits:
@@ -57,110 +103,49 @@ services:
           cpus: '0.25'
           memory: 256M
     ports:
-      - "45000:8000"
+      # Local browser access only. Service-to-service calls use avender_network.
+      - "127.0.0.1:45000:8000"
     volumes:
       - ../../admin:/app
       - ./sysadmin_entrypoint.sh:/app/entrypoint.sh
+      - ${AVENDER_SECRETS_DIR:-./secrets}/postgres_password:/run/secrets/postgres_password:ro
+      - ${AVENDER_SECRETS_DIR:-./secrets}/django_secret_key:/run/secrets/django_secret_key:ro
+      - ${AVENDER_SECRETS_DIR:-./secrets}/django_superuser_password:/run/secrets/django_superuser_password:ro
+      - ${AVENDER_SECRETS_DIR:-./secrets}/sysadmin_api_key:/run/secrets/sysadmin_api_key:ro
+      - ${AVENDER_SECRETS_DIR:-./secrets}/vultr_api_key:/run/secrets/vultr_api_key:ro
+      - ${AVENDER_SECRETS_DIR:-./secrets}/vault_token:/run/secrets/vault_token:ro
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-avender_db}
       POSTGRES_USER: ${POSTGRES_USER:-avender_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
       POSTGRES_HOST: avender_postgres
       POSTGRES_PORT: 5432
-      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY is required}
+      DJANGO_SECRET_KEY_FILE: /run/secrets/django_secret_key
       DJANGO_DEBUG: ${DJANGO_DEBUG:-false}
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,0.0.0.0}
       DJANGO_SUPERUSER_USERNAME: ${DJANGO_SUPERUSER_USERNAME:-admin}
-      DJANGO_SUPERUSER_PASSWORD: ${DJANGO_SUPERUSER_PASSWORD:?DJANGO_SUPERUSER_PASSWORD is required}
+      DJANGO_SUPERUSER_PASSWORD_FILE: /run/secrets/django_superuser_password
       DJANGO_SUPERUSER_EMAIL: ${DJANGO_SUPERUSER_EMAIL:-admin@avender.local}
-      SYSADMIN_API_KEY: ${SYSADMIN_API_KEY:?SYSADMIN_API_KEY is required}
-      VULTR_API_KEY: ${VULTR_API_KEY:-}
+      SYSADMIN_API_KEY_FILE: /run/secrets/sysadmin_api_key
+      VULTR_API_KEY_FILE: /run/secrets/vultr_api_key
       VULTR_REGION: ${VULTR_REGION:-mia}
-      VULTR_PLAN: ${VULTR_PLAN:-vc2-1c-1gb}
-      VAULT_ADDR: ${VAULT_ADDR:-}
-      VAULT_TOKEN: ${VAULT_TOKEN:-}
+      # IMPORTANT: must be ≥ vc2-2c-4gb to fit the 3GB RAM / 2 CPU container limit
+      VULTR_PLAN: ${VULTR_PLAN:-vc2-2c-4gb}
+      VULTR_OS_ID: ${VULTR_OS_ID:-2136}
+      VULTR_VPC_ID: ${VULTR_VPC_ID:-}
+      VULTR_FIREWALL_GROUP_ID: ${VULTR_FIREWALL_GROUP_ID:-}
+      CLUSTER_VPC_IP: ${CLUSTER_VPC_IP:-}
+      VAULT_ADDR: ${VAULT_ADDR:-http://vault:8200}
+      VAULT_TOKEN_FILE: /run/secrets/vault_token
       VAULT_KV_MOUNT: ${VAULT_KV_MOUNT:-secret}
       VAULT_NAMESPACE: ${VAULT_NAMESPACE:-}
       VAULT_TIMEOUT_SECONDS: ${VAULT_TIMEOUT_SECONDS:-10}
-      SYSADMIN_API_PUBLIC_URL: ${SYSADMIN_API_PUBLIC_URL:-}
-      WHISPER_API_URL: ${WHISPER_API_URL:-http://avender_whisper_proxy:8000/v1/audio/transcriptions}
-      WHISPER_PROXY_PORT: ${WHISPER_PROXY_PORT:-45002}
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8000/admin/login/ || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 5
       start_period: 30s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    networks:
-      - avender_network
-
-  # ==========================================================================
-  # TIER 1.5 — CENTRALIZED TRANSCRIPTION ENGINE (Whisper)
-  # INTERNAL ONLY — never exposed directly. Access via whisper_proxy.
-  # ==========================================================================
-  whisper_server:
-    image: fedirz/faster-whisper-server:latest-cpu
-    restart: unless-stopped
-    container_name: avender_whisper
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 1G
-        reservations:
-          cpus: '0.5'
-          memory: 512M
-    # No ports exposed directly — only whisper_proxy can reach this
-    environment:
-      WHISPER__MODEL: Systran/faster-whisper-base
-      WHISPER__INFERENCE_DEVICE: cpu
-    healthcheck:
-      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/docs')\" || exit 1"]
-      interval: 15s
-      timeout: 10s
-      retries: 12
-      start_period: 60s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    networks:
-      - avender_network
-
-  # ==========================================================================
-  # TIER 1.5 — WHISPER PROXY (Nginx + API Key Auth)
-  # The ONLY exposed Whisper surface. Validates per-tenant API keys.
-  # ==========================================================================
-  whisper_proxy:
-    image: nginx:alpine
-    restart: unless-stopped
-    container_name: avender_whisper_proxy
-    depends_on:
-      whisper_server:
-        condition: service_healthy
-    deploy:
-      resources:
-        limits:
-          cpus: '0.25'
-          memory: 128M
-    ports:
-      # Bind to localhost only — tenant VMs reach this via VPN/reverse tunnel
-      # or change to "45002:8000" if using a public-facing load balancer
-      - "127.0.0.1:45002:8000"
-    volumes:
-      - ./nginx-whisper.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./whisper.htpasswd:/etc/nginx/whisper.htpasswd:ro
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8000/health || exit 1"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
     logging:
       driver: json-file
       options:
@@ -190,28 +175,28 @@ services:
         reservations:
           cpus: '1.0'
           memory: 1G
-    depends_on:
-      whisper_proxy:
-        condition: service_healthy
-    ports:
-      - "45001:80"
+    # NOTE: This is a DEV-ONLY instance. In production each tenant gets their
+    # own Vultr VM. No public port binding — access via VPC or localhost tunnel.
+    # ports:
+    #   - "45001:80"
     volumes:
       # IMPORTANT: Per-tenant containers must NOT share this bind mount.
       # Use a per-tenant named volume instead. This bind mount is only
       # for local single-tenant development.
       - ../../usr:/a0/usr
       - a0_workdir:/a0/usr/workdir
+      - ${AVENDER_SECRETS_DIR:-./secrets}/avender_setup_token:/run/secrets/avender_setup_token:ro
+      - ${AVENDER_SECRETS_DIR:-./secrets}/sysadmin_api_key:/run/secrets/sysadmin_api_key:ro
     environment:
-      AVENDER_SETUP_TOKEN: ${AVENDER_SETUP_TOKEN:?AVENDER_SETUP_TOKEN is required}
+      AVENDER_SETUP_TOKEN_FILE: /run/secrets/avender_setup_token
       WEB_UI_HOST: 0.0.0.0
-      # Point to the authenticated proxy, not the raw Whisper container
-      WHISPER_API_URL: http://avender_whisper_proxy:8000/v1/audio/transcriptions
-      WHISPER_API_KEY: ${WHISPER_API_KEY:-}
-      TENANT_ID: "2e121b7e-94ea-4511-abfc-ac8a36adcb8b"
+      STT_MODEL_SIZE: base
+      STT_LANGUAGE: es
+      TENANT_ID: ${DEV_TENANT_ID:-00000000-0000-0000-0000-000000000000}
       SYSADMIN_API_URL: http://avender_sysadmin:8000/api/saas
-      SYSADMIN_API_KEY: ${SYSADMIN_API_KEY:?SYSADMIN_API_KEY is required}
+      SYSADMIN_API_KEY_FILE: /run/secrets/sysadmin_api_key
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:80 || exit 1"]
+      test: ["CMD-SHELL", "ps aux | grep -q '[r]un_ui.py' && ps aux | grep -q '[b]ridge.js' || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 12
@@ -230,6 +215,8 @@ networks:
     name: avender_network
 
 volumes:
+  vault_data:
+    name: avender_vault_data
   a0_workdir:
     name: avender_a0_workdir
   avender_pg_data:

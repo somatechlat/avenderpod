@@ -511,7 +511,7 @@ def get_default_settings() -> Settings:
             "uvicorn_access_logs_enabled", False
         ),
         stt_model_size=get_default_value("stt_model_size", "base"),
-        stt_language=get_default_value("stt_language", "en"),
+        stt_language=get_default_value("stt_language", "es"),
         stt_silence_threshold=get_default_value("stt_silence_threshold", 0.3),
         stt_silence_duration=get_default_value("stt_silence_duration", 1000),
         stt_waiting_timeout=get_default_value("stt_waiting_timeout", 2000),

@@ -10,21 +10,19 @@ import shlex
 import requests
 
 from .models import Tenant
+from .secret_values import read_secret
 
 VULTR_API_BASE = "https://api.vultr.com/v2"
 
 
 def get_vultr_api_key() -> str:
     """
-    Retrieve the Vultr API key from environment.
-    In production, this should be sourced from HashiCorp Vault via the
-    hvac client. For now we enforce it exists as an env var — no fallback,
-    no fake tokens.
+    Retrieve the Vultr API key from a Vault/Docker secret file.
     """
-    key = os.environ.get("VULTR_API_KEY", "")
+    key = read_secret("VULTR_API_KEY")
     if not key:
         raise EnvironmentError(
-            "VULTR_API_KEY environment variable is not set. "
+            "VULTR_API_KEY_FILE is not set. "
             "Cannot perform infrastructure operations without it."
         )
     return key
@@ -46,11 +44,21 @@ def _build_user_data_script(tenant: Tenant, bootstrap_env: dict[str, str]) -> st
       4. Starts the container with resource limits and security hardening
       5. Runs a health-check loop to confirm startup
     """
-    # Build env file contents with safe shell quoting
+    secret_keys = {
+        "AVENDER_SETUP_TOKEN",
+        "SYSADMIN_API_KEY",
+        "MCP_SERVER_TOKEN",
+    }
     env_lines = []
+    secret_lines = []
     for key, value in bootstrap_env.items():
-        env_lines.append(f"{key}={shlex.quote(str(value))}")
+        if key in secret_keys:
+            encoded = base64.b64encode(str(value).encode("utf-8")).decode("ascii")
+            secret_lines.append(f"{key}={encoded}")
+        else:
+            env_lines.append(f"{key}={shlex.quote(str(value))}")
     env_file_contents = "\n".join(env_lines)
+    secret_file_contents = "\n".join(secret_lines)
 
     script = f"""#!/bin/bash
 set -euo pipefail
@@ -87,13 +95,24 @@ for i in {{1..30}}; do
 done
 
 # --------------------------------------------------------------------------
-# 2. Write tenant environment file
+# 2. Write tenant non-secret config and secret files
 # --------------------------------------------------------------------------
 install -d -m 700 /etc/avender
+install -d -m 700 /etc/avender/secrets
 cat >/etc/avender/tenant.env <<'EOF'
 {env_file_contents}
 EOF
 chmod 600 /etc/avender/tenant.env
+cat >/etc/avender/tenant.secrets <<'EOF'
+{secret_file_contents}
+EOF
+chmod 600 /etc/avender/tenant.secrets
+while IFS='=' read -r key value; do
+    [ -n "$key" ] || continue
+    printf '%s' "$value" | base64 -d >"/etc/avender/secrets/$key"
+    chmod 600 "/etc/avender/secrets/$key"
+done </etc/avender/tenant.secrets
+shred -u /etc/avender/tenant.secrets || rm -f /etc/avender/tenant.secrets
 
 echo 'tenant={tenant.id}' >/etc/avender/provisioned.info
 
@@ -141,7 +160,6 @@ docker run -d \\
   --memory "${{A0_MEMORY_LIMIT:-3g}}" \\
   --cpus "${{A0_CPU_LIMIT:-2.0}}" \\
   --memory-reservation "${{A0_MEMORY_RESERVATION:-1g}}" \\
-  --cpus "${{A0_CPU_RESERVATION:-1.0}}" \\
   --pids-limit 1000 \\
   --no-new-privileges \\
   --security-opt no-new-privileges:true \\
@@ -151,13 +169,31 @@ docker run -d \\
   -v "$VOLUME_NAME:/a0/usr/workdir" \\
   -p "${{ASSIGNED_PORT}}:80" \\
   -e "TENANT_ID=${{TENANT_ID}}" \\
-  -e "AVENDER_SETUP_TOKEN=${{AVENDER_SETUP_TOKEN}}" \\
+  -e "A0_PLAN_ID=${{A0_PLAN_ID:-}}" \\
+  -e "A0_PLAN_NAME=${{A0_PLAN_NAME:-}}" \\
+  -e "A0_MAX_CONVERSATIONS_PER_MONTH=${{A0_MAX_CONVERSATIONS_PER_MONTH:-0}}" \\
+  -e "A0_MAX_MESSAGES_PER_DAY=${{A0_MAX_MESSAGES_PER_DAY:-0}}" \\
+  -e "A0_MAX_MESSAGES_PER_MINUTE=${{A0_MAX_MESSAGES_PER_MINUTE:-0}}" \\
+  -e "A0_MAX_WHATSAPP_NUMBERS=${{A0_MAX_WHATSAPP_NUMBERS:-0}}" \\
+  -e "A0_MAX_CATALOG_ITEMS=${{A0_MAX_CATALOG_ITEMS:-0}}" \\
+  -e "A0_MAX_TRANSCRIPTION_MINUTES_PER_MONTH=${{A0_MAX_TRANSCRIPTION_MINUTES_PER_MONTH:-0}}" \\
+  -e "A0_MAX_STORAGE_MB=${{A0_MAX_STORAGE_MB:-0}}" \\
+  -e "A0_MAX_USERS=${{A0_MAX_USERS:-0}}" \\
+  -e "A0_MAX_AGENT_CONTEXTS=${{A0_MAX_AGENT_CONTEXTS:-0}}" \\
+  -e "A0_ALLOW_CATALOG_UPLOAD=${{A0_ALLOW_CATALOG_UPLOAD:-False}}" \\
+  -e "A0_ALLOW_VOICE_MESSAGES=${{A0_ALLOW_VOICE_MESSAGES:-False}}" \\
+  -e "A0_ALLOW_HUMAN_HANDOFF=${{A0_ALLOW_HUMAN_HANDOFF:-False}}" \\
+  -e "A0_ALLOW_CREATOR_OVERRIDE=${{A0_ALLOW_CREATOR_OVERRIDE:-False}}" \\
+  -e "A0_ALLOW_CUSTOM_DOMAIN=${{A0_ALLOW_CUSTOM_DOMAIN:-False}}" \\
+  -e "A0_ALLOW_INTEGRATIONS=${{A0_ALLOW_INTEGRATIONS:-False}}" \\
+  -e "AVENDER_SETUP_TOKEN_FILE=/run/secrets/AVENDER_SETUP_TOKEN" \\
   -e "SYSADMIN_API_URL=${{SYSADMIN_API_URL}}" \\
-  -e "SYSADMIN_API_KEY=${{SYSADMIN_API_KEY}}" \\
-  -e "WHISPER_API_URL=${{WHISPER_API_URL}}" \\
-  -e "WHISPER_API_KEY=${{WHISPER_API_KEY}}" \\
-  -e "MCP_SERVER_TOKEN=${{MCP_SERVER_TOKEN}}" \\
+  -e "SYSADMIN_API_KEY_FILE=/run/secrets/SYSADMIN_API_KEY" \\
+  -e "STT_MODEL_SIZE=${{STT_MODEL_SIZE:-base}}" \\
+  -e "STT_LANGUAGE=${{STT_LANGUAGE:-es}}" \\
+  -e "MCP_SERVER_TOKEN_FILE=/run/secrets/MCP_SERVER_TOKEN" \\
   -e "WEB_UI_HOST=0.0.0.0" \\
+  -v "/etc/avender/secrets:/run/secrets:ro" \\
   "${{A0_IMAGE:-agent0ai/agent-zero:latest}}"
 
 # --------------------------------------------------------------------------
@@ -182,6 +218,14 @@ if [ "$HEALTHY" != "true" ]; then
     docker logs "$CONTAINER_NAME" | tail -n 50
     exit 1
 fi
+
+# --------------------------------------------------------------------------
+# 9. Disk cleanup — keep image as small as possible
+# --------------------------------------------------------------------------
+echo "[$(date -Iseconds)] Running disk cleanup..."
+docker image prune -af --filter "until=1h" || true
+apt-get clean
+rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 echo "[$(date -Iseconds)] Bootstrap complete."
 """
@@ -214,13 +258,25 @@ def deploy_tenant_pod(
 
     payload = {
         "region": os.environ.get("VULTR_REGION", "mia"),
-        "plan": os.environ.get("VULTR_PLAN", "vc2-1c-1gb"),
+        "plan": (
+            tenant.plan.vultr_plan
+            if tenant.plan
+            else os.environ.get("VULTR_PLAN", "vc2-2c-4gb")
+        ),
         "os_id": int(os.environ.get("VULTR_OS_ID", "2136")),  # Docker on Ubuntu
         "label": f"avender-{tenant.name[:30]}-{tenant.id.hex[:8]}",
         "hostname": f"avender-{tenant.id.hex[:12]}",
         "tag": "avender-saas",
         "user_data": "",
     }
+
+    # Attach to VPC and firewall group if configured
+    vpc_id = os.environ.get("VULTR_VPC_ID", "").strip()
+    if vpc_id:
+        payload["vpc_id"] = vpc_id
+    firewall_group_id = os.environ.get("VULTR_FIREWALL_GROUP_ID", "").strip()
+    if firewall_group_id:
+        payload["firewall_group_id"] = firewall_group_id
     if bootstrap_env:
         script = _build_user_data_script(tenant, bootstrap_env)
         payload["user_data"] = base64.b64encode(script.encode("utf-8")).decode("ascii")

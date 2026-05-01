@@ -9,6 +9,7 @@ This directory contains mock files and generation scripts used strictly for test
 | `mock_catalog.xlsx` | A test Excel catalog containing simulated products, prices, and descriptions to test the `parse_catalog_api`. |
 | `mock_menu.pdf` | A test PDF menu containing simulated restaurant items to verify the Agent's multimodal PDF text extraction. |
 | `mock_menu_image.jpg` | A test JPEG image of a menu to verify the Agent's OCR capabilities (using Gemini/GPT-4o vision) during the Onboarding Wizard. |
+| `santa-lucia.pdf` | A real bilingual restaurant menu PDF (Santa Lucia, Ecuador) with appetizers, mains, desserts, and a full wine/liquor list. Used to test realistic PDF text extraction against live LLM infrastructure. |
 | `create_test_xls.py` | A Python script used to dynamically generate or regenerate the `mock_catalog.xlsx` file for unit testing. |
 
 ## Usage

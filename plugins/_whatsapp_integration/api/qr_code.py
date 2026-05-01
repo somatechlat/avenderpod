@@ -10,6 +10,14 @@ PLUGIN_NAME = "_whatsapp_integration"
 
 class QrCode(ApiHandler):
 
+    @classmethod
+    def requires_auth(cls) -> bool:
+        return False
+
+    @classmethod
+    def requires_csrf(cls) -> bool:
+        return False
+
     async def process(self, input: dict, request: Request) -> dict:
         config = plugins.get_plugin_config(PLUGIN_NAME) or {}
         port = int(config.get("bridge_port", 3100))

@@ -10,6 +10,12 @@ _db_initialized = False
 _db_lock = threading.Lock()
 SQLITE_TIMEOUT_SECONDS = 30
 SQLITE_BUSY_TIMEOUT_MS = SQLITE_TIMEOUT_SECONDS * 1000
+REQUIRED_TABLES = (
+    "tenant_config",
+    "catalog_item",
+    "interaction_record",
+    "auth_sessions",
+)
 
 
 def get_connection():
@@ -24,10 +30,22 @@ def get_connection():
     conn.execute("PRAGMA journal_mode = WAL")
     conn.execute("PRAGMA foreign_keys = ON")
     with _db_lock:
-        if not _db_initialized:
+        if not _db_initialized or not _schema_ready(conn):
             _init_schema(conn)
             _db_initialized = True
     return conn
+
+
+def _schema_ready(conn: sqlite3.Connection) -> bool:
+    cursor = conn.cursor()
+    for table in REQUIRED_TABLES:
+        cursor.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+            (table,),
+        )
+        if cursor.fetchone() is None:
+            return False
+    return True
 
 
 def _init_schema(conn):

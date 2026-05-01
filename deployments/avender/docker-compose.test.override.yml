@@ -1,0 +1,4 @@
+services:
+  agent_zero:
+    ports:
+      - "45001:80"

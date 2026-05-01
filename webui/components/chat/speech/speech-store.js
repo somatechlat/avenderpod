@@ -19,8 +19,8 @@ const model = {
   _initialized: false,
 
   // STT Settings
-  stt_model_size: "tiny",
-  stt_language: "en",
+  stt_model_size: "base",
+  stt_language: "es",
   stt_silence_threshold: 0.05,
   stt_silence_duration: 1000,
   stt_waiting_timeout: 2000,

@@ -27,8 +27,9 @@ ENV PYTHONDONTWRITEBYTECODE=1
 RUN apt-get update && apt-get install -y --no-install-recommends \
     # Node.js 20.x for Baileys WhatsApp bridge
     curl ca-certificates gnupg \
-    # SQLite, image processing, general utilities
+    # SQLite, image processing, Whisper audio decoding, general utilities
     libsqlite3-0 libgl1-mesa-glx libglib2.0-0 libsm6 libxext6 libxrender-dev \
+    ffmpeg \
     # Tesseract OCR (for catalog image processing)
     tesseract-ocr tesseract-ocr-spa \
     # Runtime networking

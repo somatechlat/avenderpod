@@ -89,6 +89,8 @@ usr/**/*.sqlite3
 admin/staticfiles/
 
 # Secrets and private keys
+deployments/avender/secrets/
+deployments/avender/*.secret
 *.pem
 *.key
 *.crt
