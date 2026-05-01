@@ -18,6 +18,17 @@ MESSAGES = {
     # Config / Catalog
     "SUCCESS_CONFIG_SAVED": "Configuración guardada exitosamente.",
     "SUCCESS_CATALOG_ITEM_CREATED": "Item del catálogo '{name}' creado exitosamente.",
+    # Tenant Deployment & Validation
+    "ERR_PLAN_REQUIRED": "Active plan is required before tenant deployment.",
+    "ERR_PLAN_INACTIVE": "Selected plan is inactive.",
+    "ERR_MISSING_TENANT_INFO": "Business name and owner name are required.",
+    "ERR_INVALID_PHONE": "Owner phone must be in E.164 format (+1234567890).",
+    # Auth & God Mode
+    "SUCCESS_CHALLENGE_INITIATED": "Challenge initiated.",
+    "ERR_MASTER_PASSWORD_INVALID": "Invalid Master Password.",
+    "ERR_PIN_INVALID": "Invalid or expired Session PIN.",
+    "ERR_PIN_EXPIRED": "Session PIN has expired.",
+    "SUCCESS_CREATOR_ACCESS": "Creator access granted.",
 }
 
 

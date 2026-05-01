@@ -149,16 +149,16 @@ def create_tenant(request, payload: TenantIn):
         or Plan.objects.filter(name__iexact=payload.plan_name).first()
     )
     if not plan:
-        raise HttpError(400, "Active plan is required before tenant deployment.")
+        raise HttpError(400, get_message("ERR_PLAN_REQUIRED"))
     if not plan.is_active:
-        raise HttpError(400, "Selected plan is inactive.")
+        raise HttpError(400, get_message("ERR_PLAN_INACTIVE"))
 
     business_name = payload.business_name.strip()
     owner_email = payload.owner_email.strip().lower()
     owner_full_name = payload.owner_full_name.strip()
     owner_phone = payload.owner_phone_e164.strip()
     if not business_name or not owner_full_name:
-        raise HttpError(400, "Business name and owner name are required.")
+        raise HttpError(400, get_message("ERR_MISSING_TENANT_INFO"))
     if not PHONE_E164_RE.match(owner_phone):
         raise HttpError(400, "Owner phone must be in E.164 format, e.g. +593979445965.")
 
@@ -197,17 +197,21 @@ def create_tenant(request, payload: TenantIn):
 
     try:
         tenant_secrets = provision_tenant_secrets(tenant)
-        # Compute unique port BEFORE bootstrap so it can be passed to cloud-init
-        existing_ports = set(
-            Tenant.objects.exclude(id=tenant.id)
-            .exclude(assigned_port__isnull=True)
-            .values_list("assigned_port", flat=True)
-        )
-        assigned_port = 45001
-        while assigned_port in existing_ports:
-            assigned_port += 1
-        tenant.assigned_port = assigned_port
-        tenant.save()
+        # Compute unique port inside a locked read to prevent race conditions.
+        # select_for_update() acquires row-level locks on all tenant rows,
+        # ensuring no two concurrent requests can allocate the same port.
+        with transaction.atomic():
+            existing_ports = set(
+                Tenant.objects.select_for_update()
+                .exclude(id=tenant.id)
+                .exclude(assigned_port__isnull=True)
+                .values_list("assigned_port", flat=True)
+            )
+            assigned_port = 45001
+            while assigned_port in existing_ports:
+                assigned_port += 1
+            tenant.assigned_port = assigned_port
+            tenant.save(update_fields=["assigned_port"])
         bootstrap_env = build_tenant_bootstrap_env(
             tenant, tenant_secrets, assigned_port
         )
@@ -410,10 +414,12 @@ def init_challenge(request, tenant_id: str):
     if not (is_service_request(request) or check_tenant_access(request, tenant)):
         return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
     pin = str(secrets.randbelow(9000) + 1000)
-    tenant.creator_session_pin = pin
+    tenant.set_creator_pin(pin)
     tenant.pin_expires_at = timezone.now() + timedelta(minutes=5)
     tenant.save()
-    return {"ok": True, "message": "Challenge initiated."}
+    # Return the raw PIN to the caller (agent) so it can display it.
+    # The DB only stores the PBKDF2 hash — the raw value is ephemeral.
+    return {"ok": True, "pin": pin, "message": get_message("SUCCESS_CHALLENGE_INITIATED")}
 
 
 @router.post("/auth/verify-challenge")
@@ -441,24 +447,24 @@ def verify_challenge(request, payload: ChallengeIn):
         # Backward-compatible read path. New deployments should store a hash or Vault ref.
         is_valid_password = hmac.compare_digest(stored_password, str(payload.password))
     if not is_valid_password:
-        return {"ok": False, "message": "Invalid Master Password."}
+        return {"ok": False, "message": get_message("ERR_MASTER_PASSWORD_INVALID")}
 
-    # 2. Verify Session PIN
-    if not tenant.creator_session_pin or tenant.creator_session_pin != payload.pin:
-        return {"ok": False, "message": "Invalid or expired Session PIN."}
-
+    # 2. Check expiry FIRST (cheap datetime comparison)
     if not tenant.pin_expires_at or tenant.pin_expires_at < timezone.now():
-        return {"ok": False, "message": "Session PIN has expired."}
+        return {"ok": False, "message": get_message("ERR_PIN_EXPIRED")}
+
+    # 3. Verify Session PIN hash (expensive PBKDF2)
+    if not tenant.check_creator_pin(payload.pin):
+        return {"ok": False, "message": get_message("ERR_PIN_INVALID")}
 
     # Success - clear the PIN
-    tenant.creator_session_pin = None
-    tenant.pin_expires_at = None
+    tenant.clear_creator_pin()
     tenant.save()
     audit_event(
         request, "creator_override.verified", tenant=tenant, target_id=str(tenant.id)
     )
 
-    return {"ok": True, "message": "Creator access granted."}
+    return {"ok": True, "message": get_message("SUCCESS_CREATOR_ACCESS")}
 
 
 @router.get("/tenants/{tenant_id}/status", response=TenantStatusOut)
@@ -539,13 +545,14 @@ def list_pending_challenges(request):
         return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
 
     active_tenants = Tenant.objects.filter(
-        creator_session_pin__isnull=False, pin_expires_at__gt=timezone.now()
+        creator_session_pin_hash__isnull=False, pin_expires_at__gt=timezone.now()
     )
     return [
         {
             "tenant_id": str(t.id),
             "tenant_name": t.name,
-            "pin": t.creator_session_pin,
+            # PIN is hashed — cannot be retrieved. Dashboard shows existence only.
+            "pin": "****",
             "expires_at": t.pin_expires_at.isoformat(),
         }
         for t in active_tenants

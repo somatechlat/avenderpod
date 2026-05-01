@@ -1,0 +1,20 @@
+# ============================================================================
+# ¡A VENDER! — Development Overrides
+# ============================================================================
+# Usage:  docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# ============================================================================
+
+services:
+  sysadmin:
+    volumes:
+      # Bind-mount source for hot-reload during development.
+      # NEVER use this in production — use the built image instead.
+      - ../../admin:/app
+      - ./sysadmin_entrypoint.sh:/app/entrypoint.sh
+    environment:
+      DJANGO_DEBUG: "true"
+
+  agent_zero:
+    volumes:
+      # Dev-only source mount for plugin development
+      - ../../usr:/a0/usr

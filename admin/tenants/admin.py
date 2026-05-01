@@ -1,6 +1,7 @@
 from django.contrib import admin
 from .models import (
     AuditEvent,
+    GlobalConfig,
     Plan,
     ServiceCredential,
     Subscription,
@@ -12,6 +13,15 @@ from .models import (
     CatalogItem,
     InteractionRecord,
 )
+
+
+@admin.register(GlobalConfig)
+class GlobalConfigAdmin(admin.ModelAdmin):
+    list_display = ("key", "description", "updated_at")
+    search_fields = ("key",)
+    readonly_fields = ("updated_at",)
+    # NOTE: 'value' is NOT in list_display to avoid leaking sensitive data.
+    # It IS editable in the detail view for authorized superusers.
 
 
 @admin.register(Plan)

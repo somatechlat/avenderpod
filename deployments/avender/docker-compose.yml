@@ -106,8 +106,7 @@ services:
       # Local browser access only. Service-to-service calls use avender_network.
       - "127.0.0.1:45000:8000"
     volumes:
-      - ../../admin:/app
-      - ./sysadmin_entrypoint.sh:/app/entrypoint.sh
+      # Secret files — bind-mounted read-only from Vault-materialized directory
       - ${AVENDER_SECRETS_DIR:-./secrets}/postgres_password:/run/secrets/postgres_password:ro
       - ${AVENDER_SECRETS_DIR:-./secrets}/django_secret_key:/run/secrets/django_secret_key:ro
       - ${AVENDER_SECRETS_DIR:-./secrets}/django_superuser_password:/run/secrets/django_superuser_password:ro
@@ -180,11 +179,9 @@ services:
     # ports:
     #   - "45001:80"
     volumes:
-      # IMPORTANT: Per-tenant containers must NOT share this bind mount.
-      # Use a per-tenant named volume instead. This bind mount is only
-      # for local single-tenant development.
-      - ../../usr:/a0/usr
+      # Per-tenant named volume for agent workspace
       - a0_workdir:/a0/usr/workdir
+      # Secret files
       - ${AVENDER_SECRETS_DIR:-./secrets}/avender_setup_token:/run/secrets/avender_setup_token:ro
       - ${AVENDER_SECRETS_DIR:-./secrets}/sysadmin_api_key:/run/secrets/sysadmin_api_key:ro
     environment:

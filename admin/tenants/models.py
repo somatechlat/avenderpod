@@ -1,8 +1,13 @@
-import uuid
 import hashlib
-from django.db import models
+import hmac
+import uuid
+
+from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth.models import User
+from django.db import models
 from django.utils import timezone
+
+from common.fields import EncryptedJSONField, EncryptedTextField
 
 
 class Plan(models.Model):
@@ -102,14 +107,29 @@ class Tenant(models.Model):
     assigned_port = models.IntegerField(blank=True, null=True, unique=True)
     custom_domain = models.CharField(max_length=255, blank=True, null=True)
 
-    # Creator Override (God Mode) logic
-    creator_session_pin = models.CharField(
-        max_length=10,
+    # Creator Override (God Mode) logic — PIN stored as PBKDF2 hash
+    creator_session_pin_hash = models.CharField(
+        max_length=128,
         blank=True,
         null=True,
-        help_text="Temporary session PIN for God Mode challenge",
+        help_text="PBKDF2 hash of temporary session PIN for God Mode challenge",
     )
     pin_expires_at = models.DateTimeField(blank=True, null=True)
+
+    def set_creator_pin(self, raw_pin: str) -> None:
+        """Hash and store a God Mode session PIN."""
+        self.creator_session_pin_hash = make_password(raw_pin)
+
+    def check_creator_pin(self, raw_pin: str) -> bool:
+        """Verify a God Mode session PIN against the stored hash."""
+        if not self.creator_session_pin_hash:
+            return False
+        return check_password(raw_pin, self.creator_session_pin_hash)
+
+    def clear_creator_pin(self) -> None:
+        """Clear the God Mode session PIN after successful verification."""
+        self.creator_session_pin_hash = None
+        self.pin_expires_at = None
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -131,7 +151,9 @@ class GlobalConfig(models.Model):
     """System-wide configuration for the master orchestrator."""
 
     key = models.CharField(max_length=100, unique=True)
-    value = models.TextField()
+    value = EncryptedTextField(
+        help_text="Encrypted at rest. Stores sensitive config like MASTER_CREATOR_PASSWORD."
+    )
     description = models.CharField(max_length=255, blank=True, null=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -237,7 +259,14 @@ class ServiceCredential(models.Model):
 
     @staticmethod
     def hash_key(raw_key: str) -> str:
-        return hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
+        """HMAC-SHA256 keyed with Django SECRET_KEY for per-deployment salting."""
+        from django.conf import settings
+
+        return hmac.new(
+            settings.SECRET_KEY.encode("utf-8"),
+            raw_key.encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
 
     def is_valid(self) -> bool:
         if not self.is_active:
@@ -310,7 +339,7 @@ class TenantConfig(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="configs")
     key = models.CharField(max_length=100)
-    value = models.TextField()
+    value = EncryptedTextField()
 
     class Meta:
         unique_together = ("tenant", "key")
@@ -347,7 +376,7 @@ class InteractionRecord(models.Model):
     status = models.CharField(
         max_length=50
     )  # e.g., 'pending', 'completed', 'cancelled'
-    payload = models.JSONField(default=dict)  # JSON data of the interaction
+    payload = EncryptedJSONField(default=dict)  # PII encrypted at rest
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

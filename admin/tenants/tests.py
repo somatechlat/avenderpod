@@ -5,13 +5,14 @@ from datetime import timedelta
 from unittest.mock import patch, MagicMock
 
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 
 from tenants.models import GlobalConfig, ServiceCredential, Tenant, Plan, VaultRecord
 from tenants.vault_service import provision_tenant_secrets, build_tenant_bootstrap_env
 
 
+@override_settings(SECURE_SSL_REDIRECT=False)
 class GodModeAuthTests(TestCase):
     def setUp(self) -> None:
         self.owner = User.objects.create_user("owner", password="x")
@@ -35,7 +36,7 @@ class GodModeAuthTests(TestCase):
         self.assertEqual(response.status_code, 200)
 
         self.tenant.refresh_from_db()
-        self.assertIsNotNone(self.tenant.creator_session_pin)
+        self.assertIsNotNone(self.tenant.creator_session_pin_hash)
         self.assertIsNotNone(self.tenant.pin_expires_at)
 
     def test_init_challenge_other_user_forbidden(self) -> None:
@@ -46,20 +47,23 @@ class GodModeAuthTests(TestCase):
         self.assertEqual(response.status_code, 403)
 
     def test_init_challenge_service_api_key_allowed(self) -> None:
-        os.environ["SYSADMIN_API_KEY"] = "s" * 32
-        try:
-            response = self.client.post(
-                f"/api/saas/auth/init-challenge?tenant_id={self.tenant.id}",
-                headers={"X-API-KEY": "s" * 32},
-            )
-            self.assertEqual(response.status_code, 200)
-        finally:
-            os.environ.pop("SYSADMIN_API_KEY", None)
+        with patch.dict(os.environ, {
+            "SYSADMIN_API_KEY": "s" * 32,
+            "SYSADMIN_API_KEY_FILE": "",
+        }):
+            try:
+                response = self.client.post(
+                    f"/api/saas/auth/init-challenge?tenant_id={self.tenant.id}",
+                    headers={"X-API-KEY": "s" * 32},
+                )
+                self.assertEqual(response.status_code, 200)
+            finally:
+                pass
 
     def test_verify_challenge_requires_superuser_or_service(self) -> None:
-        self.tenant.creator_session_pin = "1234"
+        self.tenant.set_creator_pin("1234")
         self.tenant.pin_expires_at = timezone.now() + timedelta(minutes=5)
-        self.tenant.save(update_fields=["creator_session_pin", "pin_expires_at"])
+        self.tenant.save(update_fields=["creator_session_pin_hash", "pin_expires_at"])
 
         self.client.force_login(self.owner)
         response = self.client.post(
@@ -74,9 +78,9 @@ class GodModeAuthTests(TestCase):
         self.assertEqual(response.status_code, 403)
 
     def test_verify_challenge_superuser_success(self) -> None:
-        self.tenant.creator_session_pin = "1234"
+        self.tenant.set_creator_pin("1234")
         self.tenant.pin_expires_at = timezone.now() + timedelta(minutes=5)
-        self.tenant.save(update_fields=["creator_session_pin", "pin_expires_at"])
+        self.tenant.save(update_fields=["creator_session_pin_hash", "pin_expires_at"])
 
         self.client.force_login(self.admin)
         response = self.client.post(
@@ -92,15 +96,124 @@ class GodModeAuthTests(TestCase):
         self.assertTrue(response.json().get("ok"))
 
     def test_pending_challenges_requires_superuser_or_service(self) -> None:
-        self.tenant.creator_session_pin = "1234"
+        self.tenant.set_creator_pin("1234")
         self.tenant.pin_expires_at = timezone.now() + timedelta(minutes=5)
-        self.tenant.save(update_fields=["creator_session_pin", "pin_expires_at"])
+        self.tenant.save(update_fields=["creator_session_pin_hash", "pin_expires_at"])
 
         self.client.force_login(self.owner)
         response = self.client.get("/api/saas/auth/pending-challenges")
         self.assertEqual(response.status_code, 403)
 
+    # --- NEGATIVE SECURITY TESTS ---
 
+    def test_expired_pin_rejected(self) -> None:
+        """SEV-1: Verify that an expired PIN is rejected even if the hash matches."""
+        self.tenant.set_creator_pin("5678")
+        self.tenant.pin_expires_at = timezone.now() - timedelta(minutes=1)
+        self.tenant.save(update_fields=["creator_session_pin_hash", "pin_expires_at"])
+
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            "/api/saas/auth/verify-challenge",
+            data={
+                "tenant_id": str(self.tenant.id),
+                "password": "master-secret",
+                "pin": "5678",
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json().get("ok"))
+        self.assertIn("expired", response.json().get("message", "").lower())
+
+    def test_wrong_pin_rejected(self) -> None:
+        """SEV-1: Verify that a wrong PIN is rejected."""
+        self.tenant.set_creator_pin("9999")
+        self.tenant.pin_expires_at = timezone.now() + timedelta(minutes=5)
+        self.tenant.save(update_fields=["creator_session_pin_hash", "pin_expires_at"])
+
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            "/api/saas/auth/verify-challenge",
+            data={
+                "tenant_id": str(self.tenant.id),
+                "password": "master-secret",
+                "pin": "0000",
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json().get("ok"))
+
+    def test_wrong_master_password_rejected(self) -> None:
+        """SEV-1: Verify that a wrong master password is rejected."""
+        self.tenant.set_creator_pin("1111")
+        self.tenant.pin_expires_at = timezone.now() + timedelta(minutes=5)
+        self.tenant.save(update_fields=["creator_session_pin_hash", "pin_expires_at"])
+
+        self.client.force_login(self.admin)
+        response = self.client.post(
+            "/api/saas/auth/verify-challenge",
+            data={
+                "tenant_id": str(self.tenant.id),
+                "password": "wrong-password",
+                "pin": "1111",
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.json().get("ok"))
+
+    def test_pin_cleared_after_successful_verification(self) -> None:
+        """SEV-1: Verify that PIN is cleared after one successful use."""
+        self.tenant.set_creator_pin("3333")
+        self.tenant.pin_expires_at = timezone.now() + timedelta(minutes=5)
+        self.tenant.save(update_fields=["creator_session_pin_hash", "pin_expires_at"])
+
+        self.client.force_login(self.admin)
+        # First attempt — succeeds
+        response = self.client.post(
+            "/api/saas/auth/verify-challenge",
+            data={
+                "tenant_id": str(self.tenant.id),
+                "password": "master-secret",
+                "pin": "3333",
+            },
+            content_type="application/json",
+        )
+        self.assertTrue(response.json().get("ok"))
+
+        # Second attempt with same PIN — must fail (PIN was consumed)
+        self.tenant.refresh_from_db()
+        self.assertIsNone(self.tenant.creator_session_pin_hash)
+        response = self.client.post(
+            "/api/saas/auth/verify-challenge",
+            data={
+                "tenant_id": str(self.tenant.id),
+                "password": "master-secret",
+                "pin": "3333",
+            },
+            content_type="application/json",
+        )
+        self.assertFalse(response.json().get("ok"))
+
+    def test_pending_challenges_hides_pin(self) -> None:
+        """SEV-0-002: Verify that the raw PIN is never returned in API responses."""
+        self.tenant.set_creator_pin("7777")
+        self.tenant.pin_expires_at = timezone.now() + timedelta(minutes=5)
+        self.tenant.save(update_fields=["creator_session_pin_hash", "pin_expires_at"])
+
+        self.client.force_login(self.admin)
+        response = self.client.get("/api/saas/auth/pending-challenges")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(len(data), 1)
+        # Must NEVER return the raw PIN — only "****"
+        self.assertEqual(data[0]["pin"], "****")
+        self.assertNotEqual(data[0]["pin"], "7777")
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
 class VaultProvisioningTests(TestCase):
     def setUp(self) -> None:
         self.admin = User.objects.create_superuser("admin2", "admin2@example.com", "x")
@@ -153,18 +266,20 @@ class VaultProvisioningTests(TestCase):
             os.environ.pop("VAULT_KV_MOUNT", None)
 
     def test_build_tenant_bootstrap_env_requires_strong_sysadmin_key(self) -> None:
-        os.environ["SYSADMIN_API_URL"] = "https://sysadmin.example.com/api/saas"
-        os.environ["SYSADMIN_API_KEY"] = "short"
-        try:
-            with self.assertRaises(EnvironmentError):
-                build_tenant_bootstrap_env(
-                    self.tenant,
-                    {"AVENDER_SETUP_TOKEN": "a", "MCP_SERVER_TOKEN": "b"},
-                    assigned_port=45001,
-                )
-        finally:
-            os.environ.pop("SYSADMIN_API_URL", None)
-            os.environ.pop("SYSADMIN_API_KEY", None)
+        with patch.dict(os.environ, {
+            "SYSADMIN_API_URL": "https://sysadmin.example.com/api/saas",
+            "SYSADMIN_API_KEY": "short",
+            "SYSADMIN_API_KEY_FILE": "",  # Force it to read the env var
+        }):
+            try:
+                with self.assertRaises(EnvironmentError):
+                    build_tenant_bootstrap_env(
+                        self.tenant,
+                        {"AVENDER_SETUP_TOKEN": "a", "MCP_SERVER_TOKEN": "b"},
+                        assigned_port=45001,
+                    )
+            finally:
+                pass
 
     def test_build_tenant_bootstrap_env_uses_plan_limits(self) -> None:
         os.environ["SYSADMIN_API_URL"] = "https://sysadmin.example.com/api/saas"
@@ -271,3 +386,85 @@ class AvenderPlanCatalogTests(TestCase):
         self.assertTrue(pro.allow_call_handling)
         self.assertTrue(enterprise.is_custom_priced)
         self.assertTrue(enterprise.allow_custom_domain)
+
+
+class EncryptedFieldTests(TestCase):
+    """Verify that Fernet-encrypted fields roundtrip correctly."""
+
+    def setUp(self) -> None:
+        self.owner = User.objects.create_user("enc-owner", password="x")
+        self.tenant = Tenant.objects.create(
+            name="Enc Tenant",
+            email="enc@example.com",
+            owner=self.owner,
+            status="active",
+        )
+
+    def test_tenant_config_value_encrypted_at_rest(self) -> None:
+        from tenants.models import TenantConfig
+
+        config = TenantConfig.objects.create(
+            tenant=self.tenant, key="test_key", value="sensitive-value-123"
+        )
+        # Read back via ORM — should decrypt
+        config.refresh_from_db()
+        self.assertEqual(config.value, "sensitive-value-123")
+
+        # Read raw from DB — should be ciphertext, NOT plaintext
+        from django.db import connection
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT value FROM tenants_tenantconfig WHERE id = %s",
+                [str(config.id)],
+            )
+            raw = cursor.fetchone()[0]
+        self.assertNotEqual(raw, "sensitive-value-123")
+        self.assertTrue(len(raw) > 50)  # Fernet ciphertext is always longer
+
+    def test_interaction_record_payload_encrypted_at_rest(self) -> None:
+        from tenants.models import InteractionRecord
+
+        record = InteractionRecord.objects.create(
+            tenant=self.tenant,
+            customer_wa_id="+593979445965",
+            archetype="food_order",
+            status="pending",
+            payload={"items": ["pizza"], "total": 12.50},
+        )
+        record.refresh_from_db()
+        self.assertEqual(record.payload["items"], ["pizza"])
+        self.assertEqual(record.payload["total"], 12.50)
+
+        from django.db import connection
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT payload FROM tenants_interactionrecord WHERE id = %s",
+                [str(record.id)],
+            )
+            raw = cursor.fetchone()[0]
+        # Should be Fernet ciphertext, not JSON
+        self.assertNotIn("pizza", str(raw))
+
+
+class ServiceCredentialSecurityTests(TestCase):
+    """Verify HMAC-SHA256 keying for service credentials."""
+
+    def test_hash_key_uses_hmac_not_bare_sha256(self) -> None:
+        import hashlib
+
+        raw_key = "test-api-key-abcdef1234567890"
+        hmac_hash = ServiceCredential.hash_key(raw_key)
+        bare_sha256 = hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
+        # HMAC hash must differ from bare SHA-256
+        self.assertNotEqual(hmac_hash, bare_sha256)
+        # Must be a valid hex string of expected length
+        self.assertEqual(len(hmac_hash), 64)
+
+    def test_hash_key_deterministic(self) -> None:
+        raw_key = "deterministic-test-key"
+        h1 = ServiceCredential.hash_key(raw_key)
+        h2 = ServiceCredential.hash_key(raw_key)
+        self.assertEqual(h1, h2)
+

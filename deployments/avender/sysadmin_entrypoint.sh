@@ -44,10 +44,15 @@ if created:
 PY
 fi
 
-echo "🚀 Starting SysAdmin Control Plane on port 8000..."
-exec gunicorn core.wsgi:application \
-    --bind 0.0.0.0:8000 \
-    --workers 2 \
-    --timeout 120 \
-    --access-logfile - \
-    --error-logfile -
+if [ $# -gt 0 ]; then
+    echo "⚙️ Executing custom command: $@"
+    exec "$@"
+else
+    echo "🚀 Starting SysAdmin Control Plane on port 8000..."
+    exec gunicorn core.wsgi:application \
+        --bind 0.0.0.0:8000 \
+        --workers 2 \
+        --timeout 120 \
+        --access-logfile - \
+        --error-logfile -
+fi
