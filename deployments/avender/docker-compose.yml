@@ -136,6 +136,7 @@ services:
       POSTGRES_PORT: 5432
       DJANGO_SECRET_KEY_FILE: /run/secrets/django_secret_key
       DJANGO_DEBUG: ${DJANGO_DEBUG:-true}
+      DJANGO_SECURE_SSL_REDIRECT: ${DJANGO_SECURE_SSL_REDIRECT:-true}
       DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,0.0.0.0}
       DJANGO_SUPERUSER_USERNAME: ${DJANGO_SUPERUSER_USERNAME:-admin}
       DJANGO_SUPERUSER_PASSWORD_FILE: /run/secrets/django_superuser_password

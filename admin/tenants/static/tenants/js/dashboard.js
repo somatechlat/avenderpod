@@ -6,27 +6,33 @@ import { renderTenantWizard } from './tenant-wizard-render.js';
 import { LitElement, html, css } from 'https://cdn.jsdelivr.net/npm/lit@3.1.2/+esm';
 
         class MasterControlPlane extends LitElement {
-            static properties = {
-                currentView: { type: String },
-                tenants: { type: Array },
-                plans: { type: Array },
-                vaultRecords: { type: Array },
-                interactions: { type: Array },
-                pendingChallenges: { type: Array },
-                loading: { type: Boolean },
-                deploymentMode: { type: String },
-                
-                showWizard: { type: Boolean },
-                wizardStep: { type: Number },
-                wizardData: { type: Object },
-                wizardLoading: { type: Boolean },
-                wizardError: { type: String },
-                
-                logsModal: { type: Boolean },
-                logsContent: { type: String },
-                logsTenantName: { type: String },
-                actionLoading: { type: String },
-            };
+            static get properties() {
+                return {
+                    currentView: { type: String },
+                    tenants: { type: Array },
+                    plans: { type: Array },
+                    vaultRecords: { type: Array },
+                    interactions: { type: Array },
+                    pendingChallenges: { type: Array },
+                    loading: { type: Boolean },
+                    deploymentMode: { type: String },
+                    
+                    showWizard: { type: Boolean },
+                    wizardStep: { type: Number },
+                    wizardData: { type: Object },
+                    wizardLoading: { type: Boolean },
+                    wizardError: { type: String },
+                    
+                    showPlanWizard: { type: Boolean },
+                    planWizardMode: { type: String },
+                    planWizardData: { type: Object },
+                    
+                    logsModal: { type: Boolean },
+                    logsContent: { type: String },
+                    logsTenantName: { type: String },
+                    actionLoading: { type: String },
+                };
+            }
 
             constructor() {
                 super();
