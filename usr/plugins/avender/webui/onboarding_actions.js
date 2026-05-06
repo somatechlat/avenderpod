@@ -314,6 +314,24 @@ export function scrollToBottom() {
 export function updateField(field, value) {
     this.formData[field] = value;
     this.requestUpdate();
+    // Persist form data to localStorage for crash recovery
+    try {
+        const serializable = { ...this.formData };
+        // Strip base64 catalog file content to avoid quota overflow
+        if (serializable.catalogFile && serializable.catalogFile.content) {
+            serializable.catalogFile = { name: serializable.catalogFile.name, content: '[stored]' };
+        }
+        // Strip base64 image data from catalog items
+        if (serializable.catalogItems) {
+            serializable.catalogItems = serializable.catalogItems.map(item => {
+                const copy = { ...item };
+                if (copy.image && copy.image.length > 1000) copy.image = '[stored]';
+                return copy;
+            });
+        }
+        localStorage.setItem('avender_wizard_data', JSON.stringify(serializable));
+        localStorage.setItem('avender_wizard_step', String(this.step));
+    } catch (e) { /* localStorage quota exceeded — silently ignore */ }
 }
 
 export function formatWhatsAppNumber(raw) {
@@ -416,7 +434,12 @@ export function goToNextStep() {
         return;
     }
     this.errorMessage = "";
+    // Auto-default agentName from tradeName when leaving Step 4
+    if (this.step === 4 && !this.formData.agentName.trim()) {
+        this.formData.agentName = this.formData.tradeName;
+    }
     this.step += 1;
+    try { localStorage.setItem('avender_wizard_step', String(this.step)); } catch (e) {}
     this.requestUpdate();
 }
 
@@ -432,6 +455,11 @@ export async function submitSetup() {
     if (missing.length > 0) {
         this.errorMessage = `Completa los campos requeridos: ${[...new Set(missing)].join(", ")}`;
         return;
+    }
+
+    // Auto-default agentName from tradeName if left blank
+    if (!this.formData.agentName || !this.formData.agentName.trim()) {
+        this.formData.agentName = this.formData.tradeName;
     }
 
     this.loading = true;
@@ -450,6 +478,11 @@ export async function submitSetup() {
         const data = await resp.json();
 
         if (data.ok) {
+            // Clear persisted form data on successful submission
+            try {
+                localStorage.removeItem('avender_wizard_data');
+                localStorage.removeItem('avender_wizard_step');
+            } catch (e) {}
             this.step = 7;
             this.pollQrCode(); // Start polling QR
         } else {

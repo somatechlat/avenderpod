@@ -34,6 +34,7 @@ class VultrServiceMockTests(TestCase):
     def test_deploy_tenant_pod_success(self) -> None:
         with patch.dict(os.environ, {
             "VULTR_API_KEY": "fake-vultr-key",
+            "VULTR_API_KEY_FILE": "",
         }):
             mock_resp = MagicMock()
             mock_resp.status_code = 202
@@ -59,7 +60,7 @@ class VultrServiceMockTests(TestCase):
                 self.assertIn("AVENDER_SETUP_TOKEN", user_data_decoded)
 
     def test_deploy_tenant_pod_vultr_error(self) -> None:
-        with patch.dict(os.environ, {"VULTR_API_KEY": "fake-vultr-key"}):
+        with patch.dict(os.environ, {"VULTR_API_KEY": "fake-vultr-key", "VULTR_API_KEY_FILE": ""}):
             mock_resp = MagicMock()
             mock_resp.status_code = 400
             mock_resp.text = "Bad Request"
@@ -76,7 +77,7 @@ class VultrServiceMockTests(TestCase):
         self.tenant.vultr_instance_id = "vultr-xyz"
         self.tenant.save(update_fields=["vultr_instance_id"])
         
-        with patch.dict(os.environ, {"VULTR_API_KEY": "fake-vultr-key"}):
+        with patch.dict(os.environ, {"VULTR_API_KEY": "fake-vultr-key", "VULTR_API_KEY_FILE": ""}):
             mock_resp = MagicMock()
             mock_resp.status_code = 204
             
@@ -95,7 +96,7 @@ class VultrServiceMockTests(TestCase):
         self.tenant.status = "suspended"
         self.tenant.save(update_fields=["vultr_instance_id", "status"])
         
-        with patch.dict(os.environ, {"VULTR_API_KEY": "fake-vultr-key"}):
+        with patch.dict(os.environ, {"VULTR_API_KEY": "fake-vultr-key", "VULTR_API_KEY_FILE": ""}):
             mock_resp = MagicMock()
             mock_resp.status_code = 204
             
@@ -115,7 +116,7 @@ class VultrServiceMockTests(TestCase):
         self.tenant.status = "suspended"
         self.tenant.save()
         
-        with patch.dict(os.environ, {"VULTR_API_KEY": "fake-vultr-key"}):
+        with patch.dict(os.environ, {"VULTR_API_KEY": "fake-vultr-key", "VULTR_API_KEY_FILE": ""}):
             mock_resp = MagicMock()
             mock_resp.status_code = 204
             

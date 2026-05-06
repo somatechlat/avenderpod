@@ -18,6 +18,9 @@ class TenantOut(Schema):
     owner_phone_e164: str
     status: str
     assigned_port: int | None
+    deployment_backend: str = "vultr"
+    docker_container_id: str | None = None
+    vultr_instance_id: str | None = None
 
 
 class CatalogItemIn(Schema):
@@ -211,5 +214,9 @@ class TenantStatusOut(Schema):
     status: str
     container_status: str
     last_heartbeat: str | None
-    whisper_connection_ok: bool
+    stt_available: bool
     assigned_port: int | None
+
+
+class DeploymentModeIn(Schema):
+    mode: str  # "docker" or "vultr"

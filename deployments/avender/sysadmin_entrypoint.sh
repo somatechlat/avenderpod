@@ -38,10 +38,21 @@ user, created = user_model.objects.get_or_create(
     username=username,
     defaults={"email": email, "is_staff": True, "is_superuser": True},
 )
-if created:
+# Always sync password from secret file (handles rotation + persistent volumes)
+if created or not user.check_password(password):
     user.set_password(password)
     user.save(update_fields=["password"])
 PY
+fi
+
+echo "🏗️  Seeding SaaS plans..."
+python manage.py seed_plans
+
+# In dev mode, register the local Agent Zero container as a tenant
+# so it appears in the SysAdmin dashboard with management actions.
+if [ "${DJANGO_DEBUG:-false}" = "true" ]; then
+    echo "🐳 Registering dev tenant (Docker mode)..."
+    python manage.py register_dev_tenant
 fi
 
 if [ $# -gt 0 ]; then

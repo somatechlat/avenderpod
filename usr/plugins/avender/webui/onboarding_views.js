@@ -156,6 +156,14 @@ export function renderStep3() {
                     </div>
                 </div>
 
+                ${this.formData.archetype && this.formData.catalogItems.length === 0 ? html`
+                    <div class="mt-4 bg-amber-50 border-2 border-amber-300 border-dashed rounded-xl p-5 text-center">
+                        <span class="text-3xl mb-2 block">📋</span>
+                        <p class="text-amber-900 font-bold text-base">¡Tu catálogo está vacío!</p>
+                        <p class="text-amber-700 text-sm mt-1">Sube un archivo con tu lista de precios o crea productos manualmente para continuar.</p>
+                    </div>
+                ` : ''}
+
                 <div class="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-5">
                     <h3 class="text-lg font-bold text-blue-900 mb-2">Tu Catálogo de Productos</h3>
                     <div class="flex items-center justify-between border-t border-blue-200 pt-4 mt-2">
@@ -304,7 +312,29 @@ export function renderStep5() {
                 <div>
                     <label title="Crea una contraseña segura para entrar a tu Panel de Control de Ventas" class="block text-base font-medium text-gray-700">Contraseña de Administrador ${fieldTag(true)}</label>
                     <input type="password" title="Mínimo 8 caracteres" .value=${this.formData.adminPassword} @input=${e => this.updateField('adminPassword', e.target.value)} placeholder="••••••••" class="mt-1 block w-full rounded-lg border-gray-300 p-3 border focus:ring-indigo-500 focus:border-indigo-500">
-                </div>
+                    ${this.formData.adminPassword ? html`
+                        ${(() => {
+                            const pw = this.formData.adminPassword;
+                            let score = 0;
+                            if (pw.length >= 8) score++;
+                            if (pw.length >= 12) score++;
+                            if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++;
+                            if (/[0-9]/.test(pw)) score++;
+                            if (/[^A-Za-z0-9]/.test(pw)) score++;
+                            const labels = ['', 'Muy débil', 'Débil', 'Aceptable', 'Fuerte', 'Muy fuerte'];
+                            const colors = ['', 'bg-red-500', 'bg-orange-500', 'bg-yellow-500', 'bg-green-500', 'bg-emerald-600'];
+                            const textColors = ['', 'text-red-600', 'text-orange-600', 'text-yellow-600', 'text-green-600', 'text-emerald-600'];
+                            const widths = ['', 'w-1/5', 'w-2/5', 'w-3/5', 'w-4/5', 'w-full'];
+                            return html`
+                                <div class="mt-2">
+                                    <div class="w-full bg-gray-200 rounded-full h-1.5">
+                                        <div class="${colors[score]} h-1.5 rounded-full transition-all duration-300 ${widths[score]}"></div>
+                                    </div>
+                                    <p class="text-xs mt-1 font-medium ${textColors[score]}">${labels[score]}</p>
+                                </div>
+                            `;
+                        })()}
+                    ` : ''}
             </div>
 
             <div class="mt-6 bg-red-50 p-4 rounded-xl border border-red-200">
@@ -452,6 +482,34 @@ export function renderNavigation() {
         </div>
         ${this.errorMessage ? html`<p class="mt-3 text-sm font-semibold text-red-600">${this.errorMessage}</p>` : ''}
     `;
+}
+
+export function renderToast() {
+    if (!this.toastVisible) return html``;
+    const bgClass = this.toastType === 'error'
+        ? 'bg-red-600'
+        : this.toastType === 'warning' ? 'bg-yellow-500' : 'bg-green-600';
+    return html`
+        <div class="fixed top-6 right-6 z-[200] animate-slide-in">
+            <div class="${bgClass} text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 max-w-md">
+                <span class="text-lg">${this.toastType === 'error' ? '❌' : this.toastType === 'warning' ? '⚠️' : '✅'}</span>
+                <span class="text-sm font-medium">${this.toastMessage}</span>
+                <button @click=${() => { this.toastVisible = false; }} class="ml-2 text-white/70 hover:text-white text-lg leading-none">✕</button>
+            </div>
+        </div>
+    `;
+}
+
+export function showToast(message, type = 'success', duration = 4000) {
+    this.toastMessage = message;
+    this.toastType = type;
+    this.toastVisible = true;
+    this.requestUpdate();
+    if (this._toastTimer) clearTimeout(this._toastTimer);
+    this._toastTimer = setTimeout(() => {
+        this.toastVisible = false;
+        this.requestUpdate();
+    }, duration);
 }
 
 export function renderCopilot() {

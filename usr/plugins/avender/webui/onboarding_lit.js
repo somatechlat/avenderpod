@@ -25,12 +25,14 @@ export class AvenderWizard extends LitElement {
         loadingMessage: { type: String },
         qrStatus: { type: String },
         qrDataUrl: { type: String },
-        qrPollTimer: { type: Object }
+        qrPollTimer: { type: Object },
+        toastMessage: { type: String },
+        toastType: { type: String },
+        toastVisible: { type: Boolean },
     };
 
     constructor() {
         super();
-        this.step = 1;
         this.loading = false;
         this.errorMessage = '';
         this.successMessage = '';
@@ -45,6 +47,9 @@ export class AvenderWizard extends LitElement {
         this.chatFileName = '';
         this.showCatalogModal = false;
         this.newItem = { name: '', description: '', price: '' };
+        this.toastMessage = '';
+        this.toastType = 'success';
+        this.toastVisible = false;
 
         this.formData = {
             idType: 'RUC',
@@ -75,6 +80,45 @@ export class AvenderWizard extends LitElement {
             requireAgeVerification: false,
             promotions: ''
         };
+
+        // Restore form data from localStorage (crash recovery)
+        try {
+            const saved = localStorage.getItem('avender_wizard_data');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                // Merge saved data into formData (preserving defaults for missing keys)
+                for (const key of Object.keys(this.formData)) {
+                    if (parsed[key] !== undefined && parsed[key] !== null) {
+                        // Don't restore binary data placeholders
+                        if (key === 'catalogFile' && parsed[key]?.content === '[stored]') continue;
+                        this.formData[key] = parsed[key];
+                    }
+                }
+                // Restore catalog items but strip placeholder image data
+                if (parsed.catalogItems && Array.isArray(parsed.catalogItems)) {
+                    this.formData.catalogItems = parsed.catalogItems.map(item => {
+                        const copy = { ...item };
+                        if (copy.image === '[stored]') delete copy.image;
+                        return copy;
+                    });
+                }
+            }
+            const savedStep = localStorage.getItem('avender_wizard_step');
+            if (savedStep) {
+                const parsedStep = parseInt(savedStep, 10);
+                // Only restore to steps 1-6 (never auto-resume to 7/QR)
+                if (parsedStep >= 1 && parsedStep <= 6) {
+                    this.step = parsedStep;
+                } else {
+                    this.step = 1;
+                }
+            } else {
+                this.step = 1;
+            }
+        } catch (e) {
+            this.step = 1;
+        }
+
         this.catalogLoading = false;
         this.catalogError = '';
         this.catalogFileName = '';
@@ -111,6 +155,7 @@ export class AvenderWizard extends LitElement {
 
     render() {
         return html`
+            ${this.renderToast ? this.renderToast() : ''}
             <div class="relative w-full max-w-3xl mx-auto">
                 ${this.catalogLoading ? html`
                     <div class="fixed inset-0 z-[100] flex items-center justify-center bg-gray-900 bg-opacity-75 backdrop-blur-sm">

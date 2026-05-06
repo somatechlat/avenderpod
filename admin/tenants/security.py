@@ -1,10 +1,41 @@
 import hmac
 import os
+import time
+from collections import defaultdict, deque
 
 from django.utils import timezone
 
 from .models import AuditEvent, ServiceCredential, Tenant
 from .secret_values import read_secret
+
+
+# ── Rate Limiter ─────────────────────────────────────────────────────────
+# Lightweight in-process sliding-window rate limiter.
+# Limits sensitive auth endpoints to MAX_ATTEMPTS per WINDOW_SECONDS per IP.
+_RATE_WINDOW_SECONDS = 60
+_RATE_MAX_ATTEMPTS = 5
+_rate_log: dict[str, deque] = defaultdict(deque)
+
+
+def check_rate_limit(request, *, scope: str = "auth") -> bool:
+    """
+    Return ``True`` if the request is WITHIN the allowed rate.
+    Return ``False`` if the caller has exceeded MAX_ATTEMPTS in the window.
+    """
+    ip = actor_ip(request) or "unknown"
+    key = f"{scope}:{ip}"
+    now = time.monotonic()
+    window = _rate_log[key]
+
+    # Prune entries older than the window
+    while window and window[0] < now - _RATE_WINDOW_SECONDS:
+        window.popleft()
+
+    if len(window) >= _RATE_MAX_ATTEMPTS:
+        return False
+
+    window.append(now)
+    return True
 
 
 class SessionOrServiceAuth:

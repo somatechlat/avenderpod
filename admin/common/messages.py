@@ -15,6 +15,7 @@ MESSAGES = {
     "SUCCESS_POD_SUSPENDED": "El pod del inquilino '{name}' ha sido suspendido.",
     "SUCCESS_POD_REACTIVATED": "El pod del inquilino '{name}' ha sido reactivado.",
     "ERR_VULTR_API_FAILED": "Error en la infraestructura (Vultr): {detail}",
+    "ERR_PROVISIONING_FAILED": "Tenant provisioning failed: {detail}",
     # Config / Catalog
     "SUCCESS_CONFIG_SAVED": "Configuración guardada exitosamente.",
     "SUCCESS_CATALOG_ITEM_CREATED": "Item del catálogo '{name}' creado exitosamente.",
@@ -29,6 +30,21 @@ MESSAGES = {
     "ERR_PIN_INVALID": "Invalid or expired Session PIN.",
     "ERR_PIN_EXPIRED": "Session PIN has expired.",
     "SUCCESS_CREATOR_ACCESS": "Creator access granted.",
+    "ERR_RATE_LIMITED": "Too many attempts. Please wait a moment before trying again.",
+    # Docker Deployment
+    "SUCCESS_DOCKER_DEPLOYED": "Contenedor Docker para '{name}' desplegado en puerto {port}.",
+    "SUCCESS_DOCKER_STOPPED": "Contenedor Docker para '{name}' detenido.",
+    "SUCCESS_DOCKER_STARTED": "Contenedor Docker para '{name}' iniciado.",
+    "SUCCESS_DOCKER_RESTARTED": "Contenedor Docker para '{name}' reiniciado.",
+    "SUCCESS_DOCKER_DELETED": "Contenedor Docker para '{name}' eliminado.",
+    "ERR_DOCKER_API_FAILED": "Error en la infraestructura Docker: {detail}",
+    "ERR_DOCKER_NOT_AVAILABLE": "Docker daemon is not reachable from the SysAdmin container.",
+    "ERR_NO_CONTAINER_ID": "Tenant '{name}' has no container or instance ID assigned.",
+    # Deployment Mode
+    "SUCCESS_DEPLOYMENT_MODE_CHANGED": "Modo de despliegue cambiado a: {mode}.",
+    "ERR_INVALID_DEPLOYMENT_MODE": "Invalid deployment mode. Must be 'docker' or 'vultr'.",
+    # Container Management
+    "ERR_CONTAINER_NOT_FOUND": "Container not found for tenant '{name}'.",
 }
 
 

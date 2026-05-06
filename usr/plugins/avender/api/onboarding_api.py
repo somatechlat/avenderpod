@@ -8,6 +8,7 @@ from helpers.print_style import PrintStyle
 from usr.plugins.avender.helpers.auth import PASSWORD_KEY, hash_admin_password
 from usr.plugins.avender.helpers.config import normalize_settings
 from usr.plugins.avender.helpers.db import get_connection
+from usr.plugins.avender.helpers.messages import get_avender_message
 from usr.plugins.avender.helpers.onboarding_presets import ALLOWED_ARCHETYPES
 from usr.plugins.avender.helpers.onboarding_validators import (
     ID_PATTERNS,
@@ -50,7 +51,7 @@ class AvenderOnboardingHandler(ApiHandler):
                 conn.rollback()
                 conn.close()
                 conn = None
-                return {"ok": False, "error": "Onboarding already completed."}
+                return {"ok": False, "error": get_avender_message("ERR_ONBOARDING_COMPLETE")}
             # We keep the transaction open; conn is not None here.
 
             setup_error = require_setup_token(input, request)
@@ -74,7 +75,7 @@ class AvenderOnboardingHandler(ApiHandler):
                 conn.rollback()
                 conn.close()
                 conn = None
-                return {"ok": False, "error": f"Faltan campos obligatorios: {', '.join(missing)}"}
+                return {"ok": False, "error": get_avender_message("ERR_FIELDS_MISSING", fields=", ".join(missing))}
 
             # 3. Extract and validate inputs
             id_type = str(input.get("idType", "")).lower()
@@ -91,33 +92,33 @@ class AvenderOnboardingHandler(ApiHandler):
 
             if id_type not in ID_PATTERNS:
                 conn.rollback(); conn.close(); conn = None
-                return {"ok": False, "error": f"Tipo de ID no válido: {id_type}. Use: ruc, cedula, passport."}
+                return {"ok": False, "error": get_avender_message("ERR_ID_TYPE_INVALID", id_type=id_type)}
             if not ID_PATTERNS[id_type].match(id_number):
                 conn.rollback(); conn.close(); conn = None
-                return {"ok": False, "error": f"Número de {id_type} no válido."}
+                return {"ok": False, "error": get_avender_message("ERR_ID_NUMBER_INVALID", id_type=id_type)}
 
             if len(trade_name) < 2 or len(trade_name) > 200:
                 conn.rollback(); conn.close(); conn = None
-                return {"ok": False, "error": "El nombre comercial debe tener entre 2 y 200 caracteres."}
+                return {"ok": False, "error": get_avender_message("ERR_TRADE_NAME_LENGTH")}
             if len(headquarters) < 4 or len(headquarters) > 250:
                 conn.rollback(); conn.close(); conn = None
-                return {"ok": False, "error": "La dirección matriz debe tener entre 4 y 250 caracteres."}
+                return {"ok": False, "error": get_avender_message("ERR_HQ_LENGTH")}
 
             if not _validate_whatsapp_number(whatsapp_number):
                 conn.rollback(); conn.close(); conn = None
-                return {"ok": False, "error": "Número de WhatsApp no válido."}
+                return {"ok": False, "error": get_avender_message("ERR_WHATSAPP_INVALID")}
 
             if len(admin_password) < 8:
                 conn.rollback(); conn.close(); conn = None
-                return {"ok": False, "error": "La contraseña debe tener al menos 8 caracteres."}
+                return {"ok": False, "error": get_avender_message("ERR_PASSWORD_TOO_SHORT")}
 
             if archetype not in ALLOWED_ARCHETYPES:
                 conn.rollback(); conn.close(); conn = None
-                return {"ok": False, "error": f"Arquetipo no válido: {archetype}"}
+                return {"ok": False, "error": get_avender_message("ERR_ARCHETYPE_INVALID", archetype=archetype)}
 
             if payment_url and not _validate_url(payment_url):
                 conn.rollback(); conn.close(); conn = None
-                return {"ok": False, "error": "URL de pago no válida."}
+                return {"ok": False, "error": get_avender_message("ERR_PAYMENT_URL_INVALID")}
 
             # 3. Validate catalog items (with safe price parsing)
             catalog_items = input.get("catalogItems", [])
@@ -133,12 +134,12 @@ class AvenderOnboardingHandler(ApiHandler):
                 normalized_allowed = normalize_allowed_numbers(str(allowed_numbers))
                 if not normalized_allowed:
                     conn.rollback(); conn.close(); conn = None
-                    return {"ok": False, "error": "Debes agregar al menos un número permitido en Lista Blanca."}
+                    return {"ok": False, "error": get_avender_message("ERR_WHITELIST_EMPTY")}
                 input["allowedNumbers"] = ",".join(sorted(normalized_allowed))
                 numbers_list = [n.strip() for n in str(input["allowedNumbers"]).split(",") if n.strip()]
                 if len(numbers_list) > 100:
                     conn.rollback(); conn.close(); conn = None
-                    return {"ok": False, "error": "No puedes agregar más de 100 números permitidos."}
+                    return {"ok": False, "error": get_avender_message("ERR_WHITELIST_MAX")}
 
             # 5. Sanitize text inputs
             input["tradeName"] = _sanitize_text(trade_name)
@@ -171,7 +172,7 @@ class AvenderOnboardingHandler(ApiHandler):
                 conn.rollback()
                 conn.close()
                 PrintStyle.error(f"Avender Onboarding WhatsApp Error: {wae}")
-                return {"ok": False, "error": "Error configurando WhatsApp. Por favor intenta de nuevo."}
+                return {"ok": False, "error": get_avender_message("ERR_WHATSAPP_CONFIG")}
 
             # 9. Handle catalog items
             save_catalog(cursor, validated_catalog, archetype)
@@ -192,7 +193,7 @@ class AvenderOnboardingHandler(ApiHandler):
 
             return {
                 "ok": True,
-                "message": "¡Configuración guardada exitosamente!",
+                "message": get_avender_message("SUCCESS_ONBOARDING"),
                 "tradeName": input.get("tradeName", ""),
                 "archetype": archetype,
             }
@@ -207,5 +208,5 @@ class AvenderOnboardingHandler(ApiHandler):
                     pass
             return {
                 "ok": False,
-                "error": "Error guardando la configuración. Por favor intenta de nuevo.",
+                "error": get_avender_message("ERR_ONBOARDING_SAVE"),
             }

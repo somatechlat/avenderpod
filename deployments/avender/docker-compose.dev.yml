@@ -18,3 +18,6 @@ services:
     volumes:
       # Dev-only source mount for plugin development
       - ../../usr:/a0/usr
+      # Runtime patches for upstream third-party bugs
+      - ./a0_runtime_patches.sh:/a0/a0_runtime_patches.sh:ro
+    entrypoint: ["/bin/bash", "-c", "bash /a0/a0_runtime_patches.sh && exec /entrypoint.sh"]

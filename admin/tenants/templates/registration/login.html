@@ -75,7 +75,7 @@
 
             <form method="post" action="{% url 'login' %}" class="space-y-6">
                 {% csrf_token %}
-                <input type="hidden" name="next" value="{{ next|default:'/admin/' }}" />
+                <input type="hidden" name="next" value="{{ next|default:'/' }}" />
                 
                 <div>
                     <label for="id_username" class="block text-sm font-semibold text-slate-700 mb-2">Usuario</label>

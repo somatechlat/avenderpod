@@ -29,6 +29,7 @@ from .schemas import (
     CatalogItemOut,
     ChallengeIn,
     ConfigIn,
+    DeploymentModeIn,
     InteractionRecordOut,
     PendingChallengeOut,
     PlanIn,
@@ -44,13 +45,22 @@ from .schemas import (
 from .security import (
     SessionOrServiceAuth,
     audit_event,
+    check_rate_limit,
     check_sysadmin,
     check_tenant_access,
     get_service_credential,
     has_platform_perm,
     is_service_request,
 )
-from .vultr_service import deploy_tenant_pod, suspend_tenant_pod, reactivate_tenant_pod
+from .deployment_router import (
+    deploy_tenant_pod,
+    get_container_logs as _get_container_logs,
+    get_container_status as _get_container_status,
+    get_deployment_mode,
+    reactivate_tenant_pod,
+    set_deployment_mode as _set_deployment_mode,
+    suspend_tenant_pod,
+)
 from .vault_service import provision_tenant_secrets, build_tenant_bootstrap_env
 from common.messages import get_message
 
@@ -58,6 +68,24 @@ from common.messages import get_message
 router = Router(auth=SessionOrServiceAuth())
 
 PHONE_E164_RE = re.compile(r"^\+[1-9]\d{7,14}$")
+
+
+# --- HEALTH CHECK (unauthenticated) ---
+
+
+@router.get("/health", auth=None)
+def health_check(request):
+    """Unauthenticated health probe for container orchestration."""
+    db_ok = False
+    try:
+        from django.db import connection
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+        db_ok = True
+    except Exception:
+        pass
+    status = "ok" if db_ok else "degraded"
+    return {"status": status, "db": db_ok}
 
 
 # --- SYSTEM ENDPOINTS (SysAdmin Only) ---
@@ -160,7 +188,7 @@ def create_tenant(request, payload: TenantIn):
     if not business_name or not owner_full_name:
         raise HttpError(400, get_message("ERR_MISSING_TENANT_INFO"))
     if not PHONE_E164_RE.match(owner_phone):
-        raise HttpError(400, "Owner phone must be in E.164 format, e.g. +593979445965.")
+        raise HttpError(400, get_message("ERR_INVALID_PHONE"))
 
     with transaction.atomic():
         owner_user, created = User.objects.get_or_create(
@@ -220,7 +248,7 @@ def create_tenant(request, payload: TenantIn):
         tenant.status = "pending"
         tenant.save()
         # Return 502 so the caller knows provisioning failed
-        raise HttpError(502, f"Tenant provisioning failed: {str(e)}")
+        raise HttpError(502, get_message("ERR_PROVISIONING_FAILED", detail=str(e)))
 
     audit_event(
         request,
@@ -401,6 +429,34 @@ def report_tenant_usage(request, tenant_id: str, payload: TenantUsageIn):
     }
 
 
+@router.get("/tenants/{tenant_id}/interactions", response=list[InteractionRecordOut])
+def list_tenant_interactions(request, tenant_id: str):
+    """
+    Returns the WhatsApp interaction records for a specific tenant.
+    Accessible by the Tenant Owner OR a SysAdmin.
+    Cross-tenant access returns 403.
+    """
+    tenant = get_object_or_404(Tenant, id=tenant_id)
+    if not check_tenant_access(request, tenant):
+        return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
+
+    records = (
+        InteractionRecord.objects.filter(tenant=tenant)
+        .order_by("-created_at")[:100]
+    )
+    return [
+        {
+            "id": str(r.id),
+            "tenant_name": r.tenant.name,
+            "customer_wa_id": r.customer_wa_id,
+            "archetype": r.archetype,
+            "status": r.status,
+            "created_at": r.created_at.isoformat(),
+        }
+        for r in records
+    ]
+
+
 # --- CREATOR OVERRIDE (GOD MODE) ENDPOINTS ---
 
 
@@ -410,6 +466,8 @@ def init_challenge(request, tenant_id: str):
     Called by Agent Zero when the Creator trigger phrase is detected.
     Generates a random 4-digit PIN for the dashboard.
     """
+    if not check_rate_limit(request, scope="challenge"):
+        return {"ok": False, "message": get_message("ERR_RATE_LIMITED")}
     tenant = get_object_or_404(Tenant, id=tenant_id)
     if not (is_service_request(request) or check_tenant_access(request, tenant)):
         return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
@@ -427,6 +485,8 @@ def verify_challenge(request, payload: ChallengeIn):
     """
     Validates the Creator Password and the Session PIN.
     """
+    if not check_rate_limit(request, scope="challenge"):
+        return {"ok": False, "message": get_message("ERR_RATE_LIMITED")}
     if not (is_service_request(request) or check_sysadmin(request)):
         return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
 
@@ -483,7 +543,7 @@ def get_tenant_status(request, tenant_id: str):
     # Defaults
     container_status = "unknown"
     last_heartbeat = None
-    whisper_ok = False
+    stt_available = False
 
     # Attempt to reach the tenant VM's Agent Zero health endpoint
     if tenant.assigned_port and tenant.status in ("active", "suspended"):
@@ -518,10 +578,11 @@ def get_tenant_status(request, tenant_id: str):
                     except requests.RequestException:
                         container_status = "unreachable"
 
-                    # Whisper runs inside each tenant agent. A healthy tenant
-                    # container means the isolated local STT runtime is reachable
-                    # to the agent process; no central proxy is checked here.
-                    whisper_ok = container_status == "healthy"
+                    # STT (speech-to-text) runs inside each tenant agent
+                    # container. A healthy tenant container means the
+                    # local STT runtime is reachable to the agent process;
+                    # no central proxy is checked here.
+                    stt_available = container_status == "healthy"
         except (requests.RequestException, ValueError, KeyError):
             container_status = "error"
 
@@ -531,7 +592,7 @@ def get_tenant_status(request, tenant_id: str):
         "status": tenant.status,
         "container_status": container_status,
         "last_heartbeat": last_heartbeat,
-        "whisper_connection_ok": whisper_ok,
+        "stt_available": stt_available,
         "assigned_port": tenant.assigned_port,
     }
 
@@ -557,3 +618,81 @@ def list_pending_challenges(request):
         }
         for t in active_tenants
     ]
+
+
+# --- DEPLOYMENT MODE (SysAdmin Only) ---
+
+
+@router.get("/system/deployment-mode")
+def get_deployment_mode_endpoint(request):
+    """Returns the current deployment mode: 'docker' or 'vultr'."""
+    if not check_sysadmin(request):
+        return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
+    return {"mode": get_deployment_mode()}
+
+
+@router.post("/system/deployment-mode")
+def set_deployment_mode_endpoint(request, payload: DeploymentModeIn):
+    """SysAdmin-only. Switches between 'docker' and 'vultr'."""
+    if not check_sysadmin(request):
+        return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
+    mode = payload.mode.strip().lower()
+    if mode not in ("docker", "vultr"):
+        raise HttpError(400, get_message("ERR_INVALID_DEPLOYMENT_MODE"))
+    _set_deployment_mode(mode)
+    audit_event(
+        request,
+        "system.deployment_mode_changed",
+        metadata={"mode": mode},
+    )
+    return {
+        "ok": True,
+        "mode": mode,
+        "message": get_message("SUCCESS_DEPLOYMENT_MODE_CHANGED", mode=mode),
+    }
+
+
+# --- CONTAINER MANAGEMENT (SysAdmin Only) ---
+
+
+@router.get("/tenants/{tenant_id}/container-status")
+def container_status(request, tenant_id: str):
+    """Returns live Docker/Vultr container state."""
+    tenant = get_object_or_404(Tenant, id=tenant_id)
+    if not check_tenant_access(request, tenant):
+        return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
+    return _get_container_status(tenant)
+
+
+@router.get("/tenants/{tenant_id}/container-logs")
+def container_logs(request, tenant_id: str, tail: int = 100):
+    """Returns last N lines of container logs."""
+    if not check_sysadmin(request):
+        return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
+    tenant = get_object_or_404(Tenant, id=tenant_id)
+    logs = _get_container_logs(tenant, tail=min(tail, 500))
+    return {"tenant_id": str(tenant.id), "logs": logs}
+
+
+@router.post("/tenants/{tenant_id}/restart")
+def restart_tenant(request, tenant_id: str):
+    """Restart a tenant's Agent Zero container (stop + start)."""
+    if not has_platform_perm(request, "tenants.deploy_tenant"):
+        return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
+    tenant = get_object_or_404(Tenant, id=tenant_id)
+    try:
+        suspend_tenant_pod(tenant)
+        result = reactivate_tenant_pod(tenant)
+        audit_event(
+            request, "tenant.restarted", tenant=tenant, target_id=str(tenant.id)
+        )
+        return {
+            "ok": True,
+            "message": get_message("SUCCESS_DOCKER_RESTARTED", name=tenant.name),
+            "detail": result,
+        }
+    except (EnvironmentError, RuntimeError, ValueError) as e:
+        return {
+            "ok": False,
+            "message": get_message("ERR_DOCKER_API_FAILED", detail=str(e)),
+        }

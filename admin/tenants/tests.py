@@ -15,6 +15,12 @@ from tenants.vault_service import provision_tenant_secrets, build_tenant_bootstr
 @override_settings(SECURE_SSL_REDIRECT=False)
 class GodModeAuthTests(TestCase):
     def setUp(self) -> None:
+        # Reset the in-process rate limiter between tests to prevent
+        # cross-test state pollution (init_challenge hits exhaust the
+        # window before verify_challenge tests run).
+        from tenants.security import _rate_log
+        _rate_log.clear()
+
         self.owner = User.objects.create_user("owner", password="x")
         self.other = User.objects.create_user("other", password="x")
         self.admin = User.objects.create_superuser("admin", "admin@example.com", "x")
@@ -369,6 +375,11 @@ class VaultProvisioningTests(TestCase):
 
 
 class AvenderPlanCatalogTests(TestCase):
+    def setUp(self) -> None:
+        from django.core.management import call_command
+
+        call_command("seed_plans", verbosity=0)
+
     def test_seeded_public_plans_exist_with_expected_limits(self) -> None:
         free = Plan.objects.get(slug="free")
         starter = Plan.objects.get(slug="starter")

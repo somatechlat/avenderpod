@@ -104,6 +104,18 @@ class Tenant(models.Model):
     vultr_instance_id = models.CharField(
         max_length=100, blank=True, null=True, db_index=True
     )
+    docker_container_id = models.CharField(
+        max_length=64,
+        blank=True,
+        null=True,
+        help_text="Docker container ID for locally deployed tenants",
+    )
+    deployment_backend = models.CharField(
+        max_length=16,
+        default="vultr",
+        choices=(("docker", "Docker (Local)"), ("vultr", "Vultr (Cloud)")),
+        help_text="Which backend deployed this tenant's pod",
+    )
     assigned_port = models.IntegerField(blank=True, null=True, unique=True)
     custom_domain = models.CharField(max_length=255, blank=True, null=True)
 
