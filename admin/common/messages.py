@@ -24,6 +24,8 @@ MESSAGES = {
     "ERR_PLAN_INACTIVE": "Selected plan is inactive.",
     "ERR_MISSING_TENANT_INFO": "Business name and owner name are required.",
     "ERR_INVALID_PHONE": "Owner phone must be in E.164 format (+1234567890).",
+    "SUCCESS_PLAN_DELETED": "Plan eliminado exitosamente.",
+    "ERR_PLAN_IN_USE": "No se puede eliminar el plan porque está en uso por uno o más inquilinos.",
     # Auth & God Mode
     "SUCCESS_CHALLENGE_INITIATED": "Challenge initiated.",
     "ERR_MASTER_PASSWORD_INVALID": "Invalid Master Password.",

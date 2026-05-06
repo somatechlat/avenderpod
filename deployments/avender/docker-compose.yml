@@ -169,18 +169,18 @@ services:
       - avender_network
 
   # ==========================================================================
-  # TIER 2 — COGNITIVE ENGINE (Agent Zero + Avender Plugin + Baileys WA Bridge)
+  # TIER 2 — COGNITIVE ENGINE (AvenderPod + Baileys WA Bridge)
   # ==========================================================================
   # NOTE: This is the SINGLE-TENANT development instance.
   # In production, each tenant gets their own VM running this container.
   # See: deployments/avender/tenant-docker-compose.yml
   # ==========================================================================
-  agent_zero:
+  avenderpod:
     build:
       context: ../..
       dockerfile: DockerfileLocal
     restart: unless-stopped
-    container_name: avender_agent_zero
+    container_name: avenderpod_dev
     deploy:
       resources:
         limits:
@@ -195,18 +195,15 @@ services:
       - "127.0.0.1:45001:80"
     volumes:
       # Per-tenant named volume for agent workspace
-      - a0_workdir:/a0/usr/workdir
-      # Secret files
-      - ${AVENDER_SECRETS_DIR:-./secrets}/avender_setup_token:/run/secrets/avender_setup_token:ro
-      - ${AVENDER_SECRETS_DIR:-./secrets}/sysadmin_api_key:/run/secrets/sysadmin_api_key:ro
+      - avenderpod_workdir:/a0/usr/workdir
     environment:
-      AVENDER_SETUP_TOKEN_FILE: /run/secrets/avender_setup_token
+      AVENDER_SETUP_TOKEN: ${AVENDER_SETUP_TOKEN}
       WEB_UI_HOST: 0.0.0.0
       STT_MODEL_SIZE: base
       STT_LANGUAGE: es
       TENANT_ID: ${DEV_TENANT_ID:-00000000-0000-0000-0000-000000000000}
       SYSADMIN_API_URL: http://avender_sysadmin:8000/api/saas
-      SYSADMIN_API_KEY_FILE: /run/secrets/sysadmin_api_key
+      SYSADMIN_API_KEY: ${SYSADMIN_API_KEY}
     healthcheck:
       test: ["CMD-SHELL", "ps aux | grep -q '[r]un_ui.py' && ps aux | grep -q '[b]ridge.js' || exit 1"]
       interval: 15s
@@ -229,7 +226,7 @@ networks:
 volumes:
   vault_data:
     name: avender_vault_data
-  a0_workdir:
-    name: avender_a0_workdir
+  avenderpod_workdir:
+    name: avenderpod_workdir
   avender_pg_data:
     name: avender_pg_data

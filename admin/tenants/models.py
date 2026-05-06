@@ -38,7 +38,7 @@ class Plan(models.Model):
     # Runtime footprint for tenant deployment.
     vultr_plan = models.CharField(max_length=64, default="vc2-2c-4gb")
     a0_image = models.CharField(
-        max_length=255, default="agent0ai/agent-zero-tenant:latest"
+        max_length=255, default="avenderpod:latest"
     )
     a0_memory_limit = models.CharField(max_length=16, default="3g")
     a0_cpu_limit = models.CharField(max_length=16, default="2.0")

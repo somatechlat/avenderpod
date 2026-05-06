@@ -2,17 +2,17 @@
 # ¡A VENDER! — Single-Tenant Docker Compose (for Vultr VM deployment)
 # ============================================================================
 # This file is copied to each tenant Vultr VM and run via cloud-init.
-# It runs ONE independent Agent Zero container with no shared volumes.
+# It runs ONE independent AvenderPod container with no shared volumes.
 # All data is persisted in a per-tenant Docker named volume.
 #
-# Image: agent0ai/agent-zero-tenant (minimal, no SearXNG/SSH/supervisord)
+# Image: avenderpod:latest (minimal, no SearXNG/SSH/supervisord)
 # ============================================================================
 
 services:
-  agent_zero:
-    image: ${A0_IMAGE:-agent0ai/agent-zero-tenant:latest}
+  avenderpod:
+    image: ${A0_IMAGE:-avenderpod:latest}
     restart: unless-stopped
-    container_name: agent-zero-${TENANT_ID}
+    container_name: avenderpod-${TENANT_ID}
     deploy:
       resources:
         limits:
@@ -25,17 +25,38 @@ services:
       - "${ASSIGNED_PORT}:80"
     volumes:
       # Per-tenant named volume — completely isolated from other tenants
-      - "a0_${TENANT_ID}:/a0/usr/workdir"
-      - "${TENANT_SECRETS_DIR:-/etc/avender/secrets}:/run/secrets:ro"
+      - "avenderpod_${TENANT_ID}:/a0/usr/workdir"
     environment:
       TENANT_ID: ${TENANT_ID}
-      AVENDER_SETUP_TOKEN_FILE: /run/secrets/AVENDER_SETUP_TOKEN
+      AVENDER_SETUP_TOKEN: ${AVENDER_SETUP_TOKEN}
       SYSADMIN_API_URL: ${SYSADMIN_API_URL}
-      SYSADMIN_API_KEY_FILE: /run/secrets/SYSADMIN_API_KEY
-      MCP_SERVER_TOKEN_FILE: /run/secrets/MCP_SERVER_TOKEN
+      SYSADMIN_API_KEY: ${SYSADMIN_API_KEY}
+      MCP_SERVER_TOKEN: ${MCP_SERVER_TOKEN}
       STT_MODEL_SIZE: base
       STT_LANGUAGE: es
       WEB_UI_HOST: 0.0.0.0
+      # All rating limits injected dynamically
+      A0_PLAN_ID: ${A0_PLAN_ID}
+      A0_PLAN_NAME: ${A0_PLAN_NAME}
+      A0_MAX_CONVERSATIONS_PER_MONTH: ${A0_MAX_CONVERSATIONS_PER_MONTH}
+      A0_MAX_MESSAGES_PER_DAY: ${A0_MAX_MESSAGES_PER_DAY}
+      A0_MAX_MESSAGES_PER_MINUTE: ${A0_MAX_MESSAGES_PER_MINUTE}
+      A0_MAX_WHATSAPP_NUMBERS: ${A0_MAX_WHATSAPP_NUMBERS}
+      A0_MAX_CATALOG_ITEMS: ${A0_MAX_CATALOG_ITEMS}
+      A0_MAX_TRANSCRIPTION_MINUTES_PER_MONTH: ${A0_MAX_TRANSCRIPTION_MINUTES_PER_MONTH}
+      A0_MAX_STORAGE_MB: ${A0_MAX_STORAGE_MB}
+      A0_MAX_USERS: ${A0_MAX_USERS}
+      A0_MAX_AGENT_CONTEXTS: ${A0_MAX_AGENT_CONTEXTS}
+      A0_ALLOW_CATALOG_UPLOAD: ${A0_ALLOW_CATALOG_UPLOAD}
+      A0_ALLOW_VOICE_MESSAGES: ${A0_ALLOW_VOICE_MESSAGES}
+      A0_ALLOW_HUMAN_HANDOFF: ${A0_ALLOW_HUMAN_HANDOFF}
+      A0_ALLOW_CREATOR_OVERRIDE: ${A0_ALLOW_CREATOR_OVERRIDE}
+      A0_ALLOW_CUSTOM_DOMAIN: ${A0_ALLOW_CUSTOM_DOMAIN}
+      A0_ALLOW_INTEGRATIONS: ${A0_ALLOW_INTEGRATIONS}
+      A0_ALLOW_MOBILE_APP: ${A0_ALLOW_MOBILE_APP}
+      A0_ALLOW_MULTICHANNEL: ${A0_ALLOW_MULTICHANNEL}
+      A0_ALLOW_OUTBOUND_REACTIVATION: ${A0_ALLOW_OUTBOUND_REACTIVATION}
+      A0_ALLOW_CALL_HANDLING: ${A0_ALLOW_CALL_HANDLING}
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:80 || exit 1"]
       interval: 15s

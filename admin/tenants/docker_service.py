@@ -110,26 +110,10 @@ def deploy_tenant_pod(
         for key, value in bootstrap_env.items():
             env_vars[key] = str(value)
 
-    # ---- Secret File Mounts ----
-    # For shared secrets that exist on the host, mount them read-only
-    secrets_dir = os.environ.get("AVENDER_SECRETS_DIR", "./secrets")
-    if not os.path.isabs(secrets_dir):
-        secrets_dir = os.path.abspath(secrets_dir)
-
     volume_binds = {}
     # Workspace volume
     vol_name = _volume_name(tenant)
     volume_binds[vol_name] = {"bind": "/a0/usr/workdir", "mode": "rw"}
-
-    # Mount shared secrets if they exist on the host
-    secret_files = {
-        "sysadmin_api_key": "/run/secrets/sysadmin_api_key",
-        "avender_setup_token": "/run/secrets/avender_setup_token",
-    }
-    for secret_name, mount_path in secret_files.items():
-        host_path = os.path.join(secrets_dir, secret_name)
-        if os.path.isfile(host_path):
-            volume_binds[host_path] = {"bind": mount_path, "mode": "ro"}
 
     # ---- Cleanup any existing container with same name ----
     try:

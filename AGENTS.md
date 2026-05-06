@@ -257,3 +257,51 @@ pip install -r requirements2.txt
 
 *Last updated: 2026-03-25*
 *Maintained by: Agent Zero Core Team*
+
+---
+
+## Vibe Coding Rules (SysAdmin & Avender Pod Personalizations)
+
+These rules dictate all development on this repository.
+
+### 1. NO BULLSHIT
+- NO lies, NO guesses, NO invented APIs, NO "it probably works".
+- NO mocks, NO placeholders, NO fake functions, NO stubs, NO TODOs.
+- NO hype language. Say EXACTLY what is true.
+
+### 2. CHECK FIRST, CODE SECOND
+- ALWAYS review architecture and files BEFORE writing any code.
+- NEVER assume a file “probably exists”. ASK.
+- NEVER assume an implementation “likely works”. VERIFY.
+
+### 3. NO UNNECESSARY FILES
+- Modify existing files unless a new file is absolutely unavoidable.
+- Simplicity > complexity.
+
+### 4. REAL IMPLEMENTATIONS ONLY
+- Everything must be fully functional production-grade code.
+- NO fake returns, NO hardcoded values, NO temporary hacks.
+
+### 5. DOCUMENTATION = TRUTH
+- ALWAYS read documentation when relevant — PROACTIVELY.
+- NEVER invent API syntax or behavior.
+
+### 6. COMPLETE CONTEXT REQUIRED
+- Do NOT modify code without FULL context (Data flow, calls, dependencies).
+- If any context is missing → YOU MUST ASK FIRST.
+
+### 7. REAL DATA & SERVERS ONLY
+- Use real data structures. NO assumptions, NO hallucinated structures.
+
+### 8. API FRAMEWORK POLICY
+- Django/Ninja ONLY for the SysAdmin control plane. No FastAPI.
+
+### 9. UI FRAMEWORK POLICY (WITH AVENDER POD EXCEPTION)
+- **SysAdmin Control Plane:** ALL UI components MUST use Lit Web Components (Lit 3.x). NO Alpine.js.
+- **Avender Pod (usr/plugins/avender/webui):** EXCEPTION GRANTED. Do NOT use Lit Web Components here. Leave the Avender Pod frontend stack exactly as is (Alpine.js is permitted here). Do not attempt to migrate the Avender Pod UI to Lit.
+
+### 10. DATABASE ORM POLICY
+- Django ORM ONLY for SysAdmin. NO SQLAlchemy.
+
+### 11. CENTRALIZED MESSAGES & I18N
+- NO Hardcoded Strings. All user-facing text must use `admin.common.messages.get_message()`.
