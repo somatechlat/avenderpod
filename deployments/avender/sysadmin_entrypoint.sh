@@ -48,7 +48,7 @@ fi
 echo "🏗️  Seeding SaaS plans..."
 python manage.py seed_plans
 
-# In dev mode, register the local Agent Zero container as a tenant
+# In dev mode, register the local Avender Pod container as a tenant
 # so it appears in the SysAdmin dashboard with management actions.
 if [ "${DJANGO_DEBUG:-false}" = "true" ]; then
     echo "🐳 Registering dev tenant (Docker mode)..."

@@ -10,7 +10,9 @@ import shlex
 import requests
 
 from .models import Tenant
+from .pod_registry import register_pod_deployment, set_pod_lifecycle
 from .secret_values import read_secret
+from .vault_service import SECRET_BOOTSTRAP_KEYS
 
 VULTR_API_BASE = "https://api.vultr.com/v2"
 
@@ -39,26 +41,17 @@ def _build_user_data_script(tenant: Tenant, bootstrap_env: dict[str, str]) -> st
     """
     Build a complete cloud-init user-data script that:
       1. Installs Docker Engine
-      2. Pulls the Agent Zero image
+      2. Pulls the Avender Pod image
       3. Creates a per-tenant Docker named volume
       4. Starts the container with resource limits and security hardening
       5. Runs a health-check loop to confirm startup
     """
-    secret_keys = {
-        "AVENDER_SETUP_TOKEN",
-        "SYSADMIN_API_KEY",
-        "MCP_SERVER_TOKEN",
-    }
     env_lines = []
-    secret_lines = []
     for key, value in bootstrap_env.items():
-        if key in secret_keys:
-            encoded = base64.b64encode(str(value).encode("utf-8")).decode("ascii")
-            secret_lines.append(f"{key}={encoded}")
-        else:
-            env_lines.append(f"{key}={shlex.quote(str(value))}")
+        if key in SECRET_BOOTSTRAP_KEYS:
+            raise ValueError(f"Secret key {key} cannot be passed in Vultr user_data.")
+        env_lines.append(f"{key}={shlex.quote(str(value))}")
     env_file_contents = "\n".join(env_lines)
-    secret_file_contents = "\n".join(secret_lines)
 
     script = f"""#!/bin/bash
 set -euo pipefail
@@ -95,26 +88,15 @@ for i in {{1..30}}; do
 done
 
 # --------------------------------------------------------------------------
-# 2. Write tenant non-secret config and secret files
+	# 2. Write tenant non-secret config
 # --------------------------------------------------------------------------
-install -d -m 700 /etc/avender
-install -d -m 700 /etc/avender/secrets
-cat >/etc/avender/tenant.env <<'EOF'
-{env_file_contents}
-EOF
-chmod 600 /etc/avender/tenant.env
-cat >/etc/avender/tenant.secrets <<'EOF'
-{secret_file_contents}
-EOF
-chmod 600 /etc/avender/tenant.secrets
-while IFS='=' read -r key value; do
-    [ -n "$key" ] || continue
-    printf '%s' "$value" | base64 -d >"/etc/avender/secrets/$key"
-    chmod 600 "/etc/avender/secrets/$key"
-done </etc/avender/tenant.secrets
-shred -u /etc/avender/tenant.secrets || rm -f /etc/avender/tenant.secrets
+	install -d -m 700 /etc/avender
+	cat >/etc/avender/tenant.env <<'EOF'
+	{env_file_contents}
+	EOF
+	chmod 600 /etc/avender/tenant.env
 
-echo 'tenant={tenant.id}' >/etc/avender/provisioned.info
+	echo 'tenant={tenant.id}' >/etc/avender/provisioned.info
 
 # --------------------------------------------------------------------------
 # 3. Load environment
@@ -124,10 +106,10 @@ source /etc/avender/tenant.env
 set +a
 
 # --------------------------------------------------------------------------
-# 4. Pull Agent Zero image
+# 4. Pull Avender Pod image
 # --------------------------------------------------------------------------
-echo "[$(date -Iseconds)] Pulling image ${{A0_IMAGE:-agent0ai/agent-zero:latest}}..."
-docker pull "${{A0_IMAGE:-agent0ai/agent-zero:latest}}"
+echo "[$(date -Iseconds)] Pulling image ${{A0_IMAGE:-avenderpod:latest}}..."
+docker pull "${{A0_IMAGE:-avenderpod:latest}}"
 
 # --------------------------------------------------------------------------
 # 5. Create per-tenant named volume
@@ -143,7 +125,7 @@ fi
 # --------------------------------------------------------------------------
 # 6. Stop and remove any existing container for this tenant
 # --------------------------------------------------------------------------
-CONTAINER_NAME="agent-zero-${{TENANT_ID}}"
+CONTAINER_NAME="avenderpod-${{TENANT_ID}}"
 if docker ps -a --format '{{{{.Names}}}}' | grep -q "^$CONTAINER_NAME$"; then
     echo "[$(date -Iseconds)] Removing existing container $CONTAINER_NAME..."
     docker stop "$CONTAINER_NAME" || true
@@ -151,7 +133,7 @@ if docker ps -a --format '{{{{.Names}}}}' | grep -q "^$CONTAINER_NAME$"; then
 fi
 
 # --------------------------------------------------------------------------
-# 7. Run the Agent Zero container
+# 7. Run the Avender Pod container
 # --------------------------------------------------------------------------
 echo "[$(date -Iseconds)] Starting container $CONTAINER_NAME on port ${{ASSIGNED_PORT}}..."
 docker run -d \\
@@ -186,26 +168,25 @@ docker run -d \\
   -e "A0_ALLOW_CREATOR_OVERRIDE=${{A0_ALLOW_CREATOR_OVERRIDE:-False}}" \\
   -e "A0_ALLOW_CUSTOM_DOMAIN=${{A0_ALLOW_CUSTOM_DOMAIN:-False}}" \\
   -e "A0_ALLOW_INTEGRATIONS=${{A0_ALLOW_INTEGRATIONS:-False}}" \\
-  -e "AVENDER_SETUP_TOKEN_FILE=/run/secrets/AVENDER_SETUP_TOKEN" \\
-  -e "SYSADMIN_API_URL=${{SYSADMIN_API_URL}}" \\
-  -e "SYSADMIN_API_KEY_FILE=/run/secrets/SYSADMIN_API_KEY" \\
-  -e "STT_MODEL_SIZE=${{STT_MODEL_SIZE:-base}}" \\
-  -e "STT_LANGUAGE=${{STT_LANGUAGE:-es}}" \\
-  -e "MCP_SERVER_TOKEN_FILE=/run/secrets/MCP_SERVER_TOKEN" \\
-  -e "WEB_UI_HOST=0.0.0.0" \\
-  -v "/etc/avender/secrets:/run/secrets:ro" \\
-  "${{A0_IMAGE:-agent0ai/agent-zero:latest}}"
+	  -e "SYSADMIN_API_URL=${{SYSADMIN_API_URL}}" \\
+	  -e "TENANT_VAULT_ADDR=${{TENANT_VAULT_ADDR}}" \\
+	  -e "TENANT_VAULT_KV_MOUNT=${{TENANT_VAULT_KV_MOUNT}}" \\
+	  -e "TENANT_VAULT_SECRET_PATH=${{TENANT_VAULT_SECRET_PATH}}" \\
+	  -e "STT_MODEL_SIZE=${{STT_MODEL_SIZE:-base}}" \\
+	  -e "STT_LANGUAGE=${{STT_LANGUAGE:-es}}" \\
+	  -e "WEB_UI_HOST=0.0.0.0" \\
+	  "${{A0_IMAGE:-avenderpod:latest}}"
 
 # --------------------------------------------------------------------------
 # 8. Health check loop
 # --------------------------------------------------------------------------
-echo "[$(date -Iseconds)] Waiting for Agent Zero health check..."
+echo "[$(date -Iseconds)] Waiting for Avender Pod health check..."
 sleep 15
 
 HEALTHY=false
 for i in {{1..30}}; do
     if curl -sf "http://localhost:${{ASSIGNED_PORT}}" > /dev/null 2>&1; then
-        echo "[$(date -Iseconds)] Agent Zero is healthy on port ${{ASSIGNED_PORT}}"
+        echo "[$(date -Iseconds)] Avender Pod is healthy on port ${{ASSIGNED_PORT}}"
         HEALTHY=true
         break
     fi
@@ -214,7 +195,7 @@ for i in {{1..30}}; do
 done
 
 if [ "$HEALTHY" != "true" ]; then
-    echo "[$(date -Iseconds)] CRITICAL: Agent Zero failed to start. Check logs:"
+    echo "[$(date -Iseconds)] CRITICAL: Avender Pod failed to start. Check logs:"
     docker logs "$CONTAINER_NAME" | tail -n 50
     exit 1
 fi
@@ -233,7 +214,9 @@ echo "[$(date -Iseconds)] Bootstrap complete."
 
 
 def deploy_tenant_pod(
-    tenant: Tenant, bootstrap_env: dict[str, str] | None = None
+    tenant: Tenant,
+    bootstrap_env: dict[str, str] | None = None,
+    tenant_secrets: dict[str, str] | None = None,
 ) -> dict:
     """
     Deploy a new Vultr instance for this tenant using the Vultr REST API.
@@ -241,6 +224,11 @@ def deploy_tenant_pod(
 
     Returns the Vultr API response dict on success, raises on failure.
     """
+    if tenant_secrets:
+        raise RuntimeError(
+            "Vultr tenant-local Vault provisioning requires a secure post-boot "
+            "secret delivery channel. Refusing to place tenant secrets in cloud-init."
+        )
     # Use pre-assigned port if available (set by api.py during bootstrap).
     # Otherwise compute a unique port in the 45001+ range.
     if tenant.assigned_port:
@@ -301,6 +289,18 @@ def deploy_tenant_pod(
     tenant.vultr_instance_id = instance.get("id", "")
     tenant.status = "active"
     tenant.save()
+    register_pod_deployment(
+        tenant=tenant,
+        pod_name=f"avenderpod-{tenant.id}",
+        backend="vultr",
+        provider_resource_id=tenant.vultr_instance_id,
+        image_tag=(tenant.plan.a0_image if tenant.plan else "avenderpod:latest"),
+        assigned_port=tenant.assigned_port,
+        deployment_config=bootstrap_env,
+        lifecycle_state="active",
+        provider_health_state="unknown",
+        tenant_vault_state="unknown",
+    )
 
     return data
 
@@ -324,6 +324,7 @@ def suspend_tenant_pod(tenant: Tenant) -> dict:
 
     tenant.status = "suspended"
     tenant.save()
+    set_pod_lifecycle(tenant, action="suspend", lifecycle_state="suspended")
     return {"status": "halted", "instance_id": tenant.vultr_instance_id}
 
 
@@ -348,6 +349,7 @@ def reactivate_tenant_pod(tenant: Tenant) -> dict:
 
     tenant.status = "active"
     tenant.save()
+    set_pod_lifecycle(tenant, action="reactivate", lifecycle_state="active")
     return {"status": "started", "instance_id": tenant.vultr_instance_id}
 
 
@@ -373,4 +375,5 @@ def delete_tenant_pod(tenant: Tenant) -> dict:
     tenant.vultr_instance_id = ""
     tenant.assigned_port = None
     tenant.save()
+    set_pod_lifecycle(tenant, action="delete", lifecycle_state="deleted")
     return {"status": "deleted"}

@@ -2,8 +2,8 @@
 # ¡A VENDER! — Production Docker Compose Orchestration (v3.1)
 # ============================================================================
 # Port Range: 45000–45001 (isolated from host dev services)
-# Stack: sysadmin, db (postgres), vault, agent_zero
-# Startup Order: vault → db → sysadmin → agent_zero
+# Stack: sysadmin, db (postgres), vault, avenderpod
+# Startup Order: vault → db → sysadmin → avenderpod
 # RAM Budget: ~5GB total including tenant-local STT
 # ============================================================================
 
@@ -128,6 +128,7 @@ services:
       - ${AVENDER_SECRETS_DIR:-./secrets}/sysadmin_api_key:/run/secrets/sysadmin_api_key:ro
       - ${AVENDER_SECRETS_DIR:-./secrets}/vultr_api_key:/run/secrets/vultr_api_key:ro
       - ${AVENDER_SECRETS_DIR:-./secrets}/vault_token:/run/secrets/vault_token:ro
+      - ${AVENDER_SECRETS_DIR:-./secrets}/master_creator_password:/run/secrets/master_creator_password:ro
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-avender_db}
       POSTGRES_USER: ${POSTGRES_USER:-avender_user}
@@ -143,6 +144,7 @@ services:
       DJANGO_SUPERUSER_EMAIL: ${DJANGO_SUPERUSER_EMAIL:-admin@avender.local}
       SYSADMIN_API_KEY_FILE: /run/secrets/sysadmin_api_key
       VULTR_API_KEY_FILE: /run/secrets/vultr_api_key
+      MASTER_CREATOR_PASSWORD_FILE: /run/secrets/master_creator_password
       VULTR_REGION: ${VULTR_REGION:-mia}
       # IMPORTANT: must be ≥ vc2-2c-4gb to fit the 3GB RAM / 2 CPU container limit
       VULTR_PLAN: ${VULTR_PLAN:-vc2-2c-4gb}
@@ -150,6 +152,8 @@ services:
       VULTR_VPC_ID: ${VULTR_VPC_ID:-}
       VULTR_FIREWALL_GROUP_ID: ${VULTR_FIREWALL_GROUP_ID:-}
       CLUSTER_VPC_IP: ${CLUSTER_VPC_IP:-}
+      # SysAdmin API URL — used by vault_service to inject callback URL into tenant pods
+      SYSADMIN_API_URL: ${SYSADMIN_API_URL:-http://avender_sysadmin:8000/api/saas}
       VAULT_ADDR: ${VAULT_ADDR:-http://vault:8200}
       VAULT_TOKEN_FILE: /run/secrets/vault_token
       VAULT_KV_MOUNT: ${VAULT_KV_MOUNT:-secret}
@@ -198,13 +202,14 @@ services:
       # Per-tenant named volume for agent workspace
       - avenderpod_workdir:/a0/usr/workdir
     environment:
-      AVENDER_SETUP_TOKEN: ${AVENDER_SETUP_TOKEN}
+      TENANT_VAULT_ADDR: ${TENANT_VAULT_ADDR:-http://tenant-vault:8200}
+      TENANT_VAULT_KV_MOUNT: ${TENANT_VAULT_KV_MOUNT:-secret}
+      TENANT_VAULT_SECRET_PATH: ${TENANT_VAULT_SECRET_PATH:-avender/dev-agent}
       WEB_UI_HOST: 0.0.0.0
       STT_MODEL_SIZE: base
       STT_LANGUAGE: es
       TENANT_ID: ${DEV_TENANT_ID:-00000000-0000-0000-0000-000000000000}
       SYSADMIN_API_URL: http://avender_sysadmin:8000/api/saas
-      SYSADMIN_API_KEY: ${SYSADMIN_API_KEY}
     healthcheck:
       test: ["CMD-SHELL", "ps aux | grep -q '[r]un_ui.py' && ps aux | grep -q '[b]ridge.js' || exit 1"]
       interval: 15s

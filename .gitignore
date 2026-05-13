@@ -22,8 +22,11 @@
 .idea/
 .vscode/
 
-# ignore test files in root dir
+# ignore ad-hoc test/debug files in root dir
 /*.test.py
+/test_*.py
+/test_*.js
+/*_rendered.png
 
 # Ignore all contents of the virtual environment directory
 .venv/

@@ -30,7 +30,9 @@ def set_deployment_mode(mode: str) -> None:
 
 
 def deploy_tenant_pod(
-    tenant: Tenant, bootstrap_env: dict[str, str] | None = None
+    tenant: Tenant,
+    bootstrap_env: dict[str, str] | None = None,
+    tenant_secrets: dict[str, str] | None = None,
 ) -> dict:
     """
     Deploy a tenant pod using the CURRENT global deployment mode.
@@ -40,11 +42,11 @@ def deploy_tenant_pod(
     if mode == "docker":
         from . import docker_service
 
-        return docker_service.deploy_tenant_pod(tenant, bootstrap_env)
+        return docker_service.deploy_tenant_pod(tenant, bootstrap_env, tenant_secrets)
     else:
         from . import vultr_service
 
-        return vultr_service.deploy_tenant_pod(tenant, bootstrap_env)
+        return vultr_service.deploy_tenant_pod(tenant, bootstrap_env, tenant_secrets)
 
 
 def suspend_tenant_pod(tenant: Tenant) -> dict:

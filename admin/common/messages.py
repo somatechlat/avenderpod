@@ -26,6 +26,8 @@ MESSAGES = {
     "ERR_INVALID_PHONE": "Owner phone must be in E.164 format (+1234567890).",
     "SUCCESS_PLAN_DELETED": "Plan eliminado exitosamente.",
     "ERR_PLAN_IN_USE": "No se puede eliminar el plan porque está en uso por uno o más inquilinos.",
+    "SUCCESS_TENANT_DELETED": "El inquilino '{name}' ha sido eliminado exitosamente.",
+    "ERR_TENANT_ALREADY_DELETED": "El inquilino ya ha sido eliminado.",
     # Auth & God Mode
     "SUCCESS_CHALLENGE_INITIATED": "Challenge initiated.",
     "ERR_MASTER_PASSWORD_INVALID": "Invalid Master Password.",
@@ -47,6 +49,20 @@ MESSAGES = {
     "ERR_INVALID_DEPLOYMENT_MODE": "Invalid deployment mode. Must be 'docker' or 'vultr'.",
     # Container Management
     "ERR_CONTAINER_NOT_FOUND": "Container not found for tenant '{name}'.",
+    # Plan validation
+    "ERR_INVALID_PLAN_LIMIT": "Plan limit '{field}' must be zero or greater.",
+    "ERR_INVALID_PLAN_CPU": "Plan CPU field '{field}' must be a positive number.",
+    "ERR_INVALID_PLAN_MEMORY": "Plan memory field '{field}' must use a valid unit: b, k, m, or g.",
+    "ERR_INVALID_PLAN_IMAGE": "Plan Docker image name is invalid.",
+    "ERR_INVALID_VULTR_PLAN": "Vultr plan identifier is invalid.",
+    # Vault health
+    "ERR_VAULT_UNAVAILABLE": "Vault service is unavailable or sealed. Check Vault container health.",
+    # GlobalConfig management
+    "ERR_CONFIG_KEY_NOT_FOUND": "Configuration key '{key}' not found.",
+    "ERR_CONFIG_KEY_PROTECTED": "Configuration key '{key}' is protected and cannot be modified via API.",
+    "SUCCESS_CONFIG_UPDATED": "Configuration '{key}' updated successfully.",
+    # Pod reconciliation
+    "SUCCESS_POD_RECONCILED": "Pod reconciliation complete: {changed} pods updated, {repaired} re-deployed.",
 }
 
 

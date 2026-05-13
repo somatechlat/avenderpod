@@ -9,6 +9,17 @@ import requests
 from .models import ServiceCredential, Tenant, VaultRecord
 from .secret_values import read_secret
 
+SECRET_BOOTSTRAP_KEYS = {
+    "SYSADMIN_API_KEY",
+    "SYSADMIN_TENANT_API_KEY",
+    "AVENDER_SETUP_TOKEN",
+    "MCP_SERVER_TOKEN",
+    "VAULT_TOKEN",
+    "VAULT_ROOT_TOKEN",
+    "VAULT_UNSEAL_KEY",
+    "TENANT_VAULT_TOKEN",
+}
+
 
 def _get_env(name: str, *, required: bool = True, default: str = "") -> str:
     value = read_secret(name, default=default)
@@ -39,6 +50,15 @@ def _sysadmin_api_key() -> str:
     if len(key) < 32:
         raise EnvironmentError("SYSADMIN_API_KEY must be at least 32 characters.")
     return key
+
+
+def assert_no_secret_keys(config: dict[str, Any]) -> None:
+    present = sorted(SECRET_BOOTSTRAP_KEYS.intersection(config.keys()))
+    if present:
+        raise ValueError(
+            "Deployment config contains secret keys that must stay in Vault: "
+            + ", ".join(present)
+        )
 
 
 def build_tenant_secret_bundle(tenant: Tenant) -> dict[str, str]:
@@ -97,15 +117,43 @@ def write_tenant_secrets_to_vault(
     return full_path
 
 
+def _check_vault_health() -> None:
+    """
+    Pre-flight check: verify Vault is initialized, unsealed, and reachable.
+    Raises RuntimeError with ERR_VAULT_UNAVAILABLE if the check fails.
+    """
+    from common.messages import get_message
+
+    addr = _get_env("VAULT_ADDR")
+    timeout = float(_get_env("VAULT_TIMEOUT_SECONDS", required=False, default="5"))
+    try:
+        resp = requests.get(
+            f"{addr.rstrip('/')}/v1/sys/health",
+            timeout=timeout,
+        )
+        # Vault /sys/health returns 200 if initialized+unsealed,
+        # 429 if unsealed+standby, 472 if DR secondary, 473 if perf standby,
+        # 501 if not initialized, 503 if sealed.
+        if resp.status_code not in (200, 429, 472, 473):
+            raise RuntimeError(
+                get_message("ERR_VAULT_UNAVAILABLE")
+                + f" (status={resp.status_code})"
+            )
+    except requests.ConnectionError:
+        raise RuntimeError(get_message("ERR_VAULT_UNAVAILABLE"))
+    except requests.Timeout:
+        raise RuntimeError(get_message("ERR_VAULT_UNAVAILABLE"))
+
+
 def provision_tenant_secrets(tenant: Tenant) -> dict[str, str]:
+    _check_vault_health()
     secrets_bundle = build_tenant_secret_bundle(tenant)
     write_tenant_secrets_to_vault(tenant, secrets_bundle)
     return secrets_bundle
 
 
-def build_tenant_bootstrap_env(
+def build_tenant_deployment_config(
     tenant: Tenant,
-    tenant_secrets: dict[str, str],
     assigned_port: int,
 ) -> dict[str, str]:
     # Cluster VPC IP is the private IP of the cluster control plane VM.
@@ -128,11 +176,11 @@ def build_tenant_bootstrap_env(
         plan.a0_image
         if plan
         else _get_env(
-            "A0_IMAGE", required=False, default="agent0ai/agent-zero-tenant:latest"
+            "A0_IMAGE", required=False, default="avenderpod:latest"
         )
     )
 
-    return {
+    config = {
         "TENANT_ID": str(tenant.id),
         "A0_PLAN_ID": str(plan.id) if plan else "",
         "A0_PLAN_NAME": plan.name if plan else "",
@@ -162,10 +210,9 @@ def build_tenant_bootstrap_env(
         ),
         "A0_ALLOW_CALL_HANDLING": str(plan.allow_call_handling if plan else False),
         "SYSADMIN_API_URL": sysadmin_url,
-        "SYSADMIN_API_KEY": tenant_secrets.get("SYSADMIN_TENANT_API_KEY")
-        or _sysadmin_api_key(),
-        "AVENDER_SETUP_TOKEN": tenant_secrets["AVENDER_SETUP_TOKEN"],
-        "MCP_SERVER_TOKEN": tenant_secrets["MCP_SERVER_TOKEN"],
+        "TENANT_VAULT_ADDR": "http://tenant-vault:8200",
+        "TENANT_VAULT_KV_MOUNT": "secret",
+        "TENANT_VAULT_SECRET_PATH": f"avender/tenants/{tenant.id}",
         "STT_MODEL_SIZE": "base",
         "STT_LANGUAGE": "es",
         "ASSIGNED_PORT": str(assigned_port),
@@ -175,3 +222,17 @@ def build_tenant_bootstrap_env(
         "A0_MEMORY_RESERVATION": plan.a0_memory_reservation if plan else "1g",
         "A0_CPU_RESERVATION": plan.a0_cpu_reservation if plan else "1.0",
     }
+    assert_no_secret_keys(config)
+    return config
+
+
+def build_tenant_bootstrap_env(
+    tenant: Tenant,
+    tenant_secrets: dict[str, str],
+    assigned_port: int,
+) -> dict[str, str]:
+    """
+    Compatibility wrapper. Despite the legacy name, this returns only
+    non-secret deployment config. Tenant secrets must remain in Vault.
+    """
+    return build_tenant_deployment_config(tenant, assigned_port)

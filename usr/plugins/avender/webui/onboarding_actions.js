@@ -317,6 +317,8 @@ export function updateField(field, value) {
     // Persist form data to localStorage for crash recovery
     try {
         const serializable = { ...this.formData };
+        delete serializable.adminPassword;
+        delete serializable.setupToken;
         // Strip base64 catalog file content to avoid quota overflow
         if (serializable.catalogFile && serializable.catalogFile.content) {
             serializable.catalogFile = { name: serializable.catalogFile.name, content: '[stored]' };
@@ -480,8 +482,9 @@ export async function submitSetup() {
         if (data.ok) {
             // Clear persisted form data on successful submission
             try {
-                localStorage.removeItem('avender_wizard_data');
-                localStorage.removeItem('avender_wizard_step');
+        localStorage.removeItem('avender_wizard_data');
+        localStorage.removeItem('avender_wizard_step');
+        localStorage.removeItem('avender_setup_token');
             } catch (e) {}
             this.step = 7;
             this.pollQrCode(); // Start polling QR

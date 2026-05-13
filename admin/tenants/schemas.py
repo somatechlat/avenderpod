@@ -105,7 +105,7 @@ class PlanIn(Schema):
     max_users: int = 3
     max_agent_contexts: int = 1
     vultr_plan: str = "vc2-2c-4gb"
-    a0_image: str = "agent0ai/agent-zero-tenant:latest"
+    a0_image: str = "avenderpod:latest"
     a0_memory_limit: str = "3g"
     a0_cpu_limit: str = "2.0"
     a0_memory_reservation: str = "1g"
@@ -220,3 +220,29 @@ class TenantStatusOut(Schema):
 
 class DeploymentModeIn(Schema):
     mode: str  # "docker" or "vultr"
+
+
+class PodDeploymentOut(Schema):
+    id: UUID
+    tenant_id: UUID
+    tenant_name: str
+    pod_name: str
+    is_development: bool
+    deployment_backend: str
+    provider_resource_id: str
+    avender_container_id: str
+    tenant_vault_container_id: str
+    image_tag: str
+    assigned_port: int | None
+    public_url: str
+    private_url: str
+    effective_plan_snapshot: dict
+    effective_rate_limits: dict
+    lifecycle_state: str
+    provider_health_state: str
+    tenant_vault_state: str
+    last_lifecycle_action: str
+    last_health_check_at: str | None
+    last_error: str
+    created_at: str
+    updated_at: str

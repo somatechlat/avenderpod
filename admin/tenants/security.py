@@ -12,6 +12,15 @@ from .secret_values import read_secret
 # ── Rate Limiter ─────────────────────────────────────────────────────────
 # Lightweight in-process sliding-window rate limiter.
 # Limits sensitive auth endpoints to MAX_ATTEMPTS per WINDOW_SECONDS per IP.
+#
+# KNOWN LIMITATION: This is an in-process data structure (defaultdict of deques).
+# When SysAdmin runs with multiple Gunicorn workers (docker-compose.yml specifies
+# --workers 2), each worker maintains INDEPENDENT rate-limit state. An attacker
+# could theoretically alternate requests between workers to double the effective
+# limit. This is acceptable for the current deployment (2 workers in a single
+# container behind Docker networking). For horizontal scale-out with multiple
+# SysAdmin replicas, migrate to a Redis-backed sliding window counter
+# (e.g., redis INCR + EXPIRE, or django-ratelimit with Redis backend).
 _RATE_WINDOW_SECONDS = 60
 _RATE_MAX_ATTEMPTS = 5
 _rate_log: dict[str, deque] = defaultdict(deque)

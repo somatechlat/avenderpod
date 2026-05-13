@@ -260,7 +260,7 @@ class TenantStatusEndpointTests(TestCase):
             "tenants.vultr_service.get_vultr_api_key",
             return_value="fake-vultr-key-for-test",
         ), patch(
-            "tenants.api.requests.get",
+            "tenants.api_tenants.requests.get",
             side_effect=req_lib.RequestException("timeout"),
         ):
             resp = self.client.get(f"/api/saas/tenants/{self.tenant.id}/status")

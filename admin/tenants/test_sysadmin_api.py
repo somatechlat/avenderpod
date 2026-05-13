@@ -6,7 +6,7 @@ from unittest.mock import patch, MagicMock
 from django.test import TestCase, override_settings
 from django.contrib.auth.models import User, Permission
 
-from tenants.models import Tenant, Plan, InteractionRecord, VaultRecord
+from tenants.models import Tenant, Plan, InteractionRecord, VaultRecord, PodDeployment
 
 
 @override_settings(SECURE_SSL_REDIRECT=False)
@@ -52,6 +52,20 @@ class SysAdminAPITests(TestCase):
         )
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.json()["name"], "New Plan")
+
+    def test_create_plan_rejects_negative_rate_limit(self) -> None:
+        self.client.force_login(self.admin)
+        resp = self.client.post(
+            "/api/saas/plans",
+            data={
+                "name": "Invalid Plan",
+                "slug": "invalid-plan",
+                "price_monthly": 50,
+                "max_messages_per_day": -1,
+            },
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 400)
 
     def test_update_plan_requires_change_permission(self) -> None:
         self.client.force_login(self.admin)
@@ -99,7 +113,7 @@ class SysAdminAPITests(TestCase):
         
         self.client.force_login(self.staff)
         
-        with patch("tenants.api.suspend_tenant_pod") as mock_suspend:
+        with patch("tenants.api_tenants.suspend_tenant_pod") as mock_suspend:
             mock_suspend.return_value = {"status": "halted"}
             resp = self.client.post(f"/api/saas/tenants/{self.tenant.id}/suspend")
             self.assertEqual(resp.status_code, 200)
@@ -112,9 +126,26 @@ class SysAdminAPITests(TestCase):
         
         self.client.force_login(self.staff)
         
-        with patch("tenants.api.reactivate_tenant_pod") as mock_reactivate:
+        with patch("tenants.api_tenants.reactivate_tenant_pod") as mock_reactivate:
             mock_reactivate.return_value = {"status": "started"}
             resp = self.client.post(f"/api/saas/tenants/{self.tenant.id}/reactivate")
             self.assertEqual(resp.status_code, 200)
             self.assertTrue(resp.json()["ok"])
             mock_reactivate.assert_called_once_with(self.tenant)
+
+    def test_list_pods_requires_pod_permission(self) -> None:
+        PodDeployment.objects.create(
+            tenant=self.tenant,
+            pod_name="avender-pod-test",
+            deployment_backend="docker",
+            lifecycle_state="active",
+        )
+
+        self.client.force_login(self.user)
+        resp = self.client.get("/api/saas/pods")
+        self.assertEqual(resp.status_code, 403)
+
+        self.client.force_login(self.admin)
+        resp = self.client.get("/api/saas/pods")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()[0]["pod_name"], "avender-pod-test")

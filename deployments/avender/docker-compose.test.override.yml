@@ -1,4 +1,52 @@
+# ── docker-compose.test.override.yml ─────────────────────────────────────
+# Isolated test environment for CI and local integration testing.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.test.override.yml up -d
+#
+# This override:
+#   - Uses an isolated PostgreSQL volume (avender_test_db) to prevent
+#     contamination of development/production data.
+#   - Skips Vault bootstrap (VAULT_ADDR is empty).
+#   - Sets DJANGO_DEBUG=true to enable dev-mode behaviors.
+#   - Provides SYSADMIN_API_KEY directly via env (no secret file).
+#   - Exposes SysAdmin on port 45099 to avoid port collisions with dev/prod.
+#   - Retains the dev avenderpod port mapping.
+# ─────────────────────────────────────────────────────────────────────────
+
 services:
-  agent_zero:
+  avenderpod:
     ports:
       - "45001:80"
+
+  sysadmin:
+    ports:
+      - "45099:8000"
+    environment:
+      - DJANGO_DEBUG=true
+      - DJANGO_SECRET_KEY=test-only-insecure-key-do-not-use-in-prod
+      - SYSADMIN_API_KEY=test-api-key-at-least-32-chars-long-for-security
+      - MASTER_CREATOR_PASSWORD=TestCreatorPassword123
+      - VAULT_ADDR=
+      - DATABASE_URL=postgres://avender:avender_test@test_db:5432/avender_test
+    depends_on:
+      test_db:
+        condition: service_healthy
+
+  test_db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: avender
+      POSTGRES_PASSWORD: avender_test
+      POSTGRES_DB: avender_test
+    volumes:
+      - avender_test_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U avender -d avender_test"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  avender_test_db:
+    driver: local

@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# Agent Zero SysAdmin Entrypoint
+# ¡A VENDER! SysAdmin Entrypoint
 # This script is used when running the Django admin container standalone
 # (without the Docker Compose bind-mount hack).
 

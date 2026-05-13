@@ -25,13 +25,15 @@ services:
       - "${ASSIGNED_PORT}:80"
     volumes:
       # Per-tenant named volume — completely isolated from other tenants
-      - "avenderpod_${TENANT_ID}:/a0/usr/workdir"
+      - "avenderpod_data:/a0/usr/workdir"
+      - "tenant_vault_token:/run/secrets:ro"
     environment:
       TENANT_ID: ${TENANT_ID}
-      AVENDER_SETUP_TOKEN: ${AVENDER_SETUP_TOKEN}
       SYSADMIN_API_URL: ${SYSADMIN_API_URL}
-      SYSADMIN_API_KEY: ${SYSADMIN_API_KEY}
-      MCP_SERVER_TOKEN: ${MCP_SERVER_TOKEN}
+      TENANT_VAULT_ADDR: ${TENANT_VAULT_ADDR}
+      TENANT_VAULT_KV_MOUNT: ${TENANT_VAULT_KV_MOUNT}
+      TENANT_VAULT_SECRET_PATH: ${TENANT_VAULT_SECRET_PATH}
+      TENANT_VAULT_TOKEN_FILE: /run/secrets/tenant_vault_token
       STT_MODEL_SIZE: base
       STT_LANGUAGE: es
       WEB_UI_HOST: 0.0.0.0
@@ -71,7 +73,12 @@ services:
     # Security hardening
     security_opt:
       - no-new-privileges:true
-    pids_limit: 1000
 
 # No networks defined — uses default bridge. Tenant has no access to other
 # tenant containers by design.
+
+volumes:
+  avenderpod_data:
+    name: avenderpod_${TENANT_ID}
+  tenant_vault_token:
+    name: tenant_vault_token_${TENANT_ID}

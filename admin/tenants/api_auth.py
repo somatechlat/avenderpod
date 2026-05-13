@@ -8,7 +8,7 @@ from django.contrib.auth.hashers import check_password
 from ninja import Router
 from .models import Tenant, GlobalConfig
 from .schemas import ChallengeIn, PendingChallengeOut
-from .security import check_sysadmin, check_tenant_access, check_rate_limit, is_service_request, get_service_credential, audit_event
+from .security import check_tenant_access, check_rate_limit, is_service_request, audit_event, has_platform_perm
 from common.messages import get_message
 
 router = Router()
@@ -16,13 +16,17 @@ router = Router()
 @router.post("/auth/init-challenge")
 def init_challenge(request, tenant_id: str):
     """
-    Called by Agent Zero when the Creator trigger phrase is detected.
+    Called by the Avender Pod when the Creator trigger phrase is detected.
     Generates a random 4-digit PIN for the dashboard.
     """
     if not check_rate_limit(request, scope="challenge"):
         return {"ok": False, "message": get_message("ERR_RATE_LIMITED")}
     tenant = get_object_or_404(Tenant, id=tenant_id)
-    if not (is_service_request(request) or check_tenant_access(request, tenant)):
+    if not (
+        is_service_request(request)
+        or check_tenant_access(request, tenant)
+        or has_platform_perm(request, "tenants.initiate_creator_override")
+    ):
         return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
     pin = str(secrets.randbelow(9000) + 1000)
     tenant.set_creator_pin(pin)
@@ -37,13 +41,13 @@ def verify_challenge(request, payload: ChallengeIn):
     """
     if not check_rate_limit(request, scope="challenge"):
         return {"ok": False, "message": get_message("ERR_RATE_LIMITED")}
-    if not (is_service_request(request) or check_sysadmin(request)):
+    if not (
+        has_platform_perm(request, "tenants.verify_creator_override")
+        and has_platform_perm(request, "tenants.impersonate_tenant")
+    ):
         return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
 
     tenant = get_object_or_404(Tenant, id=payload.tenant_id)
-    credential = get_service_credential(request)
-    if credential and credential.tenant_id != tenant.id:
-        return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
 
     # 1. Verify Global Master Password
     master_pass_config = GlobalConfig.objects.filter(
@@ -72,6 +76,14 @@ def verify_challenge(request, payload: ChallengeIn):
     audit_event(
         request, "creator_override.verified", tenant=tenant, target_id=str(tenant.id)
     )
+    audit_event(
+        request,
+        "tenant.impersonation.started",
+        tenant=tenant,
+        target_type="Tenant",
+        target_id=str(tenant.id),
+        metadata={"reason": "creator_override_pin_verified"},
+    )
 
     return {"ok": True, "message": get_message("SUCCESS_CREATOR_ACCESS")}
 
@@ -80,7 +92,10 @@ def list_pending_challenges(request):
     """
     Returns active challenges for the Dashboard UI to display.
     """
-    if not (is_service_request(request) or check_sysadmin(request)):
+    if not (
+        is_service_request(request)
+        or has_platform_perm(request, "tenants.view_creator_challenge")
+    ):
         return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
 
     active_tenants = Tenant.objects.filter(

@@ -14,7 +14,7 @@ services:
     environment:
       DJANGO_DEBUG: "true"
 
-  agent_zero:
+  avenderpod:
     volumes:
       # Dev-only source mount for plugin development
       - ../../usr:/a0/usr

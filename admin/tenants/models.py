@@ -156,7 +156,94 @@ class Tenant(models.Model):
             ("deploy_tenant", "Can deploy tenant infrastructure"),
             ("rotate_tenant_secret", "Can rotate tenant secrets"),
             ("view_tenant_usage", "Can view tenant usage"),
+            ("initiate_creator_override", "Can initiate creator override"),
+            ("verify_creator_override", "Can verify creator override challenge"),
+            ("impersonate_tenant", "Can impersonate tenant"),
+            ("view_creator_challenge", "Can view creator override challenges"),
         )
+
+
+class PodDeployment(models.Model):
+    """Database-backed registry row for one deployed Avender Pod stack."""
+
+    LIFECYCLE_CHOICES = (
+        ("provisioning", "Provisioning"),
+        ("active", "Active"),
+        ("stopped", "Stopped"),
+        ("restarting", "Restarting"),
+        ("suspended", "Suspended"),
+        ("deleting", "Deleting"),
+        ("deleted", "Deleted"),
+        ("failed", "Failed"),
+        ("degraded", "Degraded"),
+        ("drifted", "Drifted"),
+        ("unknown", "Unknown"),
+    )
+    HEALTH_CHOICES = (
+        ("unknown", "Unknown"),
+        ("healthy", "Healthy"),
+        ("unhealthy", "Unhealthy"),
+        ("unreachable", "Unreachable"),
+        ("missing", "Missing"),
+        ("not_configured", "Not Configured"),
+    )
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey(
+        Tenant, on_delete=models.CASCADE, related_name="pod_deployments"
+    )
+    pod_name = models.CharField(max_length=128, db_index=True)
+    is_development = models.BooleanField(default=False)
+    deployment_backend = models.CharField(
+        max_length=16,
+        choices=(("docker", "Docker (Local)"), ("vultr", "Vultr (Cloud)")),
+        db_index=True,
+    )
+    provider_resource_id = models.CharField(max_length=128, blank=True, default="")
+    avender_container_id = models.CharField(max_length=128, blank=True, default="")
+    tenant_vault_container_id = models.CharField(max_length=128, blank=True, default="")
+    image_tag = models.CharField(max_length=255, blank=True, default="")
+    assigned_port = models.IntegerField(blank=True, null=True, db_index=True)
+    public_url = models.URLField(blank=True, default="")
+    private_url = models.URLField(blank=True, default="")
+    effective_plan_snapshot = models.JSONField(default=dict, blank=True)
+    effective_rate_limits = models.JSONField(default=dict, blank=True)
+    lifecycle_state = models.CharField(
+        max_length=24, choices=LIFECYCLE_CHOICES, default="provisioning", db_index=True
+    )
+    provider_health_state = models.CharField(
+        max_length=24, choices=HEALTH_CHOICES, default="unknown", db_index=True
+    )
+    tenant_vault_state = models.CharField(
+        max_length=24, choices=HEALTH_CHOICES, default="unknown", db_index=True
+    )
+    last_lifecycle_action = models.CharField(max_length=32, blank=True, default="")
+    last_lifecycle_action_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True
+    )
+    last_health_check_at = models.DateTimeField(blank=True, null=True)
+    last_error = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        permissions = (
+            ("deploy_poddeployment", "Can deploy pod deployment"),
+            ("stop_poddeployment", "Can stop pod deployment"),
+            ("restart_poddeployment", "Can restart pod deployment"),
+            ("suspend_poddeployment", "Can suspend pod deployment"),
+            ("reactivate_poddeployment", "Can reactivate pod deployment"),
+            ("reconcile_poddeployment", "Can reconcile pod deployments"),
+            ("view_pod_logs", "Can view pod logs"),
+            ("view_pod_health", "Can view pod health"),
+        )
+        indexes = [
+            models.Index(fields=["tenant", "lifecycle_state"]),
+            models.Index(fields=["deployment_backend", "provider_resource_id"]),
+        ]
+
+    def __str__(self):
+        return f"{self.pod_name} ({self.lifecycle_state})"
 
 
 class GlobalConfig(models.Model):

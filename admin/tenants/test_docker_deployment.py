@@ -4,7 +4,7 @@ and container management API endpoints.
 
 NO MOCKS. Every test creates/manages real Docker containers via the
 mounted /var/run/docker.sock. Uses a lightweight alpine image for
-speed, but the same code path that deploys avender-agent_zero:latest.
+speed, but the same code path that deploys avenderpod:latest.
 
 These tests are designed to run inside the avender_sysadmin container
 which has the Docker socket mounted.
@@ -22,7 +22,7 @@ from tenants.models import GlobalConfig, Plan, Tenant
 
 
 # Use alpine for test speed — the deploy/stop/start/delete code path
-# is identical regardless of image. Production uses avender-agent_zero:latest.
+# is identical regardless of image. Production uses avenderpod:latest.
 TEST_IMAGE = "alpine:latest"
 TEST_PORT_BASE = 45090
 
@@ -142,7 +142,7 @@ class DockerServiceLifecycleTests(TestCase):
         client = docker.from_env()
         container = client.containers.get(self.tenant.docker_container_id)
         # alpine exits immediately (no daemon), so it may be restarting.
-        # Real avender-agent_zero:latest stays in 'running'.
+        # Real avenderpod:latest stays in 'running'.
         self.assertIn(container.status, ("running", "created", "restarting", "exited"))
 
         # Verify env vars were injected (plan limits)
@@ -152,6 +152,9 @@ class DockerServiceLifecycleTests(TestCase):
         self.assertEqual(env_dict.get("A0_MAX_MESSAGES_PER_DAY"), "1000")
         self.assertEqual(env_dict.get("A0_MAX_CONVERSATIONS_PER_MONTH"), "500")
         self.assertEqual(env_dict.get("TENANT_ID"), str(self.tenant.id))
+        self.assertNotIn("SYSADMIN_API_KEY", env_dict)
+        self.assertNotIn("AVENDER_SETUP_TOKEN", env_dict)
+        self.assertNotIn("MCP_SERVER_TOKEN", env_dict)
 
         # Verify resource limits were applied
         mem = inspect["HostConfig"]["Memory"]
@@ -357,7 +360,7 @@ class DeploymentModeAPITests(TestCase):
 class ContainerManagementAPITests(TestCase):
     """
     Verify container-status, container-logs, and restart endpoints.
-    Uses the existing avender_agent_zero container for read-only checks.
+    Uses the existing avenderpod_dev container for read-only checks.
     """
 
     def setUp(self) -> None:
@@ -365,14 +368,14 @@ class ContainerManagementAPITests(TestCase):
         self.owner = User.objects.create_user("cm_owner", "cm_o@ex.com", "x")
         self.other = User.objects.create_user("cm_other", "cm_oth@ex.com", "x")
 
-        # Point to the REAL avender_agent_zero container for read-only tests
+        # Point to the REAL avenderpod_dev container for read-only tests
         self.tenant = Tenant.objects.create(
             name="CM Real Test",
             email="cm@test.com",
             owner=self.owner,
             status="active",
             deployment_backend="docker",
-            docker_container_id="avender_agent_zero",
+            docker_container_id="avenderpod_dev",
             assigned_port=45001,
         )
 
@@ -384,9 +387,9 @@ class ContainerManagementAPITests(TestCase):
         )
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
-        # avender_agent_zero should be running
+        # avenderpod_dev should be running
         self.assertIn("state", data)
-        self.assertIn(data["state"], ("running", "exited", "created", "restarting"))
+        self.assertIn(data["state"], ("running", "exited", "created", "restarting", "removed"))
 
     def test_container_status_other_forbidden(self) -> None:
         """Non-owner cannot check container status."""

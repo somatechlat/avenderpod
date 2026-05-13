@@ -1,8 +1,8 @@
 #!/bin/bash
 # ============================================================================
-# ¡A VENDER! — Agent Zero Runtime Patches
+# ¡A VENDER! — Avender Pod Runtime Patches
 # ============================================================================
-# Applies fixes to third-party packages inside the Agent Zero container.
+# Applies fixes to third-party packages inside the Avender Pod container.
 # These patches address upstream bugs that have not been fixed yet.
 # Mounted and executed via docker-compose.dev.yml.
 # ============================================================================

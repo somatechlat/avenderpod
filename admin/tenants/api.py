@@ -5,6 +5,7 @@ from .api_plans import router as plans_router
 from .api_system import router as system_router
 from .api_auth import router as auth_router
 from .api_tenants import router as tenants_router
+from .api_pods import router as pods_router
 
 router = Router(auth=SessionOrServiceAuth())
 
@@ -13,3 +14,4 @@ router.add_router("/", plans_router)
 router.add_router("/", system_router)
 router.add_router("/", auth_router)
 router.add_router("/", tenants_router)
+router.add_router("/", pods_router)

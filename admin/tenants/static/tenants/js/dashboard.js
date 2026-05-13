@@ -3,13 +3,19 @@ import { renderSidebar } from './sidebar-render.js';
 import { renderDashboard } from './dashboard-render.js';
 import { renderPlanWizard } from './plan-wizard-render.js';
 import { renderTenantWizard } from './tenant-wizard-render.js';
-import { LitElement, html, css } from 'https://cdn.jsdelivr.net/npm/lit@3.1.2/+esm';
+import { renderTenantRow } from './tenants-table-render.js';
+import { renderPodRow } from './pods-table-render.js';
+import { renderPlanRow } from './plans-table-render.js';
+import { renderVaultRow } from './vault-table-render.js';
+import { renderInteractionRow } from './interactions-table-render.js';
+import { LitElement, html, css } from '/static/tenants/vendor/lit-core-3.min.js';
 
         class MasterControlPlane extends LitElement {
             static get properties() {
                 return {
                     currentView: { type: String },
                     tenants: { type: Array },
+                    pods: { type: Array },
                     plans: { type: Array },
                     vaultRecords: { type: Array },
                     interactions: { type: Array },
@@ -38,6 +44,7 @@ import { LitElement, html, css } from 'https://cdn.jsdelivr.net/npm/lit@3.1.2/+e
                 super();
                 this.currentView = 'dashboard';
                 this.tenants = [];
+                this.pods = [];
                 this.plans = [];
                 this.vaultRecords = [];
                 this.interactions = [];
@@ -84,14 +91,16 @@ import { LitElement, html, css } from 'https://cdn.jsdelivr.net/npm/lit@3.1.2/+e
             async fetchAllData() {
                 this.loading = true;
                 try {
-                    const [resT, resP, resV, resI] = await Promise.all([
+                    const [resT, resPods, resP, resV, resI] = await Promise.all([
                         fetch('/api/saas/tenants', { credentials: 'same-origin' }),
+                        fetch('/api/saas/pods', { credentials: 'same-origin' }),
                         fetch('/api/saas/plans', { credentials: 'same-origin' }),
                         fetch('/api/saas/vault', { credentials: 'same-origin' }),
                         fetch('/api/saas/interactions', { credentials: 'same-origin' })
                     ]);
                     
                     if(resT.ok) this.tenants = await resT.json();
+                    if(resPods.ok) this.pods = await resPods.json();
                     if(resP.ok) this.plans = await resP.json();
                     if(resV.ok) this.vaultRecords = await resV.json();
                     if(resI.ok) this.interactions = await resI.json();
@@ -154,12 +163,68 @@ import { LitElement, html, css } from 'https://cdn.jsdelivr.net/npm/lit@3.1.2/+e
                 this.actionLoading = '';
             }
 
+            async podAction(podId, action, method = 'POST') {
+                this.actionLoading = `${podId}-${action}`;
+                try {
+                    const url = action ? `/api/saas/pods/${podId}/${action}` : `/api/saas/pods/${podId}`;
+                    const res = await fetch(url, {
+                        method,
+                        credentials: 'same-origin',
+                        headers: { 'X-CSRFToken': this.csrfToken }
+                    });
+                    const data = await res.json();
+                    if (!res.ok && data.message) {
+                        alert(data.message);
+                    }
+                    await this.fetchAllData();
+                } catch (e) {
+                    alert(`Error: ${e.message}`);
+                }
+                this.actionLoading = '';
+            }
+
+            async reconcilePods() {
+                this.actionLoading = 'pods-reconcile';
+                try {
+                    const res = await fetch('/api/saas/pods/reconcile', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: { 'X-CSRFToken': this.csrfToken }
+                    });
+                    const data = await res.json();
+                    if (!res.ok && data.message) {
+                        alert(data.message);
+                    }
+                    await this.fetchAllData();
+                } catch (e) {
+                    alert(`Error: ${e.message}`);
+                }
+                this.actionLoading = '';
+            }
+
             async viewLogs(tenantId, tenantName) {
                 this.logsTenantName = tenantName;
                 this.logsContent = 'Cargando...';
                 this.logsModal = true;
                 try {
                     const res = await fetch(`/api/saas/tenants/${tenantId}/container-logs?tail=200`, { credentials: 'same-origin' });
+                    if (res.ok) {
+                        const data = await res.json();
+                        this.logsContent = data.logs || 'Sin logs disponibles.';
+                    } else {
+                        this.logsContent = 'Error al obtener logs.';
+                    }
+                } catch (e) {
+                    this.logsContent = `Error: ${e.message}`;
+                }
+            }
+
+            async viewPodLogs(podId, podName) {
+                this.logsTenantName = podName;
+                this.logsContent = 'Cargando...';
+                this.logsModal = true;
+                try {
+                    const res = await fetch(`/api/saas/pods/${podId}/logs?tail=200`, { credentials: 'same-origin' });
                     if (res.ok) {
                         const data = await res.json();
                         this.logsContent = data.logs || 'Sin logs disponibles.';
@@ -314,10 +379,13 @@ import { LitElement, html, css } from 'https://cdn.jsdelivr.net/npm/lit@3.1.2/+e
             }
 
             // Renders...
-            ${renderSidebar.call(this)}
+            renderSidebar() {
+                return renderSidebar.call(this);
+            }
 
-            ${renderDashboard.call(this)}
-
+            renderDashboard() {
+                return renderDashboard.call(this);
+            }
             renderTable(title, cols, data, renderRow) {
                 return html`
                     <div class="animate-fade-in">
@@ -330,6 +398,10 @@ import { LitElement, html, css } from 'https://cdn.jsdelivr.net/npm/lit@3.1.2/+e
                             ` : title === 'SaaS Plans' ? html`
                                 <button @click=${() => this.openPlanWizard('create')} class="btn-primary px-6 py-2.5 rounded-full flex items-center gap-2 text-sm">
                                     Nuevo Plan
+                                </button>
+                            ` : title === 'Avender Pods' ? html`
+                                <button @click=${this.reconcilePods} class="btn-primary px-6 py-2.5 rounded-full flex items-center gap-2 text-sm" ?disabled=${this.actionLoading === 'pods-reconcile'}>
+                                    Reconciliar
                                 </button>
                             ` : ''}
                         </header>
@@ -385,94 +457,15 @@ import { LitElement, html, css } from 'https://cdn.jsdelivr.net/npm/lit@3.1.2/+e
 
                                 ${this.currentView === 'dashboard' ? this.renderDashboard() : ''}
                                 
-                                ${this.currentView === 'tenants' ? this.renderTable('Inquilinos (Tenants)', ['Empresa', 'Backend', 'Estado', 'Puerto', 'Infra ID', 'Acciones'], this.tenants, t => html`
-                                    <tr class="hover:bg-white/5 transition duration-200">
-                                        <td class="p-6 font-bold text-white flex items-center gap-4">
-                                            <div class="w-10 h-10 rounded-xl bg-gradient-brand flex items-center justify-center font-black text-white shadow-lg shadow-brand-pink/20">
-                                                ${t.name.charAt(0).toUpperCase()}
-                                            </div>
-                                            <div>
-                                                <span>${t.name}</span>
-                                                <p class="text-xs text-slate-500 font-normal">${t.email}</p>
-                                            </div>
-                                        </td>
-                                        <td class="p-6">
-                                            ${t.deployment_backend === 'docker' ? html`
-                                                <span class="px-2.5 py-1 text-[10px] font-bold rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">🐳 DOCKER</span>
-                                            ` : html`
-                                                <span class="px-2.5 py-1 text-[10px] font-bold rounded-lg bg-violet-500/10 text-violet-400 border border-violet-500/20">☁️ VULTR</span>
-                                            `}
-                                        </td>
-                                        <td class="p-6"><span class="px-3 py-1.5 text-xs font-bold rounded-full border ${t.status === 'active' ? 'bg-brand-cyan/10 text-brand-cyan border-brand-cyan/20' : t.status === 'suspended' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 'bg-brand-pink/10 text-brand-pink border-brand-pink/20'}">${t.status.toUpperCase()}</span></td>
-                                        <td class="p-6 font-mono text-slate-500">${t.assigned_port || '-'}</td>
-                                        <td class="p-6 font-mono text-[10px] text-slate-500 break-all w-32">${t.deployment_backend === 'docker' ? (t.docker_container_id ? t.docker_container_id.substring(0, 12) : '-') : (t.vultr_instance_id || '-')}</td>
-                                        <td class="p-6">
-                                            <div class="flex items-center gap-1.5">
-                                                ${t.status === 'active' ? html`
-                                                    <button @click=${() => this.tenantAction(t.id, 'suspend', t.name)} title="Detener" class="p-2 rounded-lg hover:bg-red-500/10 text-red-400 transition" ?disabled=${this.actionLoading === t.id + '-suspend'}>
-                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" stroke-width="2"/></svg>
-                                                    </button>
-                                                    <button @click=${() => this.tenantAction(t.id, 'restart', t.name)} title="Reiniciar" class="p-2 rounded-lg hover:bg-amber-500/10 text-amber-400 transition" ?disabled=${this.actionLoading === t.id + '-restart'}>
-                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                                                    </button>
-                                                ` : t.status === 'suspended' ? html`
-                                                    <button @click=${() => this.tenantAction(t.id, 'reactivate', t.name)} title="Iniciar" class="p-2 rounded-lg hover:bg-emerald-500/10 text-emerald-400 transition">
-                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21" stroke-width="2" stroke-linejoin="round"/></svg>
-                                                    </button>
-                                                ` : ''}
-                                                <button @click=${() => this.viewLogs(t.id, t.name)} title="Logs" class="p-2 rounded-lg hover:bg-brand-blue/10 text-brand-blue transition">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                `) : ''}
+                                ${this.currentView === 'tenants' ? this.renderTable('Inquilinos (Tenants)', ['Empresa', 'Backend', 'Estado', 'Puerto', 'Infra ID', 'Acciones'], this.tenants, t => renderTenantRow.call(this, t)) : ''}
+
+                                ${this.currentView === 'pods' ? this.renderTable('Avender Pods', ['Pod', 'Backend', 'Estado DB', 'Health', 'Vault', 'Rate Limits', 'Acciones'], this.pods, p => renderPodRow.call(this, p)) : ''}
                                 
-                                ${this.currentView === 'plans' ? this.renderTable('SaaS Plans', ['Plan', 'Precio', 'Limites', 'Features', 'Acciones'], this.plans, p => html`
-                                    <tr class="hover:bg-white/5 transition duration-200">
-                                        <td class="p-6">
-                                            <p class="font-bold text-white text-lg">${p.name} ${!p.is_active ? html`<span class="text-xs text-slate-500 ml-2">Inactivo</span>` : ''}</p>
-                                            <p class="text-xs text-slate-500 mt-1">${p.description || p.slug}</p>
-                                        </td>
-                                        <td class="p-6 text-brand-blue font-bold">${p.is_custom_priced ? 'A medida' : `$${p.price_monthly}/mes`}</td>
-                                        <td class="p-6 text-slate-400 text-sm">${p.max_conversations} conv. / ${p.max_messages_per_day} msg-dia / ${p.max_numbers} WA</td>
-                                        <td class="p-6 text-slate-400 text-sm">${[
-                                            p.allow_mobile_app ? 'App' : '',
-                                            p.allow_voice_messages ? 'Audios' : '',
-                                            p.allow_multichannel ? 'Multicanal' : '',
-                                            p.allow_integrations ? 'Integraciones' : '',
-                                            p.allow_call_handling ? 'Llamadas' : ''
-                                        ].filter(Boolean).join(', ') || 'Basico'}</td>
-                                        <td class="p-6">
-                                            <div class="flex gap-2">
-                                                <button @click=${() => this.openPlanWizard('edit', p)} title="Editar" class="p-2 rounded-lg hover:bg-brand-blue/10 text-brand-blue transition">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
-                                                </button>
-                                                <button @click=${() => this.deletePlan(p.id)} title="Eliminar" class="p-2 rounded-lg hover:bg-brand-pink/10 text-brand-pink transition">
-                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                `) : ''}
+                                ${this.currentView === 'plans' ? this.renderTable('SaaS Plans', ['Plan', 'Precio', 'Limites', 'Features', 'Acciones'], this.plans, p => renderPlanRow.call(this, p)) : ''}
 
-                                ${this.currentView === 'vault' ? this.renderTable('Vault Security Logs', ['Fecha', 'Tenant', 'Vault Path'], this.vaultRecords, v => html`
-                                    <tr class="hover:bg-white/5 transition duration-200">
-                                        <td class="p-6 text-xs font-mono text-slate-500">${new Date(v.created_at).toLocaleString()}</td>
-                                        <td class="p-6 font-bold text-white">${v.tenant_name}</td>
-                                        <td class="p-6 font-mono text-xs text-brand-cyan">${v.vault_path}</td>
-                                    </tr>
-                                `) : ''}
+                                ${this.currentView === 'vault' ? this.renderTable('Vault Security Logs', ['Fecha', 'Tenant', 'Vault Path'], this.vaultRecords, v => renderVaultRow.call(this, v)) : ''}
 
-                                ${this.currentView === 'interactions' ? this.renderTable('Agent Interactions', ['Fecha', 'Tenant', 'Arquetipo', 'Customer WA', 'Status'], this.interactions, i => html`
-                                    <tr class="hover:bg-white/5 transition duration-200">
-                                        <td class="p-6 text-xs font-mono text-slate-500">${new Date(i.created_at).toLocaleString()}</td>
-                                        <td class="p-6 font-bold text-white">${i.tenant_name}</td>
-                                        <td class="p-6 font-medium text-brand-pink">${i.archetype}</td>
-                                        <td class="p-6 font-mono text-xs text-slate-400">${i.customer_wa_id}</td>
-                                        <td class="p-6"><span class="px-3 py-1.5 text-xs font-bold rounded-full border bg-white/5 border-white/10 text-white">${i.status}</span></td>
-                                    </tr>
-                                `) : ''}
+                                ${this.currentView === 'interactions' ? this.renderTable('Agent Interactions', ['Fecha', 'Tenant', 'Arquetipo', 'Customer WA', 'Status'], this.interactions, i => renderInteractionRow.call(this, i)) : ''}
                             </div>
                         </main>
                         

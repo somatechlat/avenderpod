@@ -1,4 +1,4 @@
-import { html } from 'https://cdn.jsdelivr.net/npm/lit@3.1.2/+esm';
+import { html } from '/static/tenants/vendor/lit-core-3.min.js';
 export function renderDashboard() {
     return html`
                     <div class="animate-fade-in space-y-8">

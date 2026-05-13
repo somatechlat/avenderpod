@@ -11,8 +11,9 @@ from ninja.errors import HttpError
 from .models import Tenant, Plan, Subscription, TenantPlanHistory, CatalogItem, TenantConfig, TenantUsage, InteractionRecord
 from .schemas import TenantOut, TenantIn, CatalogItemOut, CatalogItemIn, ConfigIn, TenantUsageOut, TenantUsageIn, InteractionRecordOut, TenantStatusOut
 from .security import check_sysadmin, check_tenant_access, has_platform_perm, is_service_request, get_service_credential, audit_event
-from .deployment_router import deploy_tenant_pod, suspend_tenant_pod, reactivate_tenant_pod, get_container_status as _get_container_status, get_container_logs as _get_container_logs
-from .vault_service import provision_tenant_secrets, build_tenant_bootstrap_env
+from .deployment_router import deploy_tenant_pod, suspend_tenant_pod, reactivate_tenant_pod, delete_tenant_pod, get_container_status as _get_container_status, get_container_logs as _get_container_logs
+from .vault_service import provision_tenant_secrets, build_tenant_deployment_config
+from .plan_validation import validate_plan_payload
 from common.messages import get_message
 
 router = Router()
@@ -28,6 +29,26 @@ def create_tenant(request, payload: TenantIn):
         raise HttpError(400, get_message("ERR_PLAN_REQUIRED"))
     if not plan.is_active:
         raise HttpError(400, get_message("ERR_PLAN_INACTIVE"))
+
+    validate_plan_payload(
+        {
+            "a0_cpu_limit": plan.a0_cpu_limit,
+            "a0_cpu_reservation": plan.a0_cpu_reservation,
+            "a0_memory_limit": plan.a0_memory_limit,
+            "a0_memory_reservation": plan.a0_memory_reservation,
+            "a0_image": plan.a0_image,
+            "vultr_plan": plan.vultr_plan,
+            "max_conversations": plan.max_conversations,
+            "max_numbers": plan.max_numbers,
+            "max_messages_per_day": plan.max_messages_per_day,
+            "max_messages_per_minute": plan.max_messages_per_minute,
+            "max_catalog_items": plan.max_catalog_items,
+            "max_transcription_minutes": plan.max_transcription_minutes,
+            "max_storage_mb": plan.max_storage_mb,
+            "max_users": plan.max_users,
+            "max_agent_contexts": plan.max_agent_contexts,
+        }
+    )
 
     business_name = payload.business_name.strip()
     owner_email = payload.owner_email.strip().lower()
@@ -70,8 +91,12 @@ def create_tenant(request, payload: TenantIn):
                 assigned_port += 1
             tenant.assigned_port = assigned_port
             tenant.save(update_fields=["assigned_port"])
-        bootstrap_env = build_tenant_bootstrap_env(tenant, tenant_secrets, assigned_port)
-        deploy_tenant_pod(tenant, bootstrap_env=bootstrap_env)
+        deployment_config = build_tenant_deployment_config(tenant, assigned_port)
+        deploy_tenant_pod(
+            tenant,
+            bootstrap_env=deployment_config,
+            tenant_secrets=tenant_secrets,
+        )
     except (EnvironmentError, RuntimeError, ValueError) as e:
         tenant.status = "pending"
         tenant.save()
@@ -203,7 +228,13 @@ def get_tenant_status(request, tenant_id: str):
     last_heartbeat = None
     stt_available = False
 
-    if tenant.assigned_port and tenant.status in ("active", "suspended"):
+    if tenant.deployment_backend == "docker":
+        live = _get_container_status(tenant)
+        container_status = live.get("state", "unknown")
+        if live.get("running"):
+            last_heartbeat = timezone.now().isoformat()
+            stt_available = True
+    elif tenant.assigned_port and tenant.status in ("active", "suspended"):
         try:
             from .vultr_service import VULTR_API_BASE, _vultr_headers
             vultr_resp = requests.get(f"{VULTR_API_BASE}/instances/{tenant.vultr_instance_id}", headers=_vultr_headers(), timeout=10)
@@ -245,3 +276,41 @@ def container_logs(request, tenant_id: str, tail: int = 100):
     tenant = get_object_or_404(Tenant, id=tenant_id)
     logs = _get_container_logs(tenant, tail=min(tail, 500))
     return {"tenant_id": str(tenant.id), "logs": logs}
+
+
+@router.delete("/tenants/{tenant_id}")
+def delete_tenant(request, tenant_id: str):
+    """
+    Delete a tenant and clean up its infrastructure.
+    Soft-deletes the tenant record (status='deleted') and permanently
+    removes the associated Docker container / Vultr instance and volume.
+    """
+    if not has_platform_perm(request, "tenants.delete_tenant"):
+        return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
+    tenant = get_object_or_404(Tenant, id=tenant_id)
+
+    # Prevent deletion of tenants that are already deleted
+    if tenant.status == "deleted":
+        raise HttpError(400, get_message("ERR_TENANT_ALREADY_DELETED"))
+
+    try:
+        delete_tenant_pod(tenant)
+    except (EnvironmentError, RuntimeError, ValueError) as e:
+        # Log the error but still mark tenant deleted in DB
+        # so it doesn't appear in active lists
+        pass
+
+    tenant.status = "deleted"
+    tenant.docker_container_id = None
+    tenant.vultr_instance_id = ""
+    tenant.assigned_port = None
+    tenant.save(update_fields=["status", "docker_container_id", "vultr_instance_id", "assigned_port"])
+
+    audit_event(
+        request,
+        "tenant.deleted",
+        tenant=tenant,
+        target_type="Tenant",
+        target_id=str(tenant.id),
+    )
+    return {"ok": True, "message": get_message("SUCCESS_TENANT_DELETED", name=tenant.name)}

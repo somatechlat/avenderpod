@@ -41,7 +41,11 @@ class VultrServiceMockTests(TestCase):
             mock_resp.json.return_value = {"instance": {"id": "vultr-12345"}}
             
             with patch("tenants.vultr_service.requests.post", return_value=mock_resp) as mock_post:
-                bootstrap_env = {"AVENDER_SETUP_TOKEN": "secret-abc", "SYSADMIN_API_URL": "http://localhost"}
+                bootstrap_env = {
+                    "SYSADMIN_API_URL": "http://localhost",
+                    "TENANT_ID": str(self.tenant.id),
+                    "A0_MAX_MESSAGES_PER_DAY": "1000",
+                }
                 result = deploy_tenant_pod(self.tenant, bootstrap_env)
                 
                 self.assertEqual(result["instance"]["id"], "vultr-12345")
@@ -50,14 +54,15 @@ class VultrServiceMockTests(TestCase):
                 self.assertEqual(self.tenant.status, "active")
                 self.assertIsNotNone(self.tenant.assigned_port)
 
-                # Verify user_data contains encoded secrets
+                # Verify user_data contains deployment config but no secrets.
                 mock_post.assert_called_once()
                 payload = mock_post.call_args[1]["json"]
                 self.assertIn("user_data", payload)
                 
                 # Decode base64 user_data
                 user_data_decoded = base64.b64decode(payload["user_data"]).decode("utf-8")
-                self.assertIn("AVENDER_SETUP_TOKEN", user_data_decoded)
+                self.assertIn("A0_MAX_MESSAGES_PER_DAY", user_data_decoded)
+                self.assertNotIn("AVENDER_SETUP_TOKEN", user_data_decoded)
 
     def test_deploy_tenant_pod_vultr_error(self) -> None:
         with patch.dict(os.environ, {"VULTR_API_KEY": "fake-vultr-key", "VULTR_API_KEY_FILE": ""}):

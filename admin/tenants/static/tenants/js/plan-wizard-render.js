@@ -1,4 +1,4 @@
-import { html } from 'https://cdn.jsdelivr.net/npm/lit@3.1.2/+esm';
+import { html } from '/static/tenants/vendor/lit-core-3.min.js';
 export function renderPlanWizard() {
 return this.showPlanWizard ? html`
                             <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#090d14]/90 backdrop-blur-md">

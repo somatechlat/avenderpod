@@ -1,9 +1,9 @@
 # ============================================================================
-# ¡A VENDER! — Minimal Tenant Agent Zero Image
+# ¡A VENDER! — Minimal Tenant Avender Pod Image
 # ============================================================================
 # Stripped-down image for per-tenant Vultr VM deployment.
 # 
-# Differences from the full agent0ai/agent-zero-base image:
+# Differences from the full local dev image:
 #   • python:3.12-slim instead of kalilinux/kali-rolling
 #   • NO SearXNG, NO SSH daemon, NO tunnel API, NO cron
 #   • NO Playwright browsers (not needed for Avender WhatsApp sales)
@@ -11,7 +11,7 @@
 #   • Expected size: ~1.5-2GB vs ~4-6GB for the full image
 #
 # Build:
-#   docker build -f deployments/avender/Dockerfile.tenant -t agent0ai/agent-zero-tenant:latest .
+#   docker build -f deployments/avender/Dockerfile.tenant -t avenderpod:latest .
 # ============================================================================
 
 FROM python:3.12-slim
@@ -75,5 +75,5 @@ EXPOSE 80
 HEALTHCHECK --interval=15s --timeout=10s --start-period=90s --retries=12 \
     CMD curl -sf http://localhost:80 || exit 1
 
-# Run Agent Zero WebUI directly — no supervisord, no SSH, no SearXNG
+# Run Avender Pod WebUI directly — no supervisord, no SSH, no SearXNG
 CMD ["python", "run_ui.py"]

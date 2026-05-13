@@ -89,6 +89,7 @@ export class AvenderWizard extends LitElement {
                 // Merge saved data into formData (preserving defaults for missing keys)
                 for (const key of Object.keys(this.formData)) {
                     if (parsed[key] !== undefined && parsed[key] !== null) {
+                        if (key === 'adminPassword') continue;
                         // Don't restore binary data placeholders
                         if (key === 'catalogFile' && parsed[key]?.content === '[stored]') continue;
                         this.formData[key] = parsed[key];
@@ -137,10 +138,8 @@ export class AvenderWizard extends LitElement {
             { id: 'other', name: 'Otro Negocio', icon: '📦' }
         ];
         const params = new URLSearchParams(window.location.search);
-        this.setupToken = params.get('setup_token') || params.get('token') || localStorage.getItem('avender_setup_token') || '';
-        if (this.setupToken) {
-            localStorage.setItem('avender_setup_token', this.setupToken);
-        }
+        this.setupToken = params.get('setup_token') || params.get('token') || '';
+        localStorage.removeItem('avender_setup_token');
     }
 
     createRenderRoot() {

@@ -7,13 +7,8 @@
     <title>¡A VENDER! Master Control Plane</title>
     <meta name="csrf-token" content="{{ csrf_token }}">
     
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Space+Grotesk:wght@500;700;900&display=swap" rel="stylesheet">
-    
-    <!-- Tailwind CSS (Compiled) -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tailwind CSS (local runtime + compiled project CSS) -->
+    <script src="{% static 'tenants/vendor/tailwindcss-standalone.js' %}"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',

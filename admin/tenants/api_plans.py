@@ -5,6 +5,7 @@ from ninja.errors import HttpError
 from .models import Plan, Tenant
 from .schemas import PlanOut, PlanIn, PlanPatch
 from .security import check_sysadmin, audit_event, has_platform_perm
+from .plan_validation import validate_plan_payload
 from common.messages import get_message
 
 router = Router()
@@ -22,7 +23,9 @@ def create_plan(request, payload: PlanIn):
     if not check_sysadmin(request) and not has_platform_perm(request, "tenants.add_plan"):
         return HttpResponseForbidden(get_message("ERR_UNAUTHORIZED"))
     
-    plan = Plan.objects.create(**payload.dict())
+    data = payload.dict()
+    validate_plan_payload(data)
+    plan = Plan.objects.create(**data)
     audit_event(request, "plan.created", metadata={"plan_name": plan.name})
     return plan
 
@@ -34,6 +37,7 @@ def update_plan(request, plan_id: str, payload: PlanPatch):
     
     plan = get_object_or_404(Plan, id=plan_id)
     update_data = payload.dict(exclude_unset=True)
+    validate_plan_payload(update_data)
     for attr, value in update_data.items():
         setattr(plan, attr, value)
     plan.save()
